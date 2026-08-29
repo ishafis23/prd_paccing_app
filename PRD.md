@@ -7,6 +7,35 @@
 
 ---
 
+## Tentang Dokumen Ini
+
+**PRD (Product Requirement Document)** atau **Dokumen Persyaratan Produk** adalah dokumen panduan yang menjelaskan secara detail fungsi, fitur, perilaku, dan kriteria keberhasilan dari sistem yang akan dibangun.
+
+Dokumen ini menjembatani komunikasi antara **pemilik usaha (client)**, **tim desain**, dan **tim pengembang (developer)**, supaya semua pihak bekerja dari pemahaman yang sama tentang apa yang dibangun, untuk siapa, dan kenapa.
+
+**Fungsi dokumen ini:**
+
+- **Acuan pengembangan** — sumber kebenaran tunggal (*single source of truth*) tentang apa yang harus dibuat developer.
+- **Menyelaraskan visi** — client, desainer, dan developer punya pemahaman yang sama soal tujuan sistem.
+- **Mengurangi miskomunikasi** — meminimalkan asumsi liar saat proses coding/desain (lihat juga daftar asumsi terbuka di §12).
+- **Dasar pengujian** — jadi acuan skenario testing sebelum sistem dipakai sehari-hari.
+
+**Peta isi dokumen** (mengikuti komponen standar PRD, disesuaikan kebutuhan Paccing):
+
+| Komponen Standar PRD | Ada di Bagian |
+|---|---|
+| Tujuan & Latar Belakang | §1 Latar Belakang, §2 Tujuan Produk |
+| Target Pengguna (User Persona) | §3 Target Pengguna (Role) |
+| Fitur & Persyaratan Fungsional | §4 Ruang Lingkup Modul |
+| Alur Kerja Pengguna (User Flow) | §5 Alur Bisnis Utama |
+| Persyaratan Non-Fungsional | §6 Kebutuhan Non-Fungsional |
+| Desain & Wireframe | §7 Desain & Wireframe |
+| Matrik Keberhasilan (Success Metrics) | §8 Matrik Keberhasilan |
+
+Bagian tambahan di luar komponen standar, khusus untuk kebutuhan proyek ini: §9 Keputusan Teknologi, §10 Entitas Data, §11 Roadmap, §12 Asumsi Terbuka.
+
+---
+
 ## 1. Latar Belakang
 
 Paccing Official adalah usaha cleaning service dengan spesialisasi HVAC di area Makassar, Gowa, dan Maros, dengan lini layanan:
@@ -97,7 +126,33 @@ Saat ini operasional (data customer, jadwal teknisi, laporan pengerjaan, keuanga
 - **Backup data**: backup database berkala (harian).
 - **Skalabilitas ringan**: cukup untuk skala UKM (ratusan–ribuan customer), tidak perlu arsitektur high-traffic di awal.
 
-## 7. Keputusan Teknologi — PHP Native vs Laravel
+## 7. Desain & Wireframe
+
+Belum tersedia — dokumen ini masih tahap konsep/fungsional. Wireframe/mockup UI (mis. di Figma) sebaiknya dibuat **setelah** ruang lingkup fitur di §4 disepakati bersama client, supaya desain tidak bolak-balik berubah akibat perubahan requirement.
+
+Sebagai acuan awal untuk desainer, rencana halaman per modul sudah tercantum di masing-masing dokumen dev-plan:
+
+- [Halaman Modul Admin](dev-plan/admin/01-konsep-admin.md#4-halamanmenu)
+- [Halaman Modul Teknisi](dev-plan/teknisi/01-konsep-teknisi.md#4-halamanmenu)
+- [Halaman Modul Finance](dev-plan/finance/01-konsep-finance.md#4-halamanmenu)
+- [Halaman Modul HRD](dev-plan/hrd/01-konsep-hrd.md#4-halamanmenu)
+
+## 8. Matrik Keberhasilan (Success Metrics)
+
+Sistem ini untuk operasional internal (bukan aplikasi customer-facing), jadi indikator suksesnya diukur dari **efisiensi operasional & kualitas data**, bukan metrik akuisisi seperti conversion rate.
+
+| Indikator | Target Setelah Fase 1 Berjalan (~1–2 bulan) |
+|---|---|
+| Order tercatat di sistem, bukan lagi hanya di chat WA/catatan manual | 100% order baru masuk lewat sistem |
+| Waktu admin membuat 1 order baru | < 2 menit, dari cari/isi data customer sampai order tersimpan |
+| Kecepatan pencatatan pembayaran | Tercatat di sistem di hari yang sama dengan transaksi |
+| Customer aktif mendapat notice servis berikutnya | 100% otomatis via `service_reminders` setelah order selesai & lunas |
+| Laporan laba-rugi tersedia tanpa rekap manual Excel | Owner bisa cek pendapatan vs pengeluaran bulan berjalan kapan saja dari dashboard |
+| Adopsi teknisi terhadap sistem (laporan pengerjaan tidak lagi lewat WA ke admin) | 100% laporan pengerjaan masuk lewat sistem dalam 2 minggu setelah rilis |
+
+> Target di atas adalah usulan awal untuk didiskusikan — perlu disesuaikan dengan Owner setelah tahu kondisi/baseline operasional saat ini (lihat §12).
+
+## 9. Keputusan Teknologi — PHP Native vs Laravel
 
 **Rekomendasi: Laravel** (versi LTS terbaru saat development, mis. Laravel 11/12), dengan MySQL, Blade + Tailwind, dan panel admin via **Filament** atau **Livewire** untuk mempercepat pembangunan UI CRUD.
 
@@ -113,7 +168,7 @@ Saat ini operasional (data customer, jadwal teknisi, laporan pengerjaan, keuanga
 
 **Kapan native PHP masih masuk akal:** hanya jika hosting sangat terbatas (tidak bisa Composer/CLI sama sekali) atau sistem yang dibangun benar-benar sesederhana form + tabel tanpa role kompleks. Untuk kebutuhan One Gate System ini — 5 role berbeda, alur order-pembayaran-pengingat otomatis, laporan finance — kompleksitasnya sudah melewati titik di mana native PHP jadi lebih lambat dan lebih rawan bug/celah keamanan dibanding Laravel. **→ Laravel lebih tepat.**
 
-## 8. Entitas Data Utama (gambaran awal)
+## 10. Entitas Data Utama (gambaran awal)
 
 - `users` (role: owner, admin, finance, hr, teknisi)
 - `customers` (nama, kontak, alamat, area, status)
@@ -126,7 +181,7 @@ Saat ini operasional (data customer, jadwal teknisi, laporan pengerjaan, keuanga
 - `incomes` (sumber: jasa/material, nominal, tanggal, order_id)
 - `expenses` (kategori: material/perawatan/operasional, nominal, tanggal, keterangan)
 
-## 9. Roadmap / Fase Pengembangan
+## 11. Roadmap / Fase Pengembangan
 
 **Fase 1 — MVP (fokus operasional harian):**
 - Modul Admin: data customer, order, pembayaran, notice servis berikutnya
@@ -141,7 +196,7 @@ Saat ini operasional (data customer, jadwal teknisi, laporan pengerjaan, keuanga
 - Inventory/stok sederhana untuk unit AC & spare part (mendukung lini "Pengadaan AC")
 - Rating/feedback customer terhadap teknisi (mendukung capaian kerja)
 
-## 10. Asumsi & Hal yang Perlu Dikonfirmasi ke Client
+## 12. Asumsi & Hal yang Perlu Dikonfirmasi ke Client
 
 - Jumlah teknisi & admin aktif saat ini (untuk estimasi skala & desain role).
 - Apakah "Pengadaan AC" perlu manajemen stok/inventory sejak Fase 1, atau cukup dicatat sebagai transaksi di Finance dulu.
