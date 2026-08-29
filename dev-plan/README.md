@@ -5,14 +5,21 @@ Folder ini berisi dokumen perencanaan teknis (development plan) yang diturunkan 
 `PRD.md` menjelaskan **apa** yang dibangun dan **kenapa** (konsep, modul, keputusan tech stack).
 Folder ini menjelaskan **bagaimana & kapan** dibangun — breakdown tugas, urutan pengerjaan, dan detail teknis per tahap.
 
-## Struktur (akan diisi bertahap)
+## Struktur
 
-- `00-overview.md` — ringkasan fase & urutan pengerjaan (mengacu ke roadmap PRD §9)
-- `01-database-schema.md` — rancangan tabel & relasi detail (turunan dari entitas di PRD §8)
-- `02-module-checklist.md` — checklist task per modul (Admin, Teknisi, HR, Finance) per fase
-- `03-tech-setup.md` — langkah setup project Laravel, environment, dan konvensi kode
+```
+dev-plan/
+├── 00-overview.md              ← urutan pengerjaan & dependency lintas modul
+├── database-schema.md          ← skema tabel & relasi (satu sumber kebenaran, lintas modul)
+├── admin/01-konsep-admin.md    ← konsep, alur, checklist modul Admin
+├── teknisi/01-konsep-teknisi.md
+├── hrd/01-konsep-hrd.md
+└── finance/01-konsep-finance.md
+```
 
-Dokumen di atas akan ditambahkan menyusul seiring pembahasan detail teknis dengan client/tim dev.
+Konsep & fitur dipecah **per folder modul** (Admin, Teknisi, HRD, Finance) supaya bisa dibahas terpisah dengan client per bagian. Skema database tetap **satu file gabungan** karena tabel-tabelnya saling terhubung lintas modul (mis. `orders` disentuh Admin, Teknisi, dan Finance sekaligus) — alasannya dijelaskan di `00-overview.md`.
+
+`03-tech-setup.md` (langkah setup project Laravel, environment, konvensi kode) menyusul setelah keputusan hosting/server difinalkan bersama client.
 
 ## Referensi
 
