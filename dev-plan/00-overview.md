@@ -55,3 +55,26 @@ Lihat juga pertanyaan spesifik di tiap dokumen modul. Yang sifatnya lintas modul
 
 - Apakah satu order bisa berisi lebih dari satu jenis layanan/unit sekaligus (mis. cuci 3 AC beda PK dalam satu kunjungan)? Ini menentukan apakah `orders` perlu tabel detail (`order_items`) sejak Fase 1 atau bisa fase 2 (lihat catatan di `database-schema.md`).
 - Siapa saja yang akan jadi user aktif di Fase 1 — apakah role Finance & HRD dirangkap Owner/Admin dulu (sesuai asumsi PRD §3)?
+
+## Status Implementasi (6 September 2026)
+
+Keputusan atas semua pertanyaan terbuka (bisnis + teknis) sudah difinalkan —
+lihat [`02-keputusan-eksekusi.md`](02-keputusan-eksekusi.md). Setup teknis &
+konvensi kode tercatat di [`03-tech-setup.md`](03-tech-setup.md).
+
+**Selesai (engine Fase 1, teruji):**
+- Laravel 12 + Pest + spatie/permission + SQLite (dev/test) + seeder
+  (role, katalog layanan, akun demo owner/admin/teknisi1-2).
+- Migrasi & model 13 tabel Fase 1 sesuai `database-schema.md` (+ soft deletes,
+  index, enum string).
+- Service domain: `OrderService` (create/assign/cancel), `TeknisiService`
+  (berangkat/check-in/submit laporan → stok keluar), `PaymentService`
+  (DP/lunas → income + reminder otomatis), `StockService` (masuk/keluar/
+  penyesuaian), `FinanceService` (expense + laba rugi).
+- 56 test hijau (164 assertion) — cakupan: skema, relasi, role access,
+  alur order→pengerjaan→pembayaran→income→reminder end-to-end, stok minus,
+  larangan akses lintas role.
+
+**Belum dikerjakan (roadmap berikutnya):** UI backoffice Filament, UI
+teknisi mobile-first, HTTP layer (controller/route/FormRequest), deployment
+VPS+MySQL, tabel Fase 2 (employees, performance_reviews, development_plans).

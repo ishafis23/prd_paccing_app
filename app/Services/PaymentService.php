@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\IncomeCategory;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
+use App\Enums\ReminderStatus;
+use App\Enums\RoleName;
+use App\Enums\ServiceType;
+use App\Exceptions\BusinessRuleException;
+use App\Models\Income;
+use App\Models\Order;
+use App\Models\Payment;
+use App\Models\ServiceReminder;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+
+class PaymentService
+{
+    use RestrictsByRole;
+
+    /**
+     * Catat pembayaran order (Admin/Finance/Owner).
+     * - Total tagihan selalu mengikuti service_catalog (keputusan B6).
+     * - Income & reminder servis berikutnya dibuat OTOMATIS saat lunas
+     *   (keputusan B5, PRD alur B2).
+     *
+     * @throws BusinessRuleException|AuthorizationException
+     */
+    public function recordPayment(
+        Order $order,
+        PaymentMethod $metode,
+        float $jumlahDibayar,
+        User $by,
+        ?string $tanggalBayar = null
+    ): Payment {
+        $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
+
+        if ($jumlahDibayar <= 0) {
+            throw new BusinessRuleException('Jumlah bayar harus lebih dari 0.');
+        }
+
+        $payment = $order->payments()->first();
+
+        if ($payment && $payment->status === PaymentStatus::Lunas) {
+            throw new BusinessRuleException('Order ini sudah berstatus lunas.');
+        }
+
+        $total = $order->total();
+        $baruDibayar = ($payment?->jumlah_dibayar ?? 0) + $jumlahDibayar;
+
+        $payment ??= new Payment(['order_id' => $order->id]);
+        $payment->metode = $metode;
+        $payment->total_tagihan = $total;
+        $payment->jumlah_dibayar = $baruDibayar;
+        $payment->dicatat_oleh = $by->id;
+
+        if ($baruDibayar >= $total - 0.009) {
+            $payment->status = PaymentStatus::Lunas;
+            $payment->tanggal_bayar = $tanggalBayar ?? now()->toDateString();
+        } else {
+            $payment->status = PaymentStatus::Dp;
+        }
+
+        $payment->save();
+
+        if ($payment->status === PaymentStatus::Lunas) {
+            $this->finalizeLunas($order, $payment);
+        }
+
+        return $payment->fresh();
+    }
+
+    /**
+     * Saat lunas: catat income + buat service_reminder (idempotent),
+     * dan kunci order menjadi `selesai`.
+     */
+    private function finalizeLunas(Order $order, Payment $payment): void
+    {
+        $this->catatIncome($order, $payment);
+
+        if (! in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
+            $order->status = OrderStatus::Selesai;
+            $order->save();
+        }
+
+        $this->buatReminder($order, $payment);
+    }
+
+    private function catatIncome(Order $order, Payment $payment): void
+    {
+        $jenisLayanan = $order->serviceCatalog?->jenis_layanan;
+        $kategori = in_array($jenisLayanan, [ServiceType::CuciAc, ServiceType::ServiceAc], true)
+            ? IncomeCategory::Jasa
+            : IncomeCategory::Material;
+
+        $exists = Income::where('order_id', $order->id)->where('kategori', $kategori->value)->exists();
+
+        if (! $exists) {
+            Income::create([
+                'order_id' => $order->id,
+                'kategori' => $kategori,
+                'nominal' => $payment->total_tagihan,
+                'tanggal' => $payment->tanggal_bayar ?? now()->toDateString(),
+                'keterangan' => 'Otomatis dari pembayaran lunas order #' . $order->id,
+            ]);
+        }
+    }
+
+    private function buatReminder(Order $order, Payment $payment): void
+    {
+        $interval = $order->serviceCatalog?->interval_bulan;
+
+        if (! $interval) {
+            return; // layanan tanpa servis berkala (service/pengadaan).
+        }
+
+        $already = ServiceReminder::where('order_id', $order->id)->exists();
+
+        if ($already) {
+            return;
+        }
+
+        $tanggalBayar = CarbonImmutable::parse($payment->tanggal_bayar ?? now());
+
+        ServiceReminder::create([
+            'customer_id' => $order->customer_id,
+            'order_id' => $order->id,
+            'interval_bulan' => $interval,
+            'tanggal_servis_berikutnya' => $tanggalBayar->addMonthsNoOverflow($interval)->toDateString(),
+            'status_notice' => ReminderStatus::BelumJatuhTempo,
+        ]);
+    }
+
+    /**
+     * Admin menandai reminder sudah dihubungi (notice dashboard, Fase 1).
+     */
+    public function tandaiSudahDihubungi(ServiceReminder $reminder, User $by): ServiceReminder
+    {
+        $this->assertRole($by, [RoleName::Admin, RoleName::Owner]);
+
+        if ($reminder->status_notice !== ReminderStatus::Selesai) {
+            $reminder->status_notice = ReminderStatus::SudahDihubungi;
+            $reminder->save();
+        }
+
+        return $reminder->fresh();
+    }
+}

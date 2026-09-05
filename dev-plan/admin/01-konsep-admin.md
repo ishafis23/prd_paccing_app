@@ -14,6 +14,7 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 4. **Riwayat Pengerjaan** — daftar semua order per customer, termasuk laporan teknisi yang sudah masuk.
 5. **Notice Servis Berikutnya** — daftar customer yang jatuh tempo servis (dari `service_reminders`), dengan aksi "tandai sudah dihubungi".
 6. **Pembayaran** — catat metode, status (belum bayar/DP/lunas), jumlah dibayar per order.
+7. **Stok Barang/Perlengkapan** — master barang (sparepart, consumable, unit AC), catat stok masuk (pembelian), lihat kartu stok (`stock_movements`), alert stok menipis. Stok berkurang otomatis saat Teknisi submit laporan pengerjaan yang memakai material (lihat [konsep Teknisi](../teknisi/01-konsep-teknisi.md)).
 
 ## 3. Alur Pengguna
 
@@ -32,6 +33,12 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 2. Admin hubungi customer manual (Fase 1) → tandai status notice `sudah_dihubungi`.
 3. (Fase 2) sistem kirim WA otomatis, admin tinggal follow-up jika ada respon.
 
+**D. Stok barang:**
+1. Admin tambah `stock_items` baru (nama, kategori, satuan, stok minimum) saat ada jenis barang baru.
+2. Saat beli barang (restock), admin input **stok masuk**: pilih item, jumlah, tanggal → tercatat `stock_movements` jenis `masuk`, `stok_saat_ini` bertambah. Kalau ini pembelian nyata, admin juga catat manual di modul Finance sebagai `expenses` kategori `material`.
+3. Saat Teknisi submit laporan pengerjaan dengan material terpakai, sistem otomatis buat `stock_movements` jenis `keluar` dan mengurangi `stok_saat_ini` — admin tidak perlu input manual untuk ini.
+4. Dashboard/menu Stok menampilkan item dengan `stok_saat_ini <= stok_minimum` sebagai alert untuk segera direstock.
+
 ## 4. Halaman/Menu
 
 - Dashboard (ringkasan: order hari ini, notice jatuh tempo, order belum dibayar)
@@ -39,6 +46,7 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 - Order (list dengan filter status, form buat/edit, detail order + riwayat pembayaran & laporan)
 - Notice Servis Berikutnya (list + aksi tandai kontak)
 - Pembayaran (list transaksi, form catat pembayaran dari halaman detail order)
+- Stok Barang (list master `stock_items` + indikator stok menipis, form tambah item, form stok masuk, riwayat kartu stok per item)
 
 ## 5. Tabel Terkait
 
@@ -50,6 +58,8 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 | `payments` | create/update |
 | `service_reminders` | read + update status_notice |
 | `work_reports` | read only (input dari Teknisi) |
+| `stock_items` | full CRUD |
+| `stock_movements` | create (stok masuk), read (kartu stok) — jenis `keluar` dibuat otomatis dari Teknisi |
 
 ## 6. Checklist Pengembangan
 
@@ -60,14 +70,19 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 - [ ] Form catat pembayaran + auto-update status order & trigger income
 - [ ] Auto-generate `service_reminders` saat order selesai+lunas
 - [ ] Dashboard notice servis jatuh tempo
+- [ ] CRUD master `stock_items` + form stok masuk (create `stock_movements` jenis `masuk`)
+- [ ] List kartu stok per item + alert item dengan `stok_saat_ini <= stok_minimum`
 
 **Fase 2:**
 - [ ] Kirim notifikasi WA otomatis ke customer (reminder & konfirmasi jadwal)
 - [ ] Multi-item order (`order_items`) jika satu kunjungan bisa banyak jenis layanan
 - [ ] Manajemen master `service_catalog` dari UI (bukan seed manual)
+- [ ] Auto-create `expenses` saat stok masuk dicatat (sekarang masih dua langkah manual: input stok masuk + input expense terpisah)
 
 ## 7. Pertanyaan Terbuka
 
 - Apakah harga bisa berbeda per customer (nego) atau selalu ikut `service_catalog`?
 - Siapa yang menentukan interval reminder per jenis layanan — default global atau bisa per order?
 - Apakah admin perlu melihat lokasi/jarak teknisi vs customer saat assign (untuk efisiensi rute), atau assign manual berdasarkan pengalaman saja di Fase 1?
+- Siapa yang berwenang input stok masuk — admin saja, atau perlu role/akses "gudang" terpisah kalau tim membesar?
+- Kalau `stok_saat_ini` sampai minus (dipakai teknisi melebihi stok tercatat), apakah laporan tetap boleh disubmit (stok jadi utang/perlu direstock segera) atau harus diblokir sistem?

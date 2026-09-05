@@ -16,6 +16,9 @@ erDiagram
     ORDERS ||--o{ INCOMES : mencatat
     EMPLOYEES ||--o{ PERFORMANCE_REVIEWS : dievaluasi
     SERVICE_CATALOG ||--o{ ORDERS : "dipilih sebagai"
+    WORK_REPORTS ||--o{ WORK_REPORT_MATERIALS : memakai
+    STOCK_ITEMS ||--o{ WORK_REPORT_MATERIALS : "dipakai sebagai"
+    STOCK_ITEMS ||--o{ STOCK_MOVEMENTS : mencatat
 ```
 
 ## Tabel Fase 1 (MVP)
@@ -73,7 +76,7 @@ Inti dari alur transaksi.
 | alamat_pengerjaan | text | default dari alamat customer, bisa diubah |
 | tanggal_jadwal | date | |
 | jam_jadwal | time, nullable | |
-| status | enum: baru, terjadwal, dikerjakan, selesai, batal | |
+| status | enum: baru, terjadwal, menuju_lokasi, dikerjakan, selesai, butuh_followup, batal | `menuju_lokasi` diset teknisi lewat slider "mulai berangkat" sebelum check-in, lihat [konsep Teknisi](teknisi/01-konsep-teknisi.md) |
 | catatan_admin | text, nullable | |
 | created_by | FK → users | |
 | timestamps | | |
@@ -89,11 +92,53 @@ Diisi teknisi setelah selesai kerja.
 | order_id | FK → orders | |
 | teknisi_id | FK → users | |
 | catatan_pengerjaan | text | |
-| material_terpakai | text, nullable | Fase 2: relasi ke tabel stok material |
 | foto_sebelum | string (path), nullable | |
 | foto_sesudah | string (path), nullable | |
 | waktu_mulai | datetime | |
 | waktu_selesai | datetime, nullable | |
+| timestamps | | |
+
+> Material terpakai **tidak lagi free-text** — dipilih dari `stock_items` lewat tabel relasi `work_report_materials`, supaya stok otomatis berkurang saat laporan disubmit.
+
+### `work_report_materials`
+Rincian material dari `stock_items` yang dipakai per laporan pengerjaan. Submit laporan → setiap baris di sini otomatis membuat satu `stock_movements` jenis `keluar`.
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | bigint PK | |
+| work_report_id | FK → work_reports | |
+| stock_item_id | FK → stock_items | |
+| jumlah | integer | |
+| timestamps | | |
+
+### `stock_items`
+Master barang/perlengkapan AC (sparepart, consumable, unit AC untuk pengadaan).
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | bigint PK | |
+| nama_barang | string | mis. "Freon R32", "Kapasitor 25uF", "AC Split 1PK" |
+| kategori | enum: sparepart, consumable, unit_ac | |
+| satuan | string | mis. "pcs", "kg", "unit" |
+| stok_saat_ini | integer | dihitung/disinkronkan dari total `stock_movements` |
+| stok_minimum | integer, default 0 | untuk alert stok menipis |
+| harga_beli | decimal, nullable | acuan saat catat pengeluaran pembelian stok |
+| aktif | boolean | |
+| timestamps | | |
+
+### `stock_movements`
+Kartu stok — setiap barang masuk (pembelian) atau keluar (dipakai teknisi/penyesuaian).
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | bigint PK | |
+| stock_item_id | FK → stock_items | |
+| jenis | enum: masuk, keluar, penyesuaian | |
+| jumlah | integer | |
+| referensi | string, nullable | mis. "work_report:12" atau "pembelian manual" |
+| keterangan | text, nullable | |
+| dicatat_oleh | FK → users | |
+| tanggal | date | |
 | timestamps | | |
 
 ### `attendances`
@@ -206,5 +251,7 @@ Rencana pengembangan usaha (Finance §PRD 4.4).
 ## Catatan Implementasi
 
 - Semua tabel pakai `timestamps` (created_at, updated_at) standar Laravel + `softDeletes` untuk `customers`, `orders`, dan `payments` (data transaksi tidak boleh hilang permanen kalau terhapus tidak sengaja).
+- `stock_items.stok_saat_ini` sebaiknya kolom cache (bukan dihitung live dari `SUM(stock_movements)` tiap request) yang di-update lewat event/observer tiap `stock_movements` baru dibuat — lebih murah untuk halaman list & alert stok menipis.
+- Pembelian stok (jenis `masuk` di `stock_movements`) yang perlu tercatat sebagai pengeluaran → buat entri manual di `expenses` kategori `material` juga (belum otomatis di Fase 1, lihat pertanyaan terbuka di dev-plan Admin).
 - Enum di atas adalah rancangan konsep — di migration Laravel bisa berupa kolom `string` + validasi, atau `enum` DB-level, tergantung preferensi maintenance.
 - Foreign key `teknisi_id` di `orders` dan `user_id` di `attendances`/`employees` semuanya menunjuk ke tabel `users` yang sama (bukan tabel teknisi terpisah), karena teknisi = user dengan role `teknisi`.

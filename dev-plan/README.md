@@ -10,6 +10,8 @@ Folder ini menjelaskan **bagaimana & kapan** dibangun — breakdown tugas, uruta
 ```
 dev-plan/
 ├── 00-overview.md              ← urutan pengerjaan & dependency lintas modul
+├── 02-keputusan-eksekusi.md    ← jawaban final semua pertanyaan terbuka (acuan implementasi)
+├── 03-tech-setup.md            ← langkah setup Laravel, environment, konvensi kode
 ├── database-schema.md          ← skema tabel & relasi (satu sumber kebenaran, lintas modul)
 ├── admin/01-konsep-admin.md    ← konsep, alur, checklist modul Admin
 ├── teknisi/01-konsep-teknisi.md
