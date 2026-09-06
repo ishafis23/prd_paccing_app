@@ -39,6 +39,9 @@ class User extends Authenticatable implements FilamentUser
         'phone',
         'password',
         'status',
+        'last_latitude',
+        'last_longitude',
+        'last_location_at',
     ];
 
     protected $hidden = [
@@ -52,6 +55,9 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
+            'last_latitude' => 'decimal:7',
+            'last_longitude' => 'decimal:7',
+            'last_location_at' => 'datetime',
         ];
     }
 

@@ -89,6 +89,33 @@
         </div>
     </div>
 
+    {{-- Ping GPS latar belakang (B-lacak-lokasi): aktif hanya selagi menuju
+         lokasi/mengerjakan order ini. wire:key berganti tiap status supaya
+         Alpine bikin ulang timer & bersih-bersih interval lama lewat destroy(). --}}
+    @if (in_array($order->status, [$orderStatus::MenujuLokasi, $orderStatus::Dikerjakan]))
+        <div
+            wire:key="lokasi-tracker-{{ $order->status->value }}"
+            x-data="{
+                timer: null,
+                init() {
+                    this.kirim();
+                    this.timer = setInterval(() => this.kirim(), 30000);
+                },
+                destroy() {
+                    if (this.timer) clearInterval(this.timer);
+                },
+                kirim() {
+                    if (! navigator.geolocation) return;
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => $wire.updateLokasi(pos.coords.latitude, pos.coords.longitude),
+                        () => {},
+                        { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 }
+                    );
+                },
+            }"
+        ></div>
+    @endif
+
     @if ($order->status === $orderStatus::Terjadwal)
         <x-teknisi-slider
             hint="Geser untuk mulai berangkat ke lokasi customer."

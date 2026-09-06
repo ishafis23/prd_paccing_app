@@ -2,6 +2,7 @@
 
 use App\Enums\AttendanceStatus;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
@@ -65,6 +66,33 @@ it('berangkat hanya valid dari status terjadwal', function () {
     $this->teknisiService->berangkat($order, $teknisi);
 })->throws(BusinessRuleException::class);
 
+it('update lokasi menyimpan posisi GPS terakhir teknisi selagi menuju_lokasi', function () {
+    $teknisi = teknisiUser();
+    $order = orderUntuk($teknisi, OrderStatus::MenujuLokasi);
+
+    $this->teknisiService->updateLokasi($order, $teknisi, -5.147665, 119.432732);
+
+    $fresh = $teknisi->fresh();
+    expect((float) $fresh->last_latitude)->toBe(-5.147665)
+        ->and((float) $fresh->last_longitude)->toBe(119.432732)
+        ->and($fresh->last_location_at)->not->toBeNull();
+});
+
+it('update lokasi ditolak kalau order belum menuju_lokasi/dikerjakan', function () {
+    $teknisi = teknisiUser();
+    $order = orderUntuk($teknisi, OrderStatus::Terjadwal);
+
+    $this->teknisiService->updateLokasi($order, $teknisi, -5.147665, 119.432732);
+})->throws(BusinessRuleException::class);
+
+it('update lokasi ditolak untuk teknisi yang bukan anggota order', function () {
+    $teknisiA = teknisiUser();
+    $teknisiB = teknisiUser();
+    $order = orderUntuk($teknisiB, OrderStatus::MenujuLokasi);
+
+    $this->teknisiService->updateLokasi($order, $teknisiA, -5.147665, 119.432732);
+})->throws(AuthorizationException::class);
+
 it('check-in membuat attendance dan mengubah status jadi dikerjakan', function () {
     $teknisi = teknisiUser();
     $order = orderUntuk($teknisi, OrderStatus::MenujuLokasi);
@@ -117,7 +145,7 @@ it('submit laporan -> work report, stok keluar, status selesai, check-out', func
 
     $movement = StockMovement::where('stock_item_id', $freon->id)->first();
     expect($movement)->not->toBeNull()
-        ->and($movement->referensi)->toBe('work_report:' . $report->id);
+        ->and($movement->referensi)->toBe('work_report:'.$report->id);
 
     expect($order->fresh()->status)->toBe(OrderStatus::Selesai);
 
@@ -178,7 +206,7 @@ it('end-to-end: order -> berangkat -> check-in -> laporan -> lunas -> income & r
 
     expect($order->fresh()->status)->toBe(OrderStatus::Selesai);
 
-    $this->paymentService->recordPayment($order->fresh(), \App\Enums\PaymentMethod::Cash, $order->total(), $admin);
+    $this->paymentService->recordPayment($order->fresh(), PaymentMethod::Cash, $order->total(), $admin);
 
     expect(Income::where('order_id', $order->id)->count())->toBe(1)
         ->and(ServiceReminder::where('order_id', $order->id)->count())->toBe(1)

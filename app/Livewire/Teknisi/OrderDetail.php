@@ -77,6 +77,24 @@ class OrderDetail extends Component
         }
     }
 
+    /**
+     * Ping GPS berkala dari browser teknisi (lihat order-detail.blade.php).
+     * Gagal diam-diam kalau order sudah berpindah status — ini cuma ping
+     * latar belakang, bukan aksi yang perlu ditampilkan ke teknisi.
+     */
+    public function updateLokasi(float $lat, float $lng): void
+    {
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+            return;
+        }
+
+        try {
+            app(TeknisiService::class)->updateLokasi($this->order, auth()->user(), $lat, $lng);
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            // diam-diam diabaikan.
+        }
+    }
+
     public function checkIn(): void
     {
         try {

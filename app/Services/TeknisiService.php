@@ -21,9 +21,7 @@ class TeknisiService
 {
     use RestrictsByRole;
 
-    public function __construct(private readonly StockService $stockService)
-    {
-    }
+    public function __construct(private readonly StockService $stockService) {}
 
     /**
      * Slider "mulai berangkat ke lokasi" (gaya ojek online).
@@ -42,6 +40,26 @@ class TeknisiService
         $order->save();
 
         return $order->fresh();
+    }
+
+    /**
+     * Simpan posisi GPS terakhir teknisi (dipanggil berkala dari HP selagi
+     * order menuju_lokasi/dikerjakan) agar admin tahu posisinya saat ini.
+     */
+    public function updateLokasi(Order $order, User $teknisi, float $lat, float $lng): void
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (! in_array($order->status, [OrderStatus::MenujuLokasi, OrderStatus::Dikerjakan], true)) {
+            throw new BusinessRuleException('Lacak lokasi hanya aktif saat menuju lokasi atau mengerjakan order.');
+        }
+
+        $teknisi->update([
+            'last_latitude' => $lat,
+            'last_longitude' => $lng,
+            'last_location_at' => now(),
+        ]);
     }
 
     /**
@@ -196,8 +214,8 @@ class TeknisiService
                 $item,
                 $jumlah,
                 $teknisi,
-                'work_report:' . $report->id,
-                'Material laporan order #' . $report->order_id
+                'work_report:'.$report->id,
+                'Material laporan order #'.$report->order_id
             );
         }
     }
