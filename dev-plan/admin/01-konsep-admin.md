@@ -15,6 +15,7 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 5. **Notice Servis Berikutnya** — daftar customer yang jatuh tempo servis (dari `service_reminders`), dengan aksi "tandai sudah dihubungi".
 6. **Pembayaran** — catat metode, status (belum bayar/DP/lunas), jumlah dibayar per order.
 7. **Stok Barang/Perlengkapan** — master barang (sparepart, consumable, unit AC), catat stok masuk (pembelian), lihat kartu stok (`stock_movements`), alert stok menipis. Stok berkurang otomatis saat Teknisi submit laporan pengerjaan yang memakai material (lihat [konsep Teknisi](../teknisi/01-konsep-teknisi.md)).
+8. **Kelola Akun Pengguna** — (B20, 7 Sep 2026) daftar & buat akun (nama, email, HP, password, role), ubah role, aktif/nonaktif, reset password. Owner & Admin saja; tanpa hapus akun & tanpa data karyawan HRD (Fase 2).
 
 ## 3. Alur Pengguna
 
@@ -64,6 +65,7 @@ Modul Admin adalah **pusat kendali harian**: satu-satunya titik masuk data custo
 ## 6. Checklist Pengembangan
 
 **Fase 1 (MVP):**
+- [x] Kelola akun pengguna (B20): buat akun, role, aktif/nonaktif, reset password (7 Sep 2026)
 - [ ] CRUD Data Customer + filter area/status
 - [ ] CRUD Order + pilih dari `service_catalog` + assign teknisi
 - [ ] Halaman detail order (info order, laporan teknisi, riwayat pembayaran)

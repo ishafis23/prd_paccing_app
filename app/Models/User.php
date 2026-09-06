@@ -4,15 +4,34 @@ namespace App\Models;
 
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, HasRoles, Notifiable;
+
+    /** Role backoffice yang boleh masuk panel Filament (bukan Teknisi — mereka pakai UI mobile terpisah). */
+    private const PANEL_ROLES = [
+        RoleName::Owner,
+        RoleName::Admin,
+        RoleName::Finance,
+        RoleName::Hr,
+    ];
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if ($this->status !== UserStatus::Aktif) {
+            return false; // B20: user nonaktif tidak bisa masuk panel.
+        }
+
+        return $this->hasAnyRole(array_map(fn (RoleName $r) => $r->value, self::PANEL_ROLES));
+    }
 
     protected $fillable = [
         'name',

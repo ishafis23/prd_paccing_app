@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\AttendanceStatus;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
@@ -13,6 +15,7 @@ use App\Models\User;
 use App\Models\WorkReport;
 use App\Models\WorkReportMaterial;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 
 class TeknisiService
 {
@@ -28,7 +31,7 @@ class TeknisiService
      */
     public function berangkat(Order $order, User $teknisi): Order
     {
-        $this->pastikanPemilik($order, $teknisi);
+        $this->pastikanAnggota($order, $teknisi);
         $this->assertRole($teknisi, [RoleName::Teknisi]);
 
         if ($order->status !== OrderStatus::Terjadwal) {
@@ -47,7 +50,7 @@ class TeknisiService
      */
     public function checkIn(Order $order, User $teknisi, ?string $lokasi = null): Attendance
     {
-        $this->pastikanPemilik($order, $teknisi);
+        $this->pastikanAnggota($order, $teknisi);
         $this->assertRole($teknisi, [RoleName::Teknisi]);
 
         if ($order->status !== OrderStatus::MenujuLokasi) {
@@ -79,7 +82,7 @@ class TeknisiService
      */
     public function submitLaporan(Order $order, User $teknisi, array $payload): WorkReport
     {
-        $this->pastikanPemilik($order, $teknisi);
+        $this->pastikanAnggota($order, $teknisi);
         $this->assertRole($teknisi, [RoleName::Teknisi]);
 
         if (! in_array($order->status, [OrderStatus::Dikerjakan, OrderStatus::ButuhFollowup], true)) {
@@ -91,45 +94,96 @@ class TeknisiService
             throw new BusinessRuleException('Catatan pengerjaan wajib diisi.');
         }
 
-        $attendance = $order->attendances()
-            ->where('user_id', $teknisi->id)
-            ->whereNull('jam_keluar')
-            ->latest('id')
-            ->first();
+        // Validasi material SELURUHNYA dulu (sebelum ada satu pun tulisan)
+        // supaya tidak ada paruh-tulis saat baris belakangan invalid.
+        $materials = $this->validasiMaterial($payload['materials'] ?? []);
 
-        $waktuMulai = $attendance?->jam_masuk ?? now();
+        // B25 (lapis kedua): kalau penyimpanan sudah penuh dan laporan
+        // membawa foto, tolak sejak awal.
+        $bawaFoto = filled($payload['foto_sebelum'] ?? null) || filled($payload['foto_sesudah'] ?? null);
+        if ($bawaFoto) {
+            $quota = app(StorageQuotaService::class);
+            if ($quota->pakaiBytes(segar: true) >= $quota->kuotaBytes()) {
+                throw new BusinessRuleException('Penyimpanan foto penuh — foto tidak bisa dilampirkan. Hubungi admin untuk menaikkan kuota.');
+            }
+        }
 
-        $report = WorkReport::create([
-            'order_id' => $order->id,
-            'teknisi_id' => $teknisi->id,
-            'catatan_pengerjaan' => $catatan,
-            'foto_sebelum' => $payload['foto_sebelum'] ?? null,
-            'foto_sesudah' => $payload['foto_sesudah'] ?? null,
-            'waktu_mulai' => $waktuMulai,
-            'waktu_selesai' => now(),
-        ]);
+        return DB::transaction(function () use ($order, $teknisi, $payload, $catatan, $materials): WorkReport {
+            $attendance = $order->attendances()
+                ->where('user_id', $teknisi->id)
+                ->whereNull('jam_keluar')
+                ->latest('id')
+                ->first();
 
-        $this->catatMaterial($report, $teknisi, $payload['materials'] ?? []);
+            $waktuMulai = $attendance?->jam_masuk ?? now();
 
-        $order->status = ! empty($payload['butuh_followup'])
-            ? OrderStatus::ButuhFollowup
-            : OrderStatus::Selesai;
-        $order->save();
+            $report = WorkReport::create([
+                'order_id' => $order->id,
+                'teknisi_id' => $teknisi->id,
+                'catatan_pengerjaan' => $catatan,
+                'foto_sebelum' => $payload['foto_sebelum'] ?? null,
+                'foto_sesudah' => $payload['foto_sesudah'] ?? null,
+                'waktu_mulai' => $waktuMulai,
+                'waktu_selesai' => now(),
+            ]);
 
-        $attendance?->update(['jam_keluar' => now()]);
+            $this->catatMaterial($report, $teknisi, $materials);
 
-        return $report->fresh();
+            $order->status = ! empty($payload['butuh_followup'])
+                ? OrderStatus::ButuhFollowup
+                : OrderStatus::Selesai;
+            $order->save();
+
+            // Resi publik tersedia begitu order selesai (B14a).
+            if ($order->status === OrderStatus::Selesai) {
+                $order->pastikanResiToken();
+            }
+
+            // B21: attendance terbuka seluruh anggota yang hadir ikut ditutup,
+            // supaya setiap teknisi yang check-in tercatat waktu selesainya.
+            $anggotaIds = $this->anggotaTimIds($order);
+            if ($anggotaIds !== []) {
+                $order->attendances()
+                    ->whereIn('user_id', $anggotaIds)
+                    ->whereNull('jam_keluar')
+                    ->update(['jam_keluar' => now()]);
+            }
+
+            return $report->fresh();
+        });
     }
 
-    private function catatMaterial(WorkReport $report, User $teknisi, array $materials): void
+    /**
+     * @param  array<int, array{stock_item_id: int, jumlah: int}>  $materials
+     * @return array<int, array{item: StockItem, jumlah: int}>
+     */
+    private function validasiMaterial(array $materials): array
     {
-        foreach ($materials as $baris) {
-            $item = StockItem::findOrFail($baris['stock_item_id']);
-            $jumlah = (int) ($baris['jumlah'] ?? 0);
+        $hasil = [];
 
+        foreach ($materials as $baris) {
+            $item = StockItem::find($baris['stock_item_id'] ?? null)
+                ?? throw new BusinessRuleException('Material tidak ditemukan.');
+
+            $jumlah = (int) ($baris['jumlah'] ?? 0);
             if ($jumlah <= 0) {
                 throw new BusinessRuleException('Jumlah material harus lebih dari 0.');
             }
+
+            $hasil[] = ['item' => $item, 'jumlah' => $jumlah];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param  array<int, array{item: StockItem, jumlah: int}>  $materials
+     */
+    private function catatMaterial(WorkReport $report, User $teknisi, array $materials): void
+    {
+        foreach ($materials as $baris) {
+            $item = $baris['item'];
+            $jumlah = $baris['jumlah'];
 
             WorkReportMaterial::create([
                 'work_report_id' => $report->id,
@@ -148,10 +202,97 @@ class TeknisiService
         }
     }
 
-    private function pastikanPemilik(Order $order, User $teknisi): void
+    /**
+     * Teknisi menutup order yang sudah selesai & metode sudah ditandai (B32).
+     * Slider "Selesaikan Order": metode pembayaran terkunci (tak bisa diubah)
+     * dan waktu penutupan tercatat di `orders.ditutup_pada`.
+     */
+    public function tutupOrder(Order $order, User $teknisi): Order
     {
-        if ((int) $order->teknisi_id !== (int) $teknisi->id) {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if ($order->status !== OrderStatus::Selesai) {
+            throw new BusinessRuleException('Order harus berstatus selesai sebelum ditutup.');
+        }
+
+        if ($order->sudahDitutup()) {
+            throw new BusinessRuleException('Order ini sudah ditutup.');
+        }
+
+        $sudahLunas = $order->payments()
+            ->where('status', PaymentStatus::Lunas->value)
+            ->exists();
+
+        if ($sudahLunas) {
+            throw new BusinessRuleException('Order sudah lunas — tidak perlu ditutup teknisi.');
+        }
+
+        if ($order->metode_dipilih === null) {
+            throw new BusinessRuleException('Tandai dulu metode pembayaran pilihan customer sebelum menutup order.');
+        }
+
+        $order->ditutup_pada = now();
+        $order->save();
+
+        return $order->fresh();
+    }
+
+    /**
+     * Teknisi menandai metode pembayaran yang dipilih customer (B13b) —
+     * info tambahan utk Admin; `null` untuk menghapus tanda.
+     * Pencatatan resmi pembayaran tetap lewat PaymentService (Admin/Finance).
+     */
+    public function catatMetodeDipilih(Order $order, User $teknisi, ?PaymentMethod $metode): Order
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if ($order->status === OrderStatus::Batal) {
+            throw new BusinessRuleException('Order batal tidak bisa diubah.');
+        }
+
+        // B32: setelah order ditutup teknisi, metode terkunci.
+        if ($order->sudahDitutup()) {
+            throw new BusinessRuleException('Metode pembayaran terkunci — order sudah ditutup teknisi.');
+        }
+
+        $sudahLunas = $order->payments()
+            ->where('status', PaymentStatus::Lunas->value)
+            ->exists();
+
+        if ($sudahLunas) {
+            throw new BusinessRuleException('Order sudah lunas; metode pembayaran tidak bisa diubah.');
+        }
+
+        $order->metode_dipilih = $metode?->value;
+        $order->save();
+
+        return $order->fresh();
+    }
+
+    private function pastikanAnggota(Order $order, User $teknisi): void
+    {
+        if (! $order->diassignkanKe($teknisi)) {
             throw new AuthorizationException('Order ini bukan tugas teknisi Anda.');
         }
+    }
+
+    /**
+     * ID seluruh anggota tim pengerjaan (PIC + baris order_technicians).
+     * Legacy order tanpa baris tim tetap terwakili oleh PIC.
+     *
+     * @return array<int, int>
+     */
+    private function anggotaTimIds(Order $order): array
+    {
+        return $order->orderTechnicians()
+            ->pluck('teknisi_id')
+            ->push($order->teknisi_id)
+            ->unique()
+            ->filter()
+            ->values()
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

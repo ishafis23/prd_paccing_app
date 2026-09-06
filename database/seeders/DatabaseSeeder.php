@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             ServiceCatalogSeeder::class,
+            LandingPageSeeder::class,
         ]);
 
         $owner = User::updateOrCreate(
@@ -48,5 +49,8 @@ class DatabaseSeeder extends Seeder
             );
             $teknisi->syncRoles([RoleName::Teknisi->value]);
         }
+
+        // Contoh channel bayar (butuh owner/admin yang sudah dibuat di atas).
+        $this->call([PaymentChannelSeeder::class]);
     }
 }

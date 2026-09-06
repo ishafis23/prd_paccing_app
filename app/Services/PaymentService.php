@@ -16,6 +16,7 @@ use App\Models\Payment;
 use App\Models\ServiceReminder;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
@@ -49,28 +50,38 @@ class PaymentService
         }
 
         $total = $order->total();
-        $baruDibayar = ($payment?->jumlah_dibayar ?? 0) + $jumlahDibayar;
+        $sudahDibayar = (float) ($payment?->jumlah_dibayar ?? 0);
+        $sisa = $total - $sudahDibayar;
 
-        $payment ??= new Payment(['order_id' => $order->id]);
-        $payment->metode = $metode;
-        $payment->total_tagihan = $total;
-        $payment->jumlah_dibayar = $baruDibayar;
-        $payment->dicatat_oleh = $by->id;
-
-        if ($baruDibayar >= $total - 0.009) {
-            $payment->status = PaymentStatus::Lunas;
-            $payment->tanggal_bayar = $tanggalBayar ?? now()->toDateString();
-        } else {
-            $payment->status = PaymentStatus::Dp;
+        if ($jumlahDibayar > $sisa + 0.009) {
+            throw new BusinessRuleException('Jumlah bayar melebihi sisa tagihan.');
         }
 
-        $payment->save();
+        // Semua efek (payment, income, reminder, status order) satu transaksi.
+        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar): Payment {
+            $baruDibayar = $sudahDibayar + $jumlahDibayar;
 
-        if ($payment->status === PaymentStatus::Lunas) {
-            $this->finalizeLunas($order, $payment);
-        }
+            $payment ??= new Payment(['order_id' => $order->id]);
+            $payment->metode = $metode;
+            $payment->total_tagihan = $total;
+            $payment->jumlah_dibayar = $baruDibayar;
+            $payment->dicatat_oleh = $by->id;
 
-        return $payment->fresh();
+            if ($baruDibayar >= $total - 0.009) {
+                $payment->status = PaymentStatus::Lunas;
+                $payment->tanggal_bayar = $tanggalBayar ?? now()->toDateString();
+            } else {
+                $payment->status = PaymentStatus::Dp;
+            }
+
+            $payment->save();
+
+            if ($payment->status === PaymentStatus::Lunas) {
+                $this->finalizeLunas($order, $payment);
+            }
+
+            return $payment->fresh();
+        });
     }
 
     /**
@@ -84,6 +95,11 @@ class PaymentService
         if (! in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
             $order->status = OrderStatus::Selesai;
             $order->save();
+        }
+
+        // Order yang baru lunas tanpa lewat laporan teknisi tetap butuh token resi.
+        if ($order->status === OrderStatus::Selesai) {
+            $order->pastikanResiToken();
         }
 
         $this->buatReminder($order, $payment);
@@ -147,5 +163,50 @@ class PaymentService
         }
 
         return $reminder->fresh();
+    }
+
+    /**
+     * B35: Admin/Owner membuat notice servis berikutnya MANUAL dari panel —
+     * untuk koreksi/susulan (mis. order lama yang belum sempat dibuatkan
+     * reminder otomatis). Wajib menunjuk order acuan milik customer.
+     *
+     * @param  int|null  $intervalBulan  override interval; null = pakai interval service_catalog order
+     * @param  string|null  $tanggalServis  override tanggal; null = hari ini + interval
+     *
+     * @throws BusinessRuleException|AuthorizationException
+     */
+    public function buatReminderManual(
+        Order $order,
+        User $by,
+        ?int $intervalBulan = null,
+        ?string $tanggalServis = null
+    ): ServiceReminder {
+        $this->assertRole($by, [RoleName::Admin, RoleName::Owner]);
+
+        $interval = $intervalBulan ?? $order->serviceCatalog?->interval_bulan;
+
+        if (! $interval || $interval < 1) {
+            throw new BusinessRuleException(
+                'Layanan order ini tidak punya interval servis berkala (interval_bulan kosong). Isi interval_bulan di katalog layanan, atau tentukan interval manual.'
+            );
+        }
+
+        $sudahAda = ServiceReminder::where('order_id', $order->id)->exists();
+
+        if ($sudahAda) {
+            throw new BusinessRuleException('Order ini sudah punya notice servis berikutnya — hapus/ubah yang lama dulu bila perlu koreksi.');
+        }
+
+        $tanggal = $tanggalServis
+            ? CarbonImmutable::parse($tanggalServis)
+            : CarbonImmutable::now()->addMonthsNoOverflow($interval);
+
+        return ServiceReminder::create([
+            'customer_id' => $order->customer_id,
+            'order_id' => $order->id,
+            'interval_bulan' => $interval,
+            'tanggal_servis_berikutnya' => $tanggal->toDateString(),
+            'status_notice' => ReminderStatus::BelumJatuhTempo,
+        ]);
     }
 }

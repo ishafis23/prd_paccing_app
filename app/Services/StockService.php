@@ -8,6 +8,7 @@ use App\Exceptions\BusinessRuleException;
 use App\Models\StockItem;
 use App\Models\StockMovement;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class StockService
 {
@@ -66,21 +67,24 @@ class StockService
         ?string $keterangan,
         ?string $tanggal = null
     ): StockMovement {
-        $movement = StockMovement::create([
-            'stock_item_id' => $item->id,
-            'jenis' => $jenis,
-            'jumlah' => $jumlah,
-            'referensi' => $referensi,
-            'keterangan' => $keterangan,
-            'dicatat_oleh' => $by->id,
-            'tanggal' => $tanggal ?? now()->toDateString(),
-        ]);
+        // Baris movement + perubahan stok_saat_ini harus atomik.
+        return DB::transaction(function () use ($item, $jenis, $jumlah, $by, $referensi, $keterangan, $tanggal): StockMovement {
+            $movement = StockMovement::create([
+                'stock_item_id' => $item->id,
+                'jenis' => $jenis,
+                'jumlah' => $jumlah,
+                'referensi' => $referensi,
+                'keterangan' => $keterangan,
+                'dicatat_oleh' => $by->id,
+                'tanggal' => $tanggal ?? now()->toDateString(),
+            ]);
 
-        // Stok dihitung dari movement tersimpan (keluar mengurangi,
-        // penyesuaian ikut tanda jumlah) supaya konsisten di semua jenis.
-        $item->stok_saat_ini += $movement->stokDelta();
-        $item->save();
+            // Stok dihitung dari movement tersimpan (keluar mengurangi,
+            // penyesuaian ikut tanda jumlah) supaya konsisten di semua jenis.
+            $item->stok_saat_ini += $movement->stokDelta();
+            $item->save();
 
-        return $movement;
+            return $movement;
+        });
     }
 }

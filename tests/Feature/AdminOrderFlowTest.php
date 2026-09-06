@@ -95,18 +95,28 @@ it('assign teknisi mengubah order baru -> terjadwal', function () {
     $teknisi = userWithRole(RoleName::Teknisi);
     $order = Order::factory()->create(['status' => OrderStatus::Baru]);
 
-    $updated = $this->orderService->assignTechnician($order, $teknisi);
+    $updated = $this->orderService->assignTechnician($order, $teknisi, $admin);
 
     expect($updated->status)->toBe(OrderStatus::Terjadwal)
         ->and($updated->teknisi_id)->toBe($teknisi->id);
 });
 
 it('order selesai tidak bisa di-assign ulang', function () {
+    $admin = userWithRole(RoleName::Admin);
     $teknisiBaru = userWithRole(RoleName::Teknisi);
     $order = Order::factory()->terjadwal()->create(['status' => OrderStatus::Selesai]);
 
-    $this->orderService->assignTechnician($order, $teknisiBaru);
+    $this->orderService->assignTechnician($order, $teknisiBaru, $admin);
 })->throws(BusinessRuleException::class);
+
+it('teknisi/finance tidak boleh melakukan assign (actor harus Admin/Owner)', function () {
+    $teknisi = userWithRole(RoleName::Teknisi);
+    $finance = userWithRole(RoleName::Finance);
+    $order = Order::factory()->create(['status' => OrderStatus::Baru]);
+
+    expect(fn () => $this->orderService->assignTechnician($order, $teknisi, $finance))
+        ->toThrow(AuthorizationException::class);
+});
 
 it('hanya order baru/terjadwal yang bisa dibatalkan', function () {
     $admin = userWithRole(RoleName::Admin);

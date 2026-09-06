@@ -46,6 +46,7 @@ Modul untuk petugas lapangan: melihat jadwal, absen di lokasi, dan melaporkan ha
 ## 6. Checklist Pengembangan
 
 **Fase 1 (MVP):**
+- [x] Multi-teknisi per order (B21, 7 Sep 2026): order bisa punya tim (`order_technicians`); semua anggota melihat & bisa mengerjakan; lihat `../05-multi-teknisi-tim.md`
 - [ ] Halaman jadwal per teknisi (query order `WHERE teknisi_id = auth()->id()`)
 - [ ] Komponen slider swipe-to-confirm "Mulai Berangkat ke Lokasi" (update status order jadi `menuju_lokasi`)
 - [ ] Fitur check-in/check-out sederhana (timestamp, tanpa validasi lokasi ketat dulu)

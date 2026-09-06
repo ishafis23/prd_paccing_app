@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
 use App\Models\User;
 
@@ -54,6 +55,11 @@ class OrderService
         ]);
         $order->save();
 
+        // B21: PIC pertama otomatis menjadi anggota tim.
+        if ($teknisi !== null) {
+            OrderTechnician::create(['order_id' => $order->id, 'teknisi_id' => $teknisi->id]);
+        }
+
         return $order->fresh();
     }
 
@@ -61,8 +67,9 @@ class OrderService
      * Assign teknisi ke order (Admin/Owner). Order berstatus `baru`
      * atau belum-selesai yang belum punya teknisi.
      */
-    public function assignTechnician(Order $order, User $teknisi): Order
+    public function assignTechnician(Order $order, User $teknisi, User $actor): Order
     {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
         $this->assertRole($teknisi, [RoleName::Teknisi]);
 
         if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
@@ -72,6 +79,42 @@ class OrderService
         $order->teknisi_id = $teknisi->id;
         $order->status = OrderStatus::Terjadwal;
         $order->save();
+
+        // B21: PIC juga dicatat sebagai anggota tim (idempotent).
+        OrderTechnician::firstOrCreate([
+            'order_id' => $order->id,
+            'teknisi_id' => $teknisi->id,
+        ]);
+
+        return $order->fresh();
+    }
+
+    /**
+     * Tambah anggota tim pengerjaan (B21) — Admin/Owner.
+     * Order harus belum selesai/batal; teknisi belum menjadi anggota.
+     */
+    public function tambahTeknisi(Order $order, User $teknisi, User $actor): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
+            throw new BusinessRuleException('Order selesai/batal tidak bisa ditambah anggota tim.');
+        }
+
+        $sudahAnggota = $order->orderTechnicians()
+            ->where('teknisi_id', $teknisi->id)
+            ->exists()
+            || (int) $order->teknisi_id === (int) $teknisi->id;
+
+        if ($sudahAnggota) {
+            throw new BusinessRuleException('Teknisi sudah menjadi anggota tim order ini.');
+        }
+
+        OrderTechnician::create([
+            'order_id' => $order->id,
+            'teknisi_id' => $teknisi->id,
+        ]);
 
         return $order->fresh();
     }

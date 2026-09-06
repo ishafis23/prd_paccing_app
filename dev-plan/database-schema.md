@@ -71,12 +71,15 @@ Inti dari alur transaksi.
 | id | bigint PK | |
 | customer_id | FK → customers | |
 | service_catalog_id | FK → service_catalog | |
-| teknisi_id | FK → users, nullable | diisi saat assign |
+| teknisi_id | FK → users, nullable | diisi saat assign; B21: = PIC/penanggung jawab, tim penuh di `order_technicians` |
 | jumlah_unit | integer | |
 | alamat_pengerjaan | text | default dari alamat customer, bisa diubah |
 | tanggal_jadwal | date | |
 | jam_jadwal | time, nullable | |
 | status | enum: baru, terjadwal, menuju_lokasi, dikerjakan, selesai, butuh_followup, batal | `menuju_lokasi` diset teknisi lewat slider "mulai berangkat" sebelum check-in, lihat [konsep Teknisi](teknisi/01-konsep-teknisi.md) |
+| metode_dipilih | enum: cash, transfer, qris, ewallet — nullable | (7 Sep 2026, B13b) metode yang dipilih customer, ditandai teknisi saat menampilkan opsi bayar; info utk Admin. Pencatatan resmi tetap di `payments` |
+| resi_token | string(40), unique, nullable | (7 Sep 2026, B14a) token acak halaman resi publik; dibuat saat order `selesai` |
+| ditutup_pada | timestamp, nullable | (8 Sep 2026, B32) saat teknisi menggeser slider "Selesaikan Order"; metode pembayaran terkunci |
 | catatan_admin | text, nullable | |
 | created_by | FK → users | |
 | timestamps | | |
@@ -208,6 +211,39 @@ Input manual oleh Admin/Finance.
 | bukti | string (path), nullable | |
 | dicatat_oleh | FK → users | |
 | timestamps | | |
+
+### `payment_channels`
+Master media pembayaran yang ditampilkan teknisi ke customer (B15/B16, 7 Sep
+2026). `payments.metode` TIDAK berubah — tabel ini hanya "daftar channel".
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | bigint PK | |
+| nama | string | label tampil, mis. "QRIS Paccing", "BCA 1234567890" |
+| jenis | enum: qris, bank | extensible ke ewallet tanpa migrasi struktur |
+| atas_nama | string, nullable | pemilik rekening / QRIS |
+| nomor_rekening | string, nullable | khusus bank |
+| nama_bank | string, nullable | khusus bank |
+| gambar | string (path), nullable | foto QRIS (khusus qris) |
+| aktif | boolean, default true | nonaktif tidak tampil di teknisi/resi |
+| dicatat_oleh | FK → users, nullable | |
+| timestamps | | |
+
+### `order_technicians`
+Keanggotaan TIM pengerjaan order (B21, 7 Sep 2026 — revisi B9). Berisi
+SELURUH teknisi yang ditugaskan, termasuk PIC (`orders.teknisi_id`) agar
+query jadwal/riwayat/capaian seragam.
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | bigint PK | |
+| order_id | FK → orders (cascade) | |
+| teknisi_id | FK → users (cascade) | |
+| timestamps | | |
+| unique | (order_id, teknisi_id) | tidak ada anggota ganda |
+
+Catatan: `orders.teknisi_id` tetap dipertahankan sebagai **PIC** (penanggung
+jawab / assigned pertama) untuk kompatibilitas tampilan & relasi lama.
 
 ## Tabel Fase 2
 

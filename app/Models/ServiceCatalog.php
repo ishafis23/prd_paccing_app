@@ -19,6 +19,11 @@ class ServiceCatalog extends Model
         'harga',
         'interval_bulan',
         'aktif',
+        // B38: konten layanan untuk landing page.
+        'deskripsi',
+        'gambar',
+        'tampil_beranda',
+        'urutan_beranda',
     ];
 
     protected function casts(): array
@@ -29,7 +34,23 @@ class ServiceCatalog extends Model
             'harga' => 'decimal:2',
             'interval_bulan' => 'integer',
             'aktif' => 'boolean',
+            'tampil_beranda' => 'boolean',
+            'urutan_beranda' => 'integer',
         ];
+    }
+
+    /**
+     * Label ringkas utk tampilan admin/landing: "Cuci AC · Split · 1 PK".
+     */
+    public function labelLayanan(): string
+    {
+        $bagian = array_filter([
+            $this->jenis_layanan ? str($this->jenis_layanan->value)->headline()->toString() : null,
+            $this->jenis_unit ? str($this->jenis_unit->value)->headline()->toString() : null,
+            $this->pk ?: null,
+        ]);
+
+        return implode(' · ', $bagian);
     }
 
     public function orders(): HasMany
