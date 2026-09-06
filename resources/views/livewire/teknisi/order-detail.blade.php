@@ -37,8 +37,8 @@
                     ? \Illuminate\Support\Carbon::parse($r->waktu_selesai)->format('d M Y H:i')
                     : '-',
                 'catatan' => $r->catatan_pengerjaan,
-                'sebelum' => $r->foto_sebelum ? Storage::disk('public')->url($r->foto_sebelum) : null,
-                'sesudah' => $r->foto_sesudah ? Storage::disk('public')->url($r->foto_sesudah) : null,
+                'sebelum' => $r->foto_sebelum ? asset('storage/'.ltrim($r->foto_sebelum, '/')) : null,
+                'sesudah' => $r->foto_sesudah ? asset('storage/'.ltrim($r->foto_sesudah, '/')) : null,
             ])
             ->values();
 
@@ -331,7 +331,7 @@
                                 @if ($channel->jenis->value === 'qris')
                                     @if ($channel->gambar)
                                         <div class="bg-white p-4 pb-0">
-                                            <img src="{{ Storage::disk('public')->url($channel->gambar) }}"
+                                            <img src="{{ asset('storage/'.ltrim($channel->gambar, '/')) }}"
                                                 alt="Kode QR {{ $channel->nama }} untuk pembayaran"
                                                 class="mx-auto h-44 w-44 rounded-lg object-contain">
                                         </div>

@@ -143,7 +143,7 @@
                             @endif
                         </div>
                         @if ($channel->jenis === \App\Enums\PaymentChannelType::Qris && filled($channel->gambar))
-                            <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($channel->gambar) }}"
+                            <img src="{{ asset('storage/'.ltrim($channel->gambar, '/')) }}"
                                  alt="QRIS {{ $channel->nama }}"
                                  class="h-28 w-28 rounded object-contain border border-gray-200 bg-white shrink-0">
                         @endif
@@ -169,14 +169,14 @@
             <div class="mt-2 grid grid-cols-2 gap-3">
                 @if (filled($laporan->foto_sebelum))
                     <figure>
-                        <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($laporan->foto_sebelum) }}"
+                        <img src="{{ asset('storage/'.ltrim($laporan->foto_sebelum, '/')) }}"
                              alt="Foto sebelum pengerjaan" class="w-full rounded-lg border border-gray-200 object-cover">
                         <figcaption class="mt-1 text-center text-xs text-gray-500">Sebelum</figcaption>
                     </figure>
                 @endif
                 @if (filled($laporan->foto_sesudah))
                     <figure>
-                        <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($laporan->foto_sesudah) }}"
+                        <img src="{{ asset('storage/'.ltrim($laporan->foto_sesudah, '/')) }}"
                              alt="Foto sesudah pengerjaan" class="w-full rounded-lg border border-gray-200 object-cover">
                         <figcaption class="mt-1 text-center text-xs text-gray-500">Sesudah</figcaption>
                     </figure>

@@ -15,7 +15,7 @@
         'pengadaan_ac' => 'Pengadaan AC',
         default => str($item->jenis_layanan?->value ?? '')->headline()->toString(),
     };
-    $gambarUrl = fn (?string $path): ?string => $path ? '/storage/'.ltrim($path, '/') : null;
+    $gambarUrl = fn (?string $path): ?string => $path ? asset('storage/'.ltrim($path, '/')) : null;
     $area = $areaLayanan ?? ['Makassar', 'Gowa', 'Maros'];
 @endphp
 <!DOCTYPE html>

@@ -84,14 +84,15 @@ class BusinessInfoService
     }
 
     /**
-     * URL logo (relatif ke host aktif, mis. /storage/business/x.png) —
-     * agar selalu termuat apa pun host/port yang dipakai (B37).
+     * URL publik logo via helper asset('storage/...') — otomatis mengikuti
+     * APP_URL / base request aktif (aman untuk hosting subfolder seperti
+     * domain.com/paccing/public) (B37).
      */
     public function logoUrl(): ?string
     {
         $path = $this->data()->logo_path;
 
-        return $path ? '/storage/'.ltrim($path, '/') : null;
+        return $path ? asset('storage/'.ltrim($path, '/')) : null;
     }
 
     /**

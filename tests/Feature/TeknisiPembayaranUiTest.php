@@ -8,9 +8,12 @@ use App\Enums\RoleName;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\PaymentChannel;
 use App\Models\User;
+use App\Models\WorkReport;
 use App\Services\PaymentChannelService;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -37,7 +40,7 @@ beforeEach(function () {
         ], $ekstra));
     };
 
-    $this->mkChannelQris = function (User $by, array $overrides = []): \App\Models\PaymentChannel {
+    $this->mkChannelQris = function (User $by, array $overrides = []): PaymentChannel {
         return app(PaymentChannelService::class)->create(array_merge([
             'nama' => 'QRIS Paccing',
             'jenis' => PaymentChannelType::Qris->value,
@@ -169,12 +172,12 @@ it('galeri foto sebelum/sesudah tampil dari work report terakhir', function () {
     $teknisi = ($this->mkTeknisi)();
     $order = ($this->mkOrder)($teknisi, OrderStatus::Selesai);
 
-    $report = \App\Models\WorkReport::factory()->create([
+    $report = WorkReport::factory()->create([
         'order_id' => $order->id,
         'teknisi_id' => $teknisi->id,
         'catatan_pengerjaan' => 'Selesai bersih.',
-        'foto_sebelum' => \Illuminate\Http\UploadedFile::fake()->image('sebelum.jpg')->store('work-reports', 'public'),
-        'foto_sesudah' => \Illuminate\Http\UploadedFile::fake()->image('sesudah.jpg')->store('work-reports', 'public'),
+        'foto_sebelum' => UploadedFile::fake()->image('sebelum.jpg')->store('work-reports', 'public'),
+        'foto_sesudah' => UploadedFile::fake()->image('sesudah.jpg')->store('work-reports', 'public'),
     ]);
 
     Livewire::actingAs($teknisi)
@@ -182,6 +185,6 @@ it('galeri foto sebelum/sesudah tampil dari work report terakhir', function () {
         ->assertSee('Foto Pengerjaan')
         ->assertSee('Foto sebelum pengerjaan')
         ->assertSee('Foto sesudah pengerjaan')
-        ->assertSee(Storage::disk('public')->url($report->foto_sebelum))
-        ->assertSee(Storage::disk('public')->url($report->foto_sesudah));
+        ->assertSee(asset('storage/'.$report->foto_sebelum))
+        ->assertSee(asset('storage/'.$report->foto_sesudah));
 });

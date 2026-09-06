@@ -103,7 +103,7 @@ class KelolaInfoUsaha extends Page
 
     public function urlFile(string $path): string
     {
-        return \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+        return asset('storage/'.ltrim($path, '/'));
     }
 
     protected function getViewData(): array

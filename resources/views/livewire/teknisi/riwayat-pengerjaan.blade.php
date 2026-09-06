@@ -9,7 +9,7 @@
             class="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 transition active:scale-[0.99] active:bg-gray-50">
             <div class="flex items-start gap-3">
                 @if ($fotoSesudah)
-                    <img src="{{ Storage::disk('public')->url($fotoSesudah) }}" alt="Foto hasil pengerjaan {{ $order->customer->nama }}"
+                    <img src="{{ asset('storage/'.ltrim($fotoSesudah, '/')) }}" alt="Foto hasil pengerjaan {{ $order->customer->nama }}"
                         class="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-gray-100">
                 @else
                     <x-initials-avatar :name="$order->customer->nama" size="h-16 w-16 text-sm" />

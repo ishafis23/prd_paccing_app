@@ -9,7 +9,6 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Halaman Manajemen → "Penyimpanan" (B27–B31).
@@ -146,7 +145,7 @@ class KelolaPenyimpanan extends Page
 
     public function urlFile(string $path): string
     {
-        return Storage::disk('public')->url($path);
+        return asset('storage/'.ltrim($path, '/'));
     }
 
     protected function getViewData(): array
