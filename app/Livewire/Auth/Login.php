@@ -39,13 +39,13 @@ class Login extends Component
         $user = Auth::user();
 
         if ($user->canAccessPanel(filament()->getPanel('admin'))) {
-            $this->redirect('/admin', navigate: false);
+            $this->redirect(filament()->getPanel('admin')->getUrl(), navigate: false);
 
             return;
         }
 
         if ($user->hasRole('teknisi')) {
-            $this->redirect('/teknisi', navigate: false);
+            $this->redirect(route('teknisi.jadwal'), navigate: false);
 
             return;
         }

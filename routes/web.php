@@ -20,7 +20,7 @@ Route::post('/logout', function () {
     request()->session()->invalidate();
     request()->session()->regenerateToken();
 
-    return redirect('/login');
+    return redirect()->route('login');
 })->middleware('auth')->name('logout');
 
 Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->group(function () {
