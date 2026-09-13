@@ -1,10 +1,13 @@
 # Konsep Modul — Portal Customer (Corporate)
 
-> STATUS: **DRAFT — butuh keputusan sebelum implementasi.** Lihat
-> "Keputusan Terbuka" di §4. Sumber: diskusi WA 13 Sept 2026 (lihat
+> STATUS: **DITUNDA KE STAGE 2 (keputusan 13 Sept 2026)** — digeser
+> penuh sampai alur order multi-unit (§3.4) selesai duluan, supaya
+> riwayat per-unit yang ditampilkan akurat sejak awal. Keputusan akses
+> & scope sudah final (lihat §4) — dokumen ini jadi acuan siap-pakai
+> saat waktunya tiba, TIDAK PERLU dibahas ulang dari nol. Sumber: diskusi
+> WA 13 Sept 2026, lihat
 > [`../12-analisis-chat-13sep-dan-roadmap.md`](../12-analisis-chat-13sep-dan-roadmap.md)
-> §3.6) — client sendiri menyebut ini Stage 2 KECUALI utk korporat besar
-> (mis. Dafi, Kalla), yang disetujui masuk tahap 1.
+> §3.6.
 
 ## 1. Ringkasan & Tujuan
 
@@ -52,26 +55,20 @@ sebelum alur order multi-unit (§3.4) ada — kalau dipaksa sebelum itu,
 "riwayat per unit" isinya akan kosong/tidak akurat karena laporan
 teknisi belum tertaut ke unit mana pun.
 
-## 4. Keputusan Terbuka (perlu dikonfirmasi sebelum mulai coding)
+## 4. Keputusan (final, 13 Sept 2026)
 
-1. **Cara akses/login customer**:
-   - **Opsi A — Token link permanen** (pola sama seperti fitur "resi"
-     yang sudah ada: `customers.portal_token` acak, akses tanpa
-     login lewat URL, mis. `/portal/{customer}/{token}`). Simpel, cepat
-     dibangun, tapi siapa saja yang pegang link bisa akses (tidak ada
-     password), dan tidak ada "sesi" per user PIC customer.
-   - **Opsi B — Akun login sungguhan** (email+password, khusus utk PIC
-     customer corporate, terpisah dari akun Admin/Teknisi). Lebih aman
-     & bisa multi-user per customer (mis. beberapa staf sekolah), tapi
-     perlu guard/tabel baru + alur lupa password, dsb — kerja lebih besar.
-   - Rekomendasi: **Opsi A dulu** (konsisten dgn pola resi yg sudah
-     terbukti dipakai), upgrade ke Opsi B kalau ternyata dibutuhkan
-     multi-user per corporate.
-2. **Ruang lingkup "progress"**: cuma tanggal jadwal berikutnya (pasif,
-   dari `ServiceReminder`), atau juga live status order yang SEDANG
-   dikerjakan (mis. "Teknisi menuju lokasi", real-time spt Peta Teknisi)?
-3. **Timing pembangunan**: karena bergantung ke §3.4 (order multi-unit)
-   yang sendiri belum jelas skedulnya (lihat §4 dokumen sumber), apakah
-   portal ini digeser ke Stage 2 penuh, atau tetap dipaksa masuk sebelum
-   1 Okt dgn scope terbatas (mis. cuma tampilkan daftar unit + jadwal
-   customer secara umum, tanpa riwayat per-unit dulu)?
+1. **Cara akses/login customer**: **Opsi B — akun login sungguhan**
+   (email+password), khusus PIC customer corporate, terpisah dari akun
+   Admin/Teknisi. Bukan token-link spt resi.
+   - Konsekuensi teknis: perlu guard Laravel baru (mis. `customer`),
+     tabel akun terpisah dari `users` (atau kolom login di `customers`
+     kalau 1 akun = 1 customer; kalau butuh multi-user per corporate,
+     perlu tabel `customer_users` tersendiri — **perlu diperjelas lagi
+     saat mulai dikerjakan**: apakah 1 customer boleh punya beberapa
+     akun staf, atau cukup 1 akun per customer?), alur lupa password,
+     halaman login terpisah dari `/admin` dan `/teknisi` (mis. `/portal/login`).
+2. **Ruang lingkup "progress"**: belum difinalkan detail teknisnya —
+   dibahas lagi saat mulai dikerjakan (tunggu §3.4 selesai, lihat poin 3).
+3. **Timing pembangunan**: **ditunda penuh ke Stage 2** — baru mulai
+   setelah alur order multi-unit (§3.4) selesai, supaya riwayat per-unit
+   akurat sejak awal. Tidak dipaksakan sebelum 1 Okt.
