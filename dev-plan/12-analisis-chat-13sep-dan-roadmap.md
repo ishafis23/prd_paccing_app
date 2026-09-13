@@ -1,10 +1,12 @@
 # Analisis Chat Klien (13 Sept 2026) & Roadmap Lanjutan
 
-> STATUS: **SEBAGIAN DIKERJAKAN** — hasil analisis `chat.md` (ekspor WA grup
-> "PACCING - ONE GATE INTEGRATED SYSTEM", 11-13 Sept 2026). §2 (Import
-> Customer + kolom `jenis`) sudah selesai. §3.1-3.13 (13 item) **BELUM**
-> dikerjakan — masih menunggu konfirmasi client atas "Pertanyaan Terbuka"
-> di §5 sebelum lanjut ke §4 (urutan wajib-sebelum-1-Okt).
+> STATUS: **SEMUA ITEM WAJIB-SEBELUM-1-OKT SELESAI** — hasil analisis
+> `chat.md` (ekspor WA grup "PACCING - ONE GATE INTEGRATED SYSTEM",
+> 11-13 Sept 2026). §4 poin 1-5 (Import Customer+jenis, Terkendala/Gagal,
+> Bukti Pembayaran, Verifikasi Admin, Orderan Harian) ✅ selesai semua.
+> Sisa item (§3.1, §3.2, §3.4, §3.6, §3.8, §3.10 lanjutan, §3.12, §3.13)
+> realistis Stage 2 — sebagian masih menunggu jawaban client atas
+> "Pertanyaan Terbuka" di §5 sebelum bisa mulai desain teknisnya.
 
 ## 0. Konteks penting: deadline
 
@@ -75,8 +77,12 @@ tim/perjalanan, plus biaya tak terduga per order.
 trip/tim, kemungkinan pra-isi nominal default (Rp 50rb) yg bisa diedit.
 
 ### 3.3 Halaman Orderan Harian (admin)
-❌ MISSING — cuma ada `JadwalHariIni` punya teknisi (per-user). Admin belum
-punya dashboard "semua order hari ini". **Kerja**: Filament Page/widget baru.
+✅ **Selesai** — `App\Filament\Pages\OrderanHarian` (menu "Orderan Harian"):
+daftar semua order lintas teknisi pada satu tanggal (default hari ini,
+bisa pindah tanggal via date picker + tombol "Hari Ini"), ringkasan
+jumlah per status, kolom jenis pelanggan & status laporan, link "Lihat"
+ke detail order. Akses Admin/Finance/HR spt PetaTeknisi. 8 test baru
+(`tests/Feature/OrderanHarianPageTest.php`).
 
 ### 3.4 Import Excel dispatch massal (100 ruangan sekaligus assign)
 ❌ MISSING — beda dari Import Customer. Ini bulk-create **Order** + assign
@@ -161,17 +167,16 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 
 ## 4. Usulan pentahapan (mengingat deadline 1 Okt)
 
-**Wajib sebelum 1 Okt (blocking "running well" versi client):**
+**Wajib sebelum 1 Okt (blocking "running well" versi client) — SEMUA SELESAI:**
 1. ~~Penyesuaian Import Customer (`jenis` + kolom map)~~ — §2, **✅ selesai**.
 2. ~~Tombol Terkendala/Gagal + reschedule dasar~~ — §3.9, **✅ selesai**.
 3. ~~Bukti pembayaran per laporan (minimal upload, rumahan vs instansi)~~
-   — §3.7, **✅ selesai**. **❌ belum dikerjakan.**
+   — §3.7, **✅ selesai**.
 4. ~~Verifikasi admin per laporan~~ — §3.11, **✅ selesai** (client tegas:
    *"tidak bisa jalan ke titik berikutnya jika laporan kerja belum selesai"*
    — diimplementasikan sbg gate pelunasan pembayaran, bukan slider teknisi,
-   supaya tidak mengganggu alur lapangan). **❌ belum dikerjakan.**
-5. Halaman Orderan Harian admin — §3.3, kebutuhan operasional harian.
-   **❌ belum dikerjakan.**
+   supaya tidak mengganggu alur lapangan).
+5. ~~Halaman Orderan Harian admin~~ — §3.3, **✅ selesai**.
 
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
 6. Portal Klien/Corporate + Unit AC + auto-reminder per kategori — §3.6, §3.10.
