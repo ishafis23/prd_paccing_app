@@ -375,7 +375,8 @@ class OrderResource extends Resource
                     ->label('Assign Teknisi')
                     ->icon('heroicon-o-user-plus')
                     ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal]))
+                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                        && $record->teknisi_id === null)
                     ->modalHeading('Assign Teknisi')
                     ->modalDescription('Boleh pilih beberapa teknisi. Urutan pilihan menentukan PIC: teknisi PERTAMA menjadi penanggung jawab (PIC), sisanya anggota tim.')
                     ->form([
@@ -414,6 +415,39 @@ class OrderResource extends Resource
                             ->title('Teknisi di-assign')
                             ->body(implode(', ', $berhasil).($dilewati !== [] ? ' — sudah anggota: '.implode(', ', $dilewati) : ''))
                             ->send();
+                    }),
+
+                Tables\Actions\Action::make('gantiPic')
+                    ->label('Ganti PIC')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->color('warning')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                        && $record->teknisi_id !== null)
+                    ->modalHeading('Ganti PIC')
+                    ->modalDescription('Utk teknisi berhalangan di hari-H. Status order TIDAK berubah — attendance terbuka PIC lama (kalau sempat check-in) otomatis ditutup.')
+                    ->form([
+                        Forms\Components\Select::make('teknisi_id')
+                            ->label('PIC Baru')
+                            ->options(fn (Order $record) => User::role(RoleName::Teknisi->value)
+                                ->where('id', '!=', $record->teknisi_id)
+                                ->pluck('name', 'id'))
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Textarea::make('alasan')->label('Alasan (opsional)')->columnSpanFull(),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        try {
+                            app(OrderService::class)->gantiPic(
+                                $record,
+                                User::findOrFail($data['teknisi_id']),
+                                auth()->user(),
+                                $data['alasan'] ?? null,
+                            );
+                            Notification::make()->success()->title('PIC diganti')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal ganti PIC')->body($e->getMessage())->send();
+                        }
                     }),
 
                 Tables\Actions\Action::make('tambahTeknisiTim')

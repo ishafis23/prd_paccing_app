@@ -92,9 +92,14 @@ sudah ada, assign PIC/tim, validasi per baris. Bergantung pada §3.10 (data
 AC unit) kalau mau tracking per-ruangan yang benar.
 
 ### 3.5 Re-assign PIC fleksibel di hari-H
-🟡 PARTIAL — `order_technicians` sudah mendukung banyak teknisi per order
-(lihat `05-multi-teknisi-tim.md`), tapi UI "ganti PIC di hari H krn teknisi
-berhalangan" perlu dicek/dilengkapi di Filament OrderResource.
+✅ **Selesai** — aksi baru "Ganti PIC" (`OrderService::gantiPic()`),
+terpisah dari "Assign Teknisi" (kini cuma muncul kalau order belum punya
+PIC). Ganti PIC tidak mereset status order (beda dari `assignTechnician`
+yg selalu balik ke `terjadwal`) — jadi bisa dipakai saat order sudah
+`menuju_lokasi`/`dikerjakan` dan PIC-nya berhalangan mendadak. Attendance
+terbuka PIC lama ikut ditutup, PIC lama lepas dari `order_technicians`,
+riwayat dicatat ke `catatan_admin`. 15 test baru
+(`tests/Feature/OrderGantiPicTest.php`).
 
 ### 3.6 Portal Klien/Corporate (asset AC, histori, auto-reminder)
 ❌ MISSING (**client sendiri bilang ini Stage 2**, KECUALI utk korporat

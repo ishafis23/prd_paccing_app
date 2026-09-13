@@ -125,6 +125,58 @@ class OrderService
     }
 
     /**
+     * Ganti PIC (penanggung jawab) order yang sudah berjalan (dev-plan/12
+     * §3.5) — mis. teknisi berhalangan mendadak di hari-H. BEDA dari
+     * assignTechnician: status order TIDAK direset ke terjadwal (order
+     * boleh sudah menuju_lokasi/dikerjakan), PIC lama otomatis lepas dari
+     * tim & attendance terbukanya (kalau ada) ditutup.
+     */
+    public function gantiPic(Order $order, User $teknisiBaru, User $actor, ?string $alasan = null): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+        $this->assertRole($teknisiBaru, [RoleName::Teknisi]);
+
+        if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
+            throw new BusinessRuleException('Order selesai/batal tidak bisa ganti PIC.');
+        }
+
+        if ($order->teknisi_id === null) {
+            throw new BusinessRuleException('Order belum punya PIC — gunakan aksi Assign Teknisi.');
+        }
+
+        if ((int) $order->teknisi_id === (int) $teknisiBaru->id) {
+            throw new BusinessRuleException('Teknisi ini sudah menjadi PIC order ini.');
+        }
+
+        return DB::transaction(function () use ($order, $teknisiBaru, $alasan): Order {
+            $picLama = $order->teknisi;
+            $picLamaId = $order->teknisi_id;
+
+            // Attendance terbuka milik PIC lama (kalau sempat check-in) ikut ditutup.
+            $order->attendances()
+                ->where('user_id', $picLamaId)
+                ->whereNull('jam_keluar')
+                ->update(['jam_keluar' => now()]);
+
+            OrderTechnician::where('order_id', $order->id)
+                ->where('teknisi_id', $picLamaId)
+                ->delete();
+
+            $order->teknisi_id = $teknisiBaru->id;
+            $order->catatan_admin = trim(($order->catatan_admin ?? '')
+                ."\n[GANTI PIC] {$picLama?->name} -> {$teknisiBaru->name}".(filled($alasan) ? ': '.trim($alasan) : ''));
+            $order->save();
+
+            OrderTechnician::firstOrCreate([
+                'order_id' => $order->id,
+                'teknisi_id' => $teknisiBaru->id,
+            ]);
+
+            return $order->fresh();
+        });
+    }
+
+    /**
      * Jadwalkan ulang order yang terkendala (Admin/Owner) — respons dari
      * teknisi menandai "Terkendala/Gagal" di lapangan. Order kembali ke
      * status `terjadwal` dgn jadwal baru; alasan kendala lama dibersihkan

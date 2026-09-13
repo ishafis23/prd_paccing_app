@@ -35,13 +35,21 @@
   di Orderan Harian & detail order lalu Setujui (tambah baris layanan)
   atau Tolak; field "Order Terkait" opsional di form Expense buat catat
   pengeluaran per trip/order (nominal manual/bisa diedit).
+- Re-assign PIC hari-H (§3.5) — aksi baru "Ganti PIC" (`OrderService::
+  gantiPic()`), terpisah dari "Assign Teknisi" (sekarang cuma muncul kalau
+  order belum punya PIC sama sekali). Ganti PIC TIDAK mereset status order
+  (beda dari assignTechnician yg selalu balik ke terjadwal) — dipakai saat
+  order sudah `menuju_lokasi`/`dikerjakan` dan PIC-nya berhalangan
+  mendadak. Efek otomatis: attendance terbuka PIC lama ditutup, PIC lama
+  lepas dari `order_technicians`, riwayat dicatat ke `catatan_admin`.
+  Anggota tim lain (bukan PIC) tidak terganggu. 15 test baru
+  (`tests/Feature/OrderGantiPicTest.php`).
 
 ## Belum dikerjakan (realistis Stage 2)
 
 | Ref | Item | Ringkas |
 |---|---|---|
 | §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — **bergantung §3.10 lanjutan** (riwayat per unit), ditunda sampai fitur input orderan disentuh. |
-| §3.5 | Re-assign PIC hari-H | Ganti teknisi penanggung jawab di hari-H kalau berhalangan — perlu dicek kelengkapan di OrderResource. |
 | §3.12 | Surat Jalan (korporat) | Cetak/kirim daftar unit yg akan dikerjakan ke nomor order — pola spt fitur resi yg sudah ada. |
 | §3.13 | Tim Teknisi permanen (SPK) | Menu buat tim tetap (1 tim = 2 teknisi), assign order ke tim bukan pilih orang satu-satu. |
 
