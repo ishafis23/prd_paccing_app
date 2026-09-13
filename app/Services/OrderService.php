@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
 use App\Models\User;
+use App\Models\WorkReport;
 
 class OrderService
 {
@@ -142,6 +143,27 @@ class OrderService
         $order->save();
 
         return $order->fresh();
+    }
+
+    /**
+     * Admin/Owner "acc" laporan pengerjaan teknisi (§3.11) — supaya admin
+     * tidak terus menagih "mana laporan". Pelunasan pembayaran order
+     * ditahan sampai laporan terbaru diverifikasi (lihat
+     * PaymentService::recordPayment).
+     */
+    public function verifikasiLaporan(WorkReport $laporan, User $actor): WorkReport
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if ($laporan->sudahDiverifikasi()) {
+            throw new BusinessRuleException('Laporan ini sudah diverifikasi.');
+        }
+
+        $laporan->diverifikasi_pada = now();
+        $laporan->diverifikasi_oleh = $actor->id;
+        $laporan->save();
+
+        return $laporan->fresh();
     }
 
     /**

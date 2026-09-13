@@ -57,6 +57,17 @@ class PaymentService
             throw new BusinessRuleException('Jumlah bayar melebihi sisa tagihan.');
         }
 
+        // §3.11: pelunasan (yg memicu income/reminder/status selesai) ditahan
+        // sampai laporan pengerjaan terbaru diverifikasi admin — kalau order
+        // belum ada laporan sama sekali, tidak ada yg perlu diverifikasi.
+        $akanLunas = ($sudahDibayar + $jumlahDibayar) >= $total - 0.009;
+        if ($akanLunas) {
+            $laporanTerakhir = $order->workReports()->latest('id')->first();
+            if ($laporanTerakhir !== null && ! $laporanTerakhir->sudahDiverifikasi()) {
+                throw new BusinessRuleException('Verifikasi laporan pengerjaan dulu sebelum mencatat pelunasan.');
+            }
+        }
+
         // Semua efek (payment, income, reminder, status order) satu transaksi.
         return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar): Payment {
             $baruDibayar = $sudahDibayar + $jumlahDibayar;

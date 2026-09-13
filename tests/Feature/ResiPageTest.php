@@ -104,6 +104,10 @@ it('resi order lunas menampilkan badge lunas dan menyembunyikan daftar channel',
     $order = ($this->orderSelesai)($teknisi);
     ($this->buatChannel)($admin);
 
+    // §3.11: pelunasan ditahan sampai laporan diverifikasi admin.
+    $laporan = WorkReport::where('order_id', $order->id)->latest('id')->first();
+    app(\App\Services\OrderService::class)->verifikasiLaporan($laporan, $admin);
+
     app(PaymentService::class)->recordPayment($order, PaymentMethod::Qris, $order->total(), $admin);
     $order->refresh();
 

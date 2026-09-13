@@ -39,8 +39,8 @@ class OrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        // Hindari N+1 untuk kolom Tim & seksi infolist (B21).
-        return parent::getEloquentQuery()->with(['timTeknisi']);
+        // Hindari N+1 untuk kolom Tim, kolom Laporan & seksi infolist (B21/§3.11).
+        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports']);
     }
 
     public static function form(Form $form): Form
@@ -170,7 +170,14 @@ class OrderResource extends Resource
                                     ->label('Foto Sesudah')
                                     ->disk('public')
                                     ->visible(fn ($record): bool => filled($record?->foto_sesudah)),
-                                TextEntry::make('waktu_selesai')->label('Selesai')->dateTime('d M Y H:i')->columnSpanFull(),
+                                TextEntry::make('waktu_selesai')->label('Selesai')->dateTime('d M Y H:i'),
+                                TextEntry::make('diverifikasi_pada')
+                                    ->label('Verifikasi')
+                                    ->badge()
+                                    ->color(fn ($record) => $record?->sudahDiverifikasi() ? 'success' : 'warning')
+                                    ->formatStateUsing(fn ($state, $record) => $record?->sudahDiverifikasi()
+                                        ? 'Terverifikasi oleh '.($record->verifikator?->name ?? '—')
+                                        : 'Menunggu Verifikasi'),
                             ]),
                     ])
                     ->collapsible(),
@@ -200,6 +207,20 @@ class OrderResource extends Resource
                 }),
                 Tables\Columns\TextColumn::make('tanggal_jadwal')->date('d M Y')->sortable(),
                 Tables\Columns\TextColumn::make('total')->label('Total')->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.')),
+                Tables\Columns\TextColumn::make('laporan_status')
+                    ->label('Laporan')
+                    ->badge()
+                    ->placeholder('—')
+                    ->state(function (Order $record): ?string {
+                        $laporan = $record->workReports->sortByDesc('id')->first();
+
+                        if ($laporan === null) {
+                            return null;
+                        }
+
+                        return $laporan->sudahDiverifikasi() ? 'Terverifikasi' : 'Menunggu Verifikasi';
+                    })
+                    ->color(fn (?string $state): string => $state === 'Terverifikasi' ? 'success' : 'warning'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(EnumOptions::for(OrderStatus::class)),
@@ -298,6 +319,27 @@ class OrderResource extends Resource
                                 ->title('Sebagian dilewati')
                                 ->body('Sudah menjadi anggota: '.implode(', ', $dilewati))
                                 ->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('verifikasiLaporan')
+                    ->label('Verifikasi Laporan')
+                    ->icon('heroicon-o-check-badge')
+                    ->color('success')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && $record->workReports->sortByDesc('id')->first()?->sudahDiverifikasi() === false)
+                    ->requiresConfirmation()
+                    ->modalDescription(fn (Order $record) => $record->workReports->sortByDesc('id')->first()?->catatan_pengerjaan)
+                    ->modalHeading('Verifikasi Laporan Pengerjaan')
+                    ->modalSubmitActionLabel('Ya, Verifikasi')
+                    ->action(function (Order $record) {
+                        $laporan = $record->workReports->sortByDesc('id')->first();
+
+                        try {
+                            app(OrderService::class)->verifikasiLaporan($laporan, auth()->user());
+                            Notification::make()->success()->title('Laporan diverifikasi')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal verifikasi')->body($e->getMessage())->send();
                         }
                     }),
 

@@ -14,6 +14,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\WorkReport;
 use App\Models\WorkReportMaterial;
+use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\StockService;
 use App\Services\TeknisiService;
@@ -205,6 +206,10 @@ it('end-to-end: order -> berangkat -> check-in -> laporan -> lunas -> income & r
     ]);
 
     expect($order->fresh()->status)->toBe(OrderStatus::Selesai);
+
+    // §3.11: pelunasan ditahan sampai laporan diverifikasi admin.
+    $laporan = WorkReport::where('order_id', $order->id)->latest('id')->first();
+    app(OrderService::class)->verifikasiLaporan($laporan, $admin);
 
     $this->paymentService->recordPayment($order->fresh(), PaymentMethod::Cash, $order->total(), $admin);
 

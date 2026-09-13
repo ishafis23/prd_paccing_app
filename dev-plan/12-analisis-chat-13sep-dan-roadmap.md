@@ -139,8 +139,13 @@ teknisi/order dari unit ini (sengaja ditunda — akan dianalisis saat
 fitur input orderan disentuh).
 
 ### 3.11 Verifikasi/approval laporan oleh admin
-❌ MISSING — `WorkReport` tidak ada status approval. Client mau admin bisa
-klik acc/verifikasi tiap laporan masuk.
+✅ **Selesai** — kolom `work_reports.diverifikasi_pada`/`diverifikasi_oleh`,
+aksi "Verifikasi Laporan" di tabel Order admin (`OrderService::verifikasiLaporan`,
+Admin/Owner saja), kolom badge "Laporan" (Terverifikasi/Menunggu Verifikasi).
+**Gate nyata**: `PaymentService::recordPayment()` menolak pelunasan (bukan
+DP) selama laporan terakhir order belum diverifikasi — order tanpa
+laporan sama sekali tidak terhalang. 10 test baru
+(`tests/Feature/VerifikasiLaporanTest.php`).
 
 ### 3.12 Surat Jalan (khusus korporat)
 ❌ MISSING — belum ada fitur serupa. Pola termudah: contek fitur "resi"
@@ -161,8 +166,10 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 2. ~~Tombol Terkendala/Gagal + reschedule dasar~~ — §3.9, **✅ selesai**.
 3. ~~Bukti pembayaran per laporan (minimal upload, rumahan vs instansi)~~
    — §3.7, **✅ selesai**. **❌ belum dikerjakan.**
-4. Verifikasi admin per laporan — §3.11 (client tegas: *"tidak bisa jalan ke
-   titik berikutnya jika laporan kerja belum selesai"*). **❌ belum dikerjakan.**
+4. ~~Verifikasi admin per laporan~~ — §3.11, **✅ selesai** (client tegas:
+   *"tidak bisa jalan ke titik berikutnya jika laporan kerja belum selesai"*
+   — diimplementasikan sbg gate pelunasan pembayaran, bukan slider teknisi,
+   supaya tidak mengganggu alur lapangan). **❌ belum dikerjakan.**
 5. Halaman Orderan Harian admin — §3.3, kebutuhan operasional harian.
    **❌ belum dikerjakan.**
 

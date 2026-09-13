@@ -18,6 +18,9 @@
   "Jenis Pelanggan" di form Order (default dari data customer, bisa
   diubah admin), guard wajib-bukti utk rumahan sebelum teknisi bisa
   menutup order.
+- Verifikasi laporan teknisi (§3.11) — aksi "Verifikasi Laporan" per
+  order, gate di pelunasan pembayaran (bukan slider teknisi) supaya
+  tidak mengganggu alur lapangan.
 
 ## Belum dikerjakan (butuh kerja Admin-side)
 
@@ -28,14 +31,13 @@
 | §3.3 | Halaman Orderan Harian | Dashboard admin: semua order yg berjalan hari ini (belum ada, cuma jadwal per-teknisi). |
 | §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — **bergantung §3.10 lanjutan** (riwayat per unit), ditunda sampai fitur input orderan disentuh. |
 | §3.5 | Re-assign PIC hari-H | Ganti teknisi penanggung jawab di hari-H kalau berhalangan — perlu dicek kelengkapan di OrderResource. |
-| §3.11 | Verifikasi laporan teknisi | Admin klik acc/verifikasi tiap laporan masuk sebelum order lanjut ke tahap berikut. |
 | §3.12 | Surat Jalan (korporat) | Cetak/kirim daftar unit yg akan dikerjakan ke nomor order — pola spt fitur resi yg sudah ada. |
 | §3.13 | Tim Teknisi permanen (SPK) | Menu buat tim tetap (1 tim = 2 teknisi), assign order ke tim bukan pilih orang satu-satu. |
 
 ## Prioritas (mengikuti §4 di dokumen sumber)
-Wajib sebelum 1 Okt: ~~§3.9~~ (selesai), ~~§3.7~~ (selesai), §3.11, §3.3.
-Sisanya (§3.1, §3.2, §3.4, §3.12, §3.13) realistis Stage 2 kecuali
-diputuskan lain oleh client.
+Wajib sebelum 1 Okt: ~~§3.9~~ (selesai), ~~§3.7~~ (selesai), ~~§3.11~~
+(selesai), §3.3. Sisanya (§3.1, §3.2, §3.4, §3.12, §3.13) realistis
+Stage 2 kecuali diputuskan lain oleh client.
 
 ## Pertanyaan terbuka yang perlu client
 Lihat §5 di dokumen sumber (foto laporan, kategori pekerjaan, nominal

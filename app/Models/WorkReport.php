@@ -19,6 +19,8 @@ class WorkReport extends Model
         'foto_sesudah',
         'waktu_mulai',
         'waktu_selesai',
+        'diverifikasi_pada',
+        'diverifikasi_oleh',
     ];
 
     protected function casts(): array
@@ -26,6 +28,7 @@ class WorkReport extends Model
         return [
             'waktu_mulai' => 'datetime',
             'waktu_selesai' => 'datetime',
+            'diverifikasi_pada' => 'datetime',
         ];
     }
 
@@ -37,6 +40,16 @@ class WorkReport extends Model
     public function teknisi(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teknisi_id');
+    }
+
+    public function verifikator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'diverifikasi_oleh');
+    }
+
+    public function sudahDiverifikasi(): bool
+    {
+        return $this->diverifikasi_pada !== null;
     }
 
     public function materials(): HasMany
