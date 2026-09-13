@@ -26,12 +26,20 @@
 
 **Semua 5 item wajib-sebelum-1-Okt sudah selesai.**
 
+- Order jadi multi-item, tombol "Ada Perbaikan" + pengeluaran per trip
+  (§3.1, §3.2 — spesifikasi final di
+  [`../13-ada-perbaikan-kategori-dan-pengeluaran-trip.md`](../13-ada-perbaikan-kategori-dan-pengeluaran-trip.md),
+  menggantikan deskripsi ringkas §3.1/§3.2 di atas): order bisa punya
+  beberapa baris layanan (`order_items`), admin tambah baris lewat aksi
+  "Tambah Layanan"; admin lihat notice "Menunggu Konfirmasi Perbaikan"
+  di Orderan Harian & detail order lalu Setujui (tambah baris layanan)
+  atau Tolak; field "Order Terkait" opsional di form Expense buat catat
+  pengeluaran per trip/order (nominal manual/bisa diedit).
+
 ## Belum dikerjakan (realistis Stage 2)
 
 | Ref | Item | Ringkas |
 |---|---|---|
-| §3.1 | Status order "Ada Perbaikan" | Admin ubah status order saat teknisi lapor ada sparepart yg perlu diganti, + estimasi selesai baru. |
-| §3.2 | Pengeluaran operasional per trip | Catat uang operasional (makan+bensin) & biaya tak terduga per order/tim, bukan buku besar umum spt sekarang. |
 | §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — **bergantung §3.10 lanjutan** (riwayat per unit), ditunda sampai fitur input orderan disentuh. |
 | §3.5 | Re-assign PIC hari-H | Ganti teknisi penanggung jawab di hari-H kalau berhalangan — perlu dicek kelengkapan di OrderResource. |
 | §3.12 | Surat Jalan (korporat) | Cetak/kirim daftar unit yg akan dikerjakan ke nomor order — pola spt fitur resi yg sudah ada. |
@@ -41,6 +49,6 @@ Kecuali diputuskan lain oleh client, item di atas boleh menyusul setelah
 1 Okt.
 
 ## Pertanyaan terbuka yang perlu client
-Lihat §5 di dokumen sumber (foto laporan, kategori pekerjaan, nominal
-pengeluaran) — beberapa item di atas (§3.1, §3.2) tidak bisa mulai
-dikerjakan sebelum itu terjawab.
+§3.1, §3.2, §3.8 sudah terjawab & selesai diimplementasikan (lihat
+dev-plan/13). Sisa pertanyaan terbuka §5 di dokumen sumber (kalau ada)
+sudah tidak menghalangi item wajib manapun.
