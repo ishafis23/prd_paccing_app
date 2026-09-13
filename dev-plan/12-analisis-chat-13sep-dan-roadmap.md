@@ -1,9 +1,10 @@
 # Analisis Chat Klien (13 Sept 2026) & Roadmap Lanjutan
 
-> STATUS: **DRAFT UNTUK REVIEW** — hasil analisis `chat.md` (ekspor WA grup
-> "PACCING - ONE GATE INTEGRATED SYSTEM", 11-13 Sept 2026). Berisi requirement
-> baru di luar scope yang sudah berjalan. Perlu dikonfirmasi prioritas
-> sebelum dev lanjut — lihat "Pertanyaan Terbuka" di akhir dokumen.
+> STATUS: **SEBAGIAN DIKERJAKAN** — hasil analisis `chat.md` (ekspor WA grup
+> "PACCING - ONE GATE INTEGRATED SYSTEM", 11-13 Sept 2026). §2 (Import
+> Customer + kolom `jenis`) sudah selesai. §3.1-3.13 (13 item) **BELUM**
+> dikerjakan — masih menunggu konfirmasi client atas "Pertanyaan Terbuka"
+> di §5 sebelum lanjut ke §4 (urutan wajib-sebelum-1-Okt).
 
 ## 0. Konteks penting: deadline
 
@@ -20,6 +21,7 @@
 | "tambah lokasi map pada admin dan tampil pada portal teknisi" | ✅ Selesai (commit `9eecc72`) |
 | "tombol geser pada teknisi tidak bisa, pada HP" | ✅ Selesai (commit `3814363`) |
 | bug pembulatan koordinat (ditemukan saat testing, bukan dari chat) | ✅ Selesai (commit `43ffab7`) |
+| Import Excel Customer + kolom `jenis` (company/perorangan) + `email` (§2) | ✅ Selesai (commit `1e4863e`, `ad3bc93`) — template dropdown terstandar |
 
 ## 2. Dampak langsung ke Import Excel Customer (sedang dikerjakan)
 
@@ -44,9 +46,13 @@ Dua penyesuaian yang relevan ke pekerjaan yang **sedang berjalan**
    (baris yang linknya gagal di-resolve tetap masuk, cuma lokasinya kosong —
    tidak boleh gagalkan seluruh baris).
 
-**Rekomendasi saya**: selesaikan dulu 2 penyesuaian ini di
-`CustomerImportService` yang sedang berjalan sebelum commit, supaya tidak
-perlu migrasi ulang data yang sudah kadung diimpor tanpa `jenis`.
+**Update — sudah dikerjakan:**
+- Poin 1 (kolom `jenis`) ✅ selesai — ada di migration, form, tabel, filter,
+  dan Import Excel (dropdown, default `perorangan`).
+- Poin 2 (kolom link map di file import) — **keputusan: TIDAK dulu**.
+  Resolve link Google Maps butuh request internet per baris; untuk ribuan
+  baris sekaligus berisiko lambat/timeout/kena rate-limit. Lokasi tetap
+  diisi manual per-customer pakai fitur "Ambil Koordinat" yang sudah ada.
 
 ## 3. Backlog baru per modul (hasil audit kode existing)
 
@@ -139,12 +145,15 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 ## 4. Usulan pentahapan (mengingat deadline 1 Okt)
 
 **Wajib sebelum 1 Okt (blocking "running well" versi client):**
-1. Penyesuaian Import Customer (`jenis` + kolom map) — §2, kecil, lanjutkan sekarang.
-2. Tombol Terkendala/Gagal + reschedule dasar — §3.9, dipakai tiap hari di lapangan.
-3. Bukti pembayaran per laporan (minimal upload, rumahan vs instansi) — §3.7.
+1. ~~Penyesuaian Import Customer (`jenis` + kolom map)~~ — §2, **✅ selesai**.
+2. Tombol Terkendala/Gagal + reschedule dasar — §3.9, dipakai tiap hari di
+   lapangan. **❌ belum dikerjakan.**
+3. Bukti pembayaran per laporan (minimal upload, rumahan vs instansi) —
+   §3.7. **❌ belum dikerjakan.**
 4. Verifikasi admin per laporan — §3.11 (client tegas: *"tidak bisa jalan ke
-   titik berikutnya jika laporan kerja belum selesai"*).
+   titik berikutnya jika laporan kerja belum selesai"*). **❌ belum dikerjakan.**
 5. Halaman Orderan Harian admin — §3.3, kebutuhan operasional harian.
+   **❌ belum dikerjakan.**
 
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
 6. Portal Klien/Corporate + Unit AC + auto-reminder per kategori — §3.6, §3.10.
