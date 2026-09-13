@@ -59,19 +59,31 @@ class GoogleMapsLinkService
     {
         // Pin tempat spesifik, lebih akurat dari titik tengah peta.
         if (preg_match('/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/', $text, $m)) {
-            return ['lat' => (float) $m[1], 'lng' => (float) $m[2]];
+            return $this->bulatkan($m[1], $m[2]);
         }
 
         // Titik tengah peta pada URL, contoh: /@-5.1477,119.4327,17z/
         if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $text, $m)) {
-            return ['lat' => (float) $m[1], 'lng' => (float) $m[2]];
+            return $this->bulatkan($m[1], $m[2]);
         }
 
         // Parameter query q=lat,lng atau ll=lat,lng
         if (preg_match('/[?&](?:q|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/', $text, $m)) {
-            return ['lat' => (float) $m[1], 'lng' => (float) $m[2]];
+            return $this->bulatkan($m[1], $m[2]);
         }
 
         return null;
+    }
+
+    /**
+     * Bulatkan ke 7 desimal (presisi kolom DB) — cast (float) polos bisa
+     * menghasilkan sisa presisi ganjil (mis. 119.44289239999999) yang
+     * ditolak validasi HTML5 `step` pada input Latitude/Longitude.
+     *
+     * @return array{lat: float, lng: float}
+     */
+    private function bulatkan(string $lat, string $lng): array
+    {
+        return ['lat' => round((float) $lat, 7), 'lng' => round((float) $lng, 7)];
     }
 }
