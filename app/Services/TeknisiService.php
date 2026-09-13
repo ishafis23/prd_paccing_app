@@ -11,10 +11,13 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\StockItem;
 use App\Models\User;
 use App\Models\WorkReport;
 use App\Models\WorkReportMaterial;
+use App\Models\WorkReportPhoto;
+use App\Support\FotoLaporanSlot;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
@@ -97,7 +100,7 @@ class TeknisiService
      * Efek otomatis (PRD alur 5): stok keluar per material, status order
      * menjadi `selesai` atau `butuh_followup`, check-out attendance.
      *
-     * @param  array{catatan: string, materials: array<int, array{stock_item_id: int, jumlah: int}>, foto_sebelum?: ?string, foto_sesudah?: ?string, butuh_followup?: bool}  $payload
+     * @param  array{catatan: string, materials: array<int, array{stock_item_id: int, jumlah: int}>, foto_sebelum?: ?string, foto_sesudah?: ?string, foto_kategori?: array<int, array{order_item_id: int, slot: string, path: string}>, butuh_followup?: bool}  $payload
      */
     public function submitLaporan(Order $order, User $teknisi, array $payload): WorkReport
     {
@@ -117,9 +120,13 @@ class TeknisiService
         // supaya tidak ada paruh-tulis saat baris belakangan invalid.
         $materials = $this->validasiMaterial($payload['materials'] ?? []);
 
+        // dev-plan/13 §3: foto per kategori order_item (menggantikan pola
+        // foto_sebelum/foto_sesudah generik utk laporan baru).
+        $fotoKategori = $this->validasiFotoKategori($order, $payload['foto_kategori'] ?? []);
+
         // B25 (lapis kedua): kalau penyimpanan sudah penuh dan laporan
         // membawa foto, tolak sejak awal.
-        $bawaFoto = filled($payload['foto_sebelum'] ?? null) || filled($payload['foto_sesudah'] ?? null);
+        $bawaFoto = filled($payload['foto_sebelum'] ?? null) || filled($payload['foto_sesudah'] ?? null) || $fotoKategori !== [];
         if ($bawaFoto) {
             $quota = app(StorageQuotaService::class);
             if ($quota->pakaiBytes(segar: true) >= $quota->kuotaBytes()) {
@@ -127,7 +134,7 @@ class TeknisiService
             }
         }
 
-        return DB::transaction(function () use ($order, $teknisi, $payload, $catatan, $materials): WorkReport {
+        return DB::transaction(function () use ($order, $teknisi, $payload, $catatan, $materials, $fotoKategori): WorkReport {
             $attendance = $order->attendances()
                 ->where('user_id', $teknisi->id)
                 ->whereNull('jam_keluar')
@@ -147,6 +154,7 @@ class TeknisiService
             ]);
 
             $this->catatMaterial($report, $teknisi, $materials);
+            $this->catatFotoKategori($report, $fotoKategori);
 
             $order->status = ! empty($payload['butuh_followup'])
                 ? OrderStatus::ButuhFollowup
@@ -222,6 +230,57 @@ class TeknisiService
     }
 
     /**
+     * dev-plan/13 §3: validasi seluruh baris foto_kategori SEBELUM ada
+     * satu pun tulisan — order_item harus milik order ini & slot harus
+     * sesuai template kategori order_item tsb (App\Support\FotoLaporanSlot).
+     *
+     * @param  array<int, array{order_item_id: int, slot: string, path: string}>  $fotoKategori
+     * @return array<int, array{order_item: OrderItem, slot: string, path: string, urutan: int}>
+     */
+    private function validasiFotoKategori(Order $order, array $fotoKategori): array
+    {
+        $items = $order->orderItems->keyBy('id');
+        $hasil = [];
+
+        foreach ($fotoKategori as $baris) {
+            $item = $items->get((int) ($baris['order_item_id'] ?? 0))
+                ?? throw new BusinessRuleException('Baris layanan untuk foto tidak ditemukan pada order ini.');
+
+            $slot = trim((string) ($baris['slot'] ?? ''));
+            $template = FotoLaporanSlot::untuk($item->kategori);
+            $urutan = array_search($slot, array_keys($template), true);
+            if ($urutan === false) {
+                throw new BusinessRuleException("Slot foto '{$slot}' tidak valid untuk kategori {$item->nama_layanan}.");
+            }
+
+            $path = trim((string) ($baris['path'] ?? ''));
+            if ($path === '') {
+                throw new BusinessRuleException('Path foto tidak valid.');
+            }
+
+            $hasil[] = ['order_item' => $item, 'slot' => $slot, 'path' => $path, 'urutan' => $urutan];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param  array<int, array{order_item: OrderItem, slot: string, path: string, urutan: int}>  $fotoKategori
+     */
+    private function catatFotoKategori(WorkReport $report, array $fotoKategori): void
+    {
+        foreach ($fotoKategori as $baris) {
+            WorkReportPhoto::create([
+                'work_report_id' => $report->id,
+                'order_item_id' => $baris['order_item']->id,
+                'slot' => $baris['slot'],
+                'path' => $baris['path'],
+                'urutan' => $baris['urutan'],
+            ]);
+        }
+    }
+
+    /**
      * Tombol "Terkendala / Gagal": teknisi lapor order tidak bisa
      * dilanjutkan di lapangan (mis. customer tidak jadi / tidak ada di
      * lokasi). Menutup attendance terbuka (kalau ada) dan menunggu admin
@@ -258,6 +317,45 @@ class TeknisiService
 
             return $order->fresh();
         });
+    }
+
+    /**
+     * Tombol "Ada Perbaikan" (dev-plan/13 §2): teknisi lapor kebutuhan
+     * sparepart/perbaikan tambahan yg sudah dibicarakan dgn customer.
+     * Beda dari tandaiKendala — order TETAP `dikerjakan`, cuma menambah
+     * flag "menunggu konfirmasi" supaya admin tahu tanpa mengganggu
+     * progres teknisi di lokasi.
+     */
+    public function laporPerbaikan(Order $order, User $teknisi, string $catatan, ?float $estimasiHarga = null): Order
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if ($order->status !== OrderStatus::Dikerjakan) {
+            throw new BusinessRuleException('Lapor perbaikan hanya bisa saat order sedang dikerjakan.');
+        }
+
+        if ($order->perbaikan_menunggu_konfirmasi) {
+            throw new BusinessRuleException('Masih ada laporan perbaikan yang menunggu konfirmasi admin.');
+        }
+
+        $catatan = trim($catatan);
+        if ($catatan === '') {
+            throw new BusinessRuleException('Catatan perbaikan wajib diisi.');
+        }
+
+        if ($estimasiHarga !== null && $estimasiHarga < 0) {
+            throw new BusinessRuleException('Estimasi harga tidak valid.');
+        }
+
+        $order->perbaikan_menunggu_konfirmasi = true;
+        $order->perbaikan_catatan = $catatan;
+        $order->perbaikan_estimasi_harga = $estimasiHarga;
+        $order->perbaikan_dilaporkan_oleh = $teknisi->id;
+        $order->perbaikan_dilaporkan_pada = now();
+        $order->save();
+
+        return $order->fresh();
     }
 
     /**

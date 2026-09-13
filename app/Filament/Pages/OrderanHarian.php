@@ -59,7 +59,7 @@ class OrderanHarian extends Page
     {
         $orders = Order::query()
             ->whereDate('tanggal_jadwal', $this->tanggal)
-            ->with(['customer', 'serviceCatalog', 'teknisi', 'timTeknisi', 'workReports', 'latestPayment', 'orderItems'])
+            ->with(['customer', 'serviceCatalog', 'teknisi', 'timTeknisi', 'workReports', 'latestPayment', 'orderItems', 'pelaporPerbaikan'])
             ->orderByRaw('jam_jadwal IS NULL, jam_jadwal')
             ->get();
 

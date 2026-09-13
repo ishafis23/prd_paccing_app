@@ -35,6 +35,11 @@ class Order extends Model
         'ditutup_pada',
         'catatan_admin',
         'alasan_kendala',
+        'perbaikan_menunggu_konfirmasi',
+        'perbaikan_catatan',
+        'perbaikan_estimasi_harga',
+        'perbaikan_dilaporkan_oleh',
+        'perbaikan_dilaporkan_pada',
         'created_by',
     ];
 
@@ -47,6 +52,9 @@ class Order extends Model
             'jumlah_unit' => 'integer',
             'tanggal_jadwal' => 'date:Y-m-d',
             'ditutup_pada' => 'datetime',
+            'perbaikan_menunggu_konfirmasi' => 'boolean',
+            'perbaikan_estimasi_harga' => 'decimal:2',
+            'perbaikan_dilaporkan_pada' => 'datetime',
         ];
     }
 
@@ -111,6 +119,15 @@ class Order extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Teknisi yang lapor "Ada Perbaikan" (dev-plan/13 §2) — hanya terisi
+     * selagi perbaikan_menunggu_konfirmasi true.
+     */
+    public function pelaporPerbaikan(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'perbaikan_dilaporkan_oleh');
     }
 
     public function workReports(): HasMany

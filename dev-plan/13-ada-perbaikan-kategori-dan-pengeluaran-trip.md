@@ -126,9 +126,32 @@ terkait - modal material`) — nilai tambah yg tidak ada sebelumnya.
    Order dapat section "Rincian Layanan". 10 test baru
    (`tests/Feature/OrderItemsTest.php`), 381 test total lulus (tidak ada
    regresi meski `total()` dipakai di puluhan tempat).
-3. **Tombol "Ada Perbaikan" + flag konfirmasi** (teknisi + admin) —
-   bergantung pada #2 selesai duluan (butuh `order_items` sbg tempat
-   nampung baris baru).
-4. **Foto per kategori** (`work_report_photos`, `ServiceType` diperluas)
-   — bisa paralel dgn #2/#3, tapi baru penuh berguna setelah order bisa
-   multi-kategori.
+3. ~~**Tombol "Ada Perbaikan" + flag konfirmasi**~~ — **✅ selesai**:
+   kolom `orders.perbaikan_menunggu_konfirmasi/catatan/estimasi_harga/
+   dilaporkan_oleh/dilaporkan_pada`. Teknisi: tombol "Ada Perbaikan" di
+   portal (`TeknisiService::laporPerbaikan()`, hanya saat `dikerjakan`,
+   order tetap jalan) + notice "Menunggu Konfirmasi Perbaikan" di detail
+   order. Admin: notice tampil di Orderan Harian & infolist detail order;
+   aksi "Setujui Perbaikan" (`OrderService::setujuiPerbaikan()` — tambah
+   `order_items` baru + bersihkan flag, form prefill dari catatan/estimasi
+   teknisi) & "Tolak Perbaikan" (`tolakPerbaikan()` — flag hilang, dicatat
+   ke `catatan_admin`, tanpa baris baru). 18 test baru
+   (`tests/Feature/OrderPerbaikanTest.php`), 399 test total lulus.
+4. ~~**Foto per kategori**~~ — **✅ selesai**: `ServiceType` diperluas
+   (`TambahFreon, Instalasi, Relokasi, Bongkar`). Tabel baru
+   `work_report_photos` (`work_report_id`, `order_item_id`, `slot`, `path`,
+   `urutan`) — tiap order_item punya slot fotonya sendiri sesuai kategori.
+   Template slot per kategori di `App\Support\FotoLaporanSlot` (persis tabel
+   §3 di atas; `PengadaanAc`/kategori kosong dpt template umum
+   sebelum/sesudah — tidak eksplisit di daftar chat client, ditambahkan
+   krn tidak ada acuan lain). `TeknisiService::submitLaporan()` terima
+   `foto_kategori` (array order_item_id+slot+path, divalidasi seluruhnya
+   dulu sebelum ditulis — pola sama dgn validasi material), urutan
+   otomatis dari posisi slot di template. Form submitLaporan teknisi
+   merender input per order_item sesuai kategorinya; admin lihat foto ini
+   di infolist "Laporan Pengerjaan" > "Foto per Kategori". Kolom
+   `foto_sebelum`/`foto_sesudah` lama tetap ada & tetap bisa dipakai
+   (tidak dihapus dari form — opsional, bukan wajib pindah total). 8 test
+   baru (`tests/Feature/WorkReportPhotoTest.php`), 407 test total lulus.
+
+Keempat langkah dev-plan/13 sudah selesai semua.

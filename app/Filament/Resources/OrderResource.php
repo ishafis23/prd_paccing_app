@@ -41,7 +41,7 @@ class OrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         // Hindari N+1 utk kolom Tim, Laporan, Total & seksi infolist (B21/§3.11/dev-plan13).
-        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports', 'orderItems']);
+        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports.photos.orderItem', 'orderItems', 'pelaporPerbaikan']);
     }
 
     public static function form(Form $form): Form
@@ -119,6 +119,16 @@ class OrderResource extends Resource
                             ->columnSpanFull()
                             ->color('danger')
                             ->visible(fn (Order $record): bool => filled($record->alasan_kendala)),
+                        TextEntry::make('perbaikan_catatan')
+                            ->label('Menunggu Konfirmasi Perbaikan')
+                            ->columnSpanFull()
+                            ->color('warning')
+                            ->formatStateUsing(fn (Order $record): string => $record->perbaikan_catatan
+                                .($record->perbaikan_estimasi_harga !== null
+                                    ? ' (estimasi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')'
+                                    : '')
+                                .' — dilaporkan '.($record->pelaporPerbaikan?->name ?? '—'))
+                            ->visible(fn (Order $record): bool => $record->perbaikan_menunggu_konfirmasi),
                         TextEntry::make('catatan_admin')->columnSpanFull()->placeholder('—'),
                     ]),
                 Section::make('Rincian Layanan')
@@ -191,6 +201,16 @@ class OrderResource extends Resource
                                     ->label('Foto Sesudah')
                                     ->disk('public')
                                     ->visible(fn ($record): bool => filled($record?->foto_sesudah)),
+                                RepeatableEntry::make('photos')
+                                    ->label('Foto per Kategori')
+                                    ->columnSpanFull()
+                                    ->columns(4)
+                                    ->schema([
+                                        TextEntry::make('orderItem.nama_layanan')->label('Layanan'),
+                                        TextEntry::make('slot')->label('Slot')->formatStateUsing(fn (?string $state): string => str($state ?? '')->headline()->toString()),
+                                        ImageEntry::make('path')->label('')->disk('public')->columnSpan(2),
+                                    ])
+                                    ->visible(fn ($record): bool => $record?->photos->isNotEmpty()),
                                 TextEntry::make('waktu_selesai')->label('Selesai')->dateTime('d M Y H:i'),
                                 TextEntry::make('diverifikasi_pada')
                                     ->label('Verifikasi')
@@ -285,6 +305,69 @@ class OrderResource extends Resource
                             Notification::make()->success()->title('Layanan ditambahkan')->send();
                         } catch (BusinessRuleException|AuthorizationException $e) {
                             Notification::make()->danger()->title('Gagal menambah layanan')->body($e->getMessage())->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('setujuiPerbaikan')
+                    ->label('Setujui Perbaikan')
+                    ->icon('heroicon-o-wrench')
+                    ->color('success')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && $record->perbaikan_menunggu_konfirmasi)
+                    ->modalHeading('Setujui Perbaikan')
+                    ->modalDescription(fn (Order $record) => 'Customer setuju atas: '.$record->perbaikan_catatan
+                        .($record->perbaikan_estimasi_harga !== null ? ' (estimasi teknisi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')' : ''))
+                    ->form([
+                        Forms\Components\TextInput::make('nama_layanan')
+                            ->label('Nama Layanan/Sparepart')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\Select::make('kategori')
+                            ->options(EnumOptions::for(ServiceType::class)),
+                        Forms\Components\TextInput::make('harga')
+                            ->label('Harga hasil deal')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->required()
+                            ->minValue(0),
+                        Forms\Components\TextInput::make('jumlah')
+                            ->numeric()
+                            ->default(1)
+                            ->minValue(1)
+                            ->required(),
+                        Forms\Components\Textarea::make('catatan')
+                            ->columnSpanFull(),
+                    ])
+                    ->fillForm(fn (Order $record): array => [
+                        'nama_layanan' => $record->perbaikan_catatan,
+                        'harga' => $record->perbaikan_estimasi_harga,
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        try {
+                            app(OrderService::class)->setujuiPerbaikan($record, $data, auth()->user());
+                            Notification::make()->success()->title('Perbaikan disetujui, layanan ditambahkan')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal menyetujui perbaikan')->body($e->getMessage())->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('tolakPerbaikan')
+                    ->label('Tolak Perbaikan')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && $record->perbaikan_menunggu_konfirmasi)
+                    ->modalHeading('Tolak Perbaikan')
+                    ->modalDescription(fn (Order $record) => 'Customer tidak setuju atas: '.$record->perbaikan_catatan)
+                    ->form([
+                        Forms\Components\Textarea::make('catatan')->label('Catatan (opsional)')->columnSpanFull(),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        try {
+                            app(OrderService::class)->tolakPerbaikan($record, auth()->user(), $data['catatan'] ?? null);
+                            Notification::make()->success()->title('Perbaikan ditolak')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal menolak perbaikan')->body($e->getMessage())->send();
                         }
                     }),
 

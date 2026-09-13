@@ -56,4 +56,13 @@ class WorkReport extends Model
     {
         return $this->hasMany(WorkReportMaterial::class);
     }
+
+    /**
+     * Foto laporan per kategori order_item (dev-plan/13 §3) — laporan baru
+     * pakai ini, bukan lagi kolom foto_sebelum/foto_sesudah.
+     */
+    public function photos(): HasMany
+    {
+        return $this->hasMany(WorkReportPhoto::class);
+    }
 }

@@ -68,7 +68,15 @@
                                     <td class="px-4 py-3 text-gray-600">
                                         {{ $tim->isNotEmpty() ? $tim->join(', ') : '— belum di-assign —' }}
                                     </td>
-                                    <td class="whitespace-nowrap px-4 py-3"><x-teknisi-status-badge :status="$order->status" /></td>
+                                    <td class="whitespace-nowrap px-4 py-3">
+                                        <x-teknisi-status-badge :status="$order->status" />
+                                        @if ($order->perbaikan_menunggu_konfirmasi)
+                                            <span title="{{ $order->perbaikan_catatan }}"
+                                                class="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                                                Ada Perbaikan
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{{ $jenisPelanggan }}</td>
                                     <td class="whitespace-nowrap px-4 py-3">
                                         @if ($laporan === null)

@@ -13,6 +13,7 @@ use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
 use App\Models\User;
 use App\Models\WorkReport;
+use Illuminate\Support\Facades\DB;
 
 class OrderService
 {
@@ -182,6 +183,63 @@ class OrderService
             'catatan' => filled($data['catatan'] ?? null) ? $data['catatan'] : null,
             'ditambahkan_oleh' => $actor->id,
         ]);
+    }
+
+    /**
+     * Customer setuju atas laporan "Ada Perbaikan" (dev-plan/13 §2 langkah
+     * 4) — admin tambah baris order_items baru (harga hasil deal) sekaligus
+     * membersihkan flag "menunggu konfirmasi".
+     */
+    public function setujuiPerbaikan(Order $order, array $data, User $actor): OrderItem
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if (! $order->perbaikan_menunggu_konfirmasi) {
+            throw new BusinessRuleException('Tidak ada laporan perbaikan yang menunggu konfirmasi.');
+        }
+
+        return DB::transaction(function () use ($order, $data, $actor): OrderItem {
+            $item = $this->tambahLayanan($order, $data, $actor);
+
+            $order->perbaikan_menunggu_konfirmasi = false;
+            $order->perbaikan_catatan = null;
+            $order->perbaikan_estimasi_harga = null;
+            $order->perbaikan_dilaporkan_oleh = null;
+            $order->perbaikan_dilaporkan_pada = null;
+            $order->save();
+
+            return $item;
+        });
+    }
+
+    /**
+     * Customer tidak setuju atas laporan "Ada Perbaikan" (dev-plan/13 §2
+     * langkah 4) — flag hilang tanpa baris order_items baru, teknisi lanjut
+     * kerja sesuai order awal saja. Catatan penolakan (kalau ada) ikut
+     * dicatat di catatan_admin sbg riwayat.
+     */
+    public function tolakPerbaikan(Order $order, User $actor, ?string $catatanPenolakan = null): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if (! $order->perbaikan_menunggu_konfirmasi) {
+            throw new BusinessRuleException('Tidak ada laporan perbaikan yang menunggu konfirmasi.');
+        }
+
+        $riwayat = '[PERBAIKAN DITOLAK] '.$order->perbaikan_catatan;
+        if (filled($catatanPenolakan)) {
+            $riwayat .= ' — '.trim($catatanPenolakan);
+        }
+
+        $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n".$riwayat);
+        $order->perbaikan_menunggu_konfirmasi = false;
+        $order->perbaikan_catatan = null;
+        $order->perbaikan_estimasi_harga = null;
+        $order->perbaikan_dilaporkan_oleh = null;
+        $order->perbaikan_dilaporkan_pada = null;
+        $order->save();
+
+        return $order->fresh();
     }
 
     /**

@@ -27,6 +27,10 @@ class OrderDetail extends Component
 
     public string $alasanKendala = '';
 
+    public string $catatanPerbaikan = '';
+
+    public string $estimasiHargaPerbaikan = '';
+
     public string $catatan = '';
 
     public bool $butuhFollowup = false;
@@ -34,6 +38,9 @@ class OrderDetail extends Component
     public $fotoSebelum;
 
     public $fotoSesudah;
+
+    /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] */
+    public array $fotoKategori = [];
 
     public $buktiPembayaran;
 
@@ -46,8 +53,21 @@ class OrderDetail extends Component
 
     public function getOrderProperty(): Order
     {
-        return Order::with(['customer', 'serviceCatalog', 'workReports.materials.stockItem', 'latestPayment'])
+        return Order::with(['customer', 'serviceCatalog', 'orderItems', 'workReports.materials.stockItem', 'workReports.photos.orderItem', 'latestPayment'])
             ->findOrFail($this->orderId);
+    }
+
+    /**
+     * Template slot foto per order_item (dev-plan/13 §3), dipakai form
+     * submitLaporan utk merender input per kategori.
+     *
+     * @return array<int, array<string, string>>
+     */
+    public function getFotoSlotsProperty(): array
+    {
+        return $this->order->orderItems
+            ->mapWithKeys(fn ($item) => [$item->id => \App\Support\FotoLaporanSlot::untuk($item->kategori)])
+            ->all();
     }
 
     public function tambahMaterial(): void
@@ -98,6 +118,27 @@ class OrderDetail extends Component
     }
 
     /**
+     * Tombol "Ada Perbaikan" (dev-plan/13 §2): lapor kebutuhan sparepart/
+     * perbaikan tambahan yg sudah dibicarakan dgn customer, tanpa
+     * menghentikan progres order (beda dari tandaiKendala).
+     */
+    public function laporPerbaikan(): void
+    {
+        try {
+            app(TeknisiService::class)->laporPerbaikan(
+                $this->order,
+                auth()->user(),
+                $this->catatanPerbaikan,
+                $this->estimasiHargaPerbaikan !== '' ? (float) $this->estimasiHargaPerbaikan : null,
+            );
+            session()->flash('status', 'Laporan perbaikan terkirim. Menunggu konfirmasi admin.');
+            $this->reset(['catatanPerbaikan', 'estimasiHargaPerbaikan']);
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
      * Ping GPS berkala dari browser teknisi (lihat order-detail.blade.php).
      * Gagal diam-diam kalau order sudah berpindah status — ini cuma ping
      * latar belakang, bukan aksi yang perlu ditampilkan ke teknisi.
@@ -133,6 +174,7 @@ class OrderDetail extends Component
             'materials.*.jumlah' => ['nullable', 'integer', 'min:1'],
             'fotoSebelum' => ['nullable', 'image', 'max:5120'],
             'fotoSesudah' => ['nullable', 'image', 'max:5120'],
+            'fotoKategori.*.*' => ['nullable', 'image', 'max:5120'],
         ]);
 
         // B25: cek kuota SEBELUM file foto disimpan ke disk.
@@ -141,6 +183,12 @@ class OrderDetail extends Component
             $tambahBytes = (int) ($this->fotoSebelum?->getSize() ?? 0)
                 + (int) ($this->fotoSesudah?->getSize() ?? 0);
 
+            foreach ($this->fotoKategori as $slots) {
+                foreach ($slots as $file) {
+                    $tambahBytes += (int) ($file?->getSize() ?? 0);
+                }
+            }
+
             if ($tambahBytes > 0) {
                 $quota->pastikanCukup($tambahBytes);
             }
@@ -148,6 +196,21 @@ class OrderDetail extends Component
             session()->flash('error', $e->getMessage());
 
             return;
+        }
+
+        $fotoKategori = [];
+        foreach ($this->fotoKategori as $orderItemId => $slots) {
+            foreach ($slots as $slot => $file) {
+                if ($file === null) {
+                    continue;
+                }
+
+                $fotoKategori[] = [
+                    'order_item_id' => (int) $orderItemId,
+                    'slot' => $slot,
+                    'path' => $file->store('work-reports', 'public'),
+                ];
+            }
         }
 
         $payload = [
@@ -160,13 +223,14 @@ class OrderDetail extends Component
             'butuh_followup' => $this->butuhFollowup,
             'foto_sebelum' => $this->fotoSebelum?->store('work-reports', 'public'),
             'foto_sesudah' => $this->fotoSesudah?->store('work-reports', 'public'),
+            'foto_kategori' => $fotoKategori,
         ];
 
         try {
             app(TeknisiService::class)->submitLaporan($this->order, auth()->user(), $payload);
             StorageQuotaService::lupakanCache();
             session()->flash('status', 'Laporan berhasil disubmit.');
-            $this->reset(['materials', 'catatan', 'butuhFollowup', 'fotoSebelum', 'fotoSesudah']);
+            $this->reset(['materials', 'catatan', 'butuhFollowup', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -253,6 +317,7 @@ class OrderDetail extends Component
             'paymentStatus' => PaymentStatus::class,
             'latestPayment' => $order->latestPayment,
             'paymentChannels' => app(PaymentChannelService::class)->daftarAktif(),
+            'fotoSlots' => $this->fotoSlots,
         ])->layout('layouts.teknisi', ['title' => 'Detail Order']);
     }
 }

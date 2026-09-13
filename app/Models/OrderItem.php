@@ -6,6 +6,7 @@ use App\Enums\ServiceType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Satu baris layanan pada Order. Baris pertama dibuat otomatis dari
@@ -55,5 +56,13 @@ class OrderItem extends Model
     public function subtotal(): float
     {
         return (float) $this->harga * $this->jumlah;
+    }
+
+    /**
+     * Foto laporan yg terkait ke baris layanan ini (dev-plan/13 §3).
+     */
+    public function photos(): HasMany
+    {
+        return $this->hasMany(WorkReportPhoto::class);
     }
 }
