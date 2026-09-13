@@ -32,6 +32,7 @@ class Order extends Model
         'metode_dipilih',
         'bukti_pembayaran',
         'resi_token',
+        'surat_jalan_token',
         'ditutup_pada',
         'catatan_admin',
         'alasan_kendala',
@@ -231,6 +232,20 @@ class Order extends Model
         }
 
         return $this->resi_token;
+    }
+
+    /**
+     * Pastikan order punya token Surat Jalan publik (dev-plan/12 §3.12) —
+     * dibuat sekali (idempotent), dipakai admin sebelum tim berangkat.
+     */
+    public function pastikanSuratJalanToken(): string
+    {
+        if ($this->surat_jalan_token === null) {
+            $this->surat_jalan_token = Str::random(40);
+            $this->save();
+        }
+
+        return $this->surat_jalan_token;
     }
 
     /**

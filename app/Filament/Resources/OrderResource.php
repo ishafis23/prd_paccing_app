@@ -271,6 +271,15 @@ class OrderResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
 
+                Tables\Actions\Action::make('suratJalan')
+                    ->label('Surat Jalan')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->color('gray')
+                    ->visible(fn (Order $record) => $record->jenis_pelanggan === CustomerJenis::Company
+                        && $record->status !== OrderStatus::Batal)
+                    ->url(fn (Order $record) => route('surat-jalan.show', [$record->id, $record->pastikanSuratJalanToken()]))
+                    ->openUrlInNewTab(),
+
                 Tables\Actions\Action::make('tambahLayanan')
                     ->label('Tambah Layanan')
                     ->icon('heroicon-o-plus-circle')

@@ -44,13 +44,18 @@
   lepas dari `order_technicians`, riwayat dicatat ke `catatan_admin`.
   Anggota tim lain (bukan PIC) tidak terganggu. 15 test baru
   (`tests/Feature/OrderGantiPicTest.php`).
+- Surat Jalan korporat (§3.12) — pola sama dgn resi (B14a): token publik
+  (`orders.surat_jalan_token`) + halaman cetak/PDF (`surat-jalan.blade.php`)
+  berisi customer, jadwal, tim teknisi, daftar pekerjaan (dari
+  `order_items`), kolom tanda tangan. Aksi "Surat Jalan" di tabel admin
+  cuma muncul utk customer instansi (`jenis_pelanggan = company`) & order
+  belum batal. 5 test baru (`tests/Feature/SuratJalanTest.php`).
 
 ## Belum dikerjakan (realistis Stage 2)
 
 | Ref | Item | Ringkas |
 |---|---|---|
 | §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — **bergantung §3.10 lanjutan** (riwayat per unit), ditunda sampai fitur input orderan disentuh. |
-| §3.12 | Surat Jalan (korporat) | Cetak/kirim daftar unit yg akan dikerjakan ke nomor order — pola spt fitur resi yg sudah ada. |
 | §3.13 | Tim Teknisi permanen (SPK) | Menu buat tim tetap (1 tim = 2 teknisi), assign order ke tim bukan pilih orang satu-satu. |
 
 Kecuali diputuskan lain oleh client, item di atas boleh menyusul setelah

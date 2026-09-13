@@ -159,9 +159,16 @@ laporan sama sekali tidak terhalang. 10 test baru
 (`tests/Feature/VerifikasiLaporanTest.php`).
 
 ### 3.12 Surat Jalan (khusus korporat)
-❌ MISSING — belum ada fitur serupa. Pola termudah: contek fitur "resi"
-yang sudah ada (token publik + halaman cetak/PDF) untuk daftar unit yang
-akan dikerjakan, dikirim ke nomor order.
+✅ **Selesai** — pola sama persis dgn resi (B14a): token publik acak
+(`orders.surat_jalan_token`, `Order::pastikanSuratJalanToken()`) + halaman
+cetak (`resources/views/surat-jalan.blade.php`, tombol "Cetak / Simpan
+PDF" pakai `window.print()`). Isi: kop usaha, customer, lokasi, jadwal,
+tim teknisi, tabel daftar pekerjaan (dari `order_items` — bukan
+`CustomerAcUnit`, krn belum ada penautan order ↔ unit spesifik, lihat
+§3.10 lanjutan), kolom tanda tangan teknisi/customer. Aksi "Surat Jalan"
+di tabel admin (`OrderResource`) cuma muncul utk `jenis_pelanggan =
+company` & order belum batal, buka link publik di tab baru. 5 test baru
+(`tests/Feature/SuratJalanTest.php`).
 
 ### 3.13 Tim Teknisi permanen (1 tim = 2 teknisi, assign by tim bukan pilih orang)
 🟡 PARTIAL — assignment tim SEKARANG ad-hoc per order (`order_technicians`
@@ -186,12 +193,12 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
 6. Portal Klien/Corporate + Unit AC + auto-reminder per kategori — §3.6, §3.10.
 7. Import Excel dispatch massal (100 ruangan) — §3.4 (bergantung §3.10).
-8. Surat Jalan — §3.12.
+8. ~~Surat Jalan~~ — §3.12, **✅ selesai**.
 9. Tim Teknisi permanen (SPK) — §3.13.
-10. Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran
-    per-trip — §3.1, §3.2, §3.8 (besar & butuh keputusan desain, lihat §5).
+10. ~~Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran
+    per-trip~~ — §3.1, §3.2, §3.8, **✅ selesai** (lihat dev-plan/13).
 
-Item 6-10 **bisa digeser** kalau target 1 Okt cuma "running well" untuk
+Item 6, 7, 9 **bisa digeser** kalau target 1 Okt cuma "running well" untuk
 alur inti (order → teknisi kerja → bayar → laporan), bukan seluruh
 corporate portal.
 
