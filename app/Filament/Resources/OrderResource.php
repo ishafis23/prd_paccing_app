@@ -93,6 +93,11 @@ class OrderResource extends Resource
                         TextEntry::make('tanggal_jadwal')->date('d M Y'),
                         TextEntry::make('total')->label('Total')->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.')),
                         TextEntry::make('alamat_pengerjaan')->columnSpanFull(),
+                        TextEntry::make('alasan_kendala')
+                            ->label('Alasan Kendala')
+                            ->columnSpanFull()
+                            ->color('danger')
+                            ->visible(fn (Order $record): bool => filled($record->alasan_kendala)),
                         TextEntry::make('catatan_admin')->columnSpanFull()->placeholder('—'),
                     ]),
                 Section::make('Tim Teknisi (B21)')
@@ -165,7 +170,7 @@ class OrderResource extends Resource
                         ->join(', ') ?: null),
                 Tables\Columns\TextColumn::make('status')->badge()->color(fn (OrderStatus $state): string => match ($state) {
                     OrderStatus::Selesai => 'success',
-                    OrderStatus::Batal => 'danger',
+                    OrderStatus::Batal, OrderStatus::Terkendala => 'danger',
                     OrderStatus::ButuhFollowup => 'warning',
                     default => 'info',
                 }),
@@ -306,12 +311,40 @@ class OrderResource extends Resource
                         }
                     }),
 
+                Tables\Actions\Action::make('jadwalkanUlang')
+                    ->label('Jadwalkan Ulang')
+                    ->icon('heroicon-o-calendar-days')
+                    ->color('warning')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && $record->status === OrderStatus::Terkendala)
+                    ->modalHeading('Jadwalkan Ulang Order')
+                    ->modalDescription(fn (Order $record) => 'Alasan kendala sebelumnya: '.$record->alasan_kendala)
+                    ->form([
+                        Forms\Components\DatePicker::make('tanggal_jadwal')
+                            ->required()
+                            ->default(now()->addDay()),
+                        Forms\Components\TimePicker::make('jam_jadwal'),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        try {
+                            app(OrderService::class)->reschedule(
+                                $record,
+                                auth()->user(),
+                                $data['tanggal_jadwal'],
+                                $data['jam_jadwal'] ?? null,
+                            );
+                            Notification::make()->success()->title('Order dijadwalkan ulang')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal menjadwalkan ulang')->body($e->getMessage())->send();
+                        }
+                    }),
+
                 Tables\Actions\Action::make('batalkan')
                     ->label('Batalkan')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && in_array($record->status, [OrderStatus::Baru, OrderStatus::Terjadwal]))
+                        && in_array($record->status, [OrderStatus::Baru, OrderStatus::Terjadwal, OrderStatus::Terkendala]))
                     ->form([
                         Forms\Components\Textarea::make('alasan')->label('Alasan pembatalan'),
                     ])

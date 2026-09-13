@@ -10,5 +10,6 @@ enum OrderStatus: string
     case Dikerjakan = 'dikerjakan';
     case Selesai = 'selesai';
     case ButuhFollowup = 'butuh_followup';
+    case Terkendala = 'terkendala';
     case Batal = 'batal';
 }

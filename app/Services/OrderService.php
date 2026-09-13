@@ -120,14 +120,38 @@ class OrderService
     }
 
     /**
+     * Jadwalkan ulang order yang terkendala (Admin/Owner) — respons dari
+     * teknisi menandai "Terkendala/Gagal" di lapangan. Order kembali ke
+     * status `terjadwal` dgn jadwal baru; alasan kendala lama dibersihkan
+     * (riwayatnya tetap tercatat di `catatan_admin`).
+     */
+    public function reschedule(Order $order, User $actor, string $tanggalJadwal, ?string $jamJadwal = null): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if ($order->status !== OrderStatus::Terkendala) {
+            throw new BusinessRuleException('Hanya order berstatus terkendala yang bisa dijadwalkan ulang.');
+        }
+
+        $order->tanggal_jadwal = $tanggalJadwal;
+        $order->jam_jadwal = $jamJadwal;
+        $order->status = OrderStatus::Terjadwal;
+        $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[JADWAL ULANG] ".$tanggalJadwal.($jamJadwal ? " {$jamJadwal}" : ''));
+        $order->alasan_kendala = null;
+        $order->save();
+
+        return $order->fresh();
+    }
+
+    /**
      * Batalkan order (Admin/Owner) — hanya dari status `baru`/`terjadwal`.
      */
     public function cancel(Order $order, User $actor, ?string $alasan = null): Order
     {
         $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
 
-        if (! in_array($order->status, [OrderStatus::Baru, OrderStatus::Terjadwal], true)) {
-            throw new BusinessRuleException('Hanya order berstatus baru/terjadwal yang bisa dibatalkan.');
+        if (! in_array($order->status, [OrderStatus::Baru, OrderStatus::Terjadwal, OrderStatus::Terkendala], true)) {
+            throw new BusinessRuleException('Hanya order berstatus baru/terjadwal/terkendala yang bisa dibatalkan.');
         }
 
         $order->status = OrderStatus::Batal;

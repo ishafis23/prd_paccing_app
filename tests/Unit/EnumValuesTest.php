@@ -18,7 +18,7 @@ class EnumValuesTest extends TestCase
 
     public function test_order_statuses_cover_full_workflow(): void
     {
-        $expected = ['baru', 'terjadwal', 'menuju_lokasi', 'dikerjakan', 'selesai', 'butuh_followup', 'batal'];
+        $expected = ['baru', 'terjadwal', 'menuju_lokasi', 'dikerjakan', 'selesai', 'butuh_followup', 'terkendala', 'batal'];
         $this->assertSame($expected, array_column(OrderStatus::cases(), 'value'));
     }
 

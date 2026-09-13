@@ -14,6 +14,7 @@
         'dikerjakan' => 'bg-indigo-50 text-indigo-700',
         'selesai' => 'bg-emerald-50 text-emerald-700',
         'butuh_followup' => 'bg-orange-50 text-orange-700',
+        'terkendala' => 'bg-rose-50 text-rose-700',
         'batal' => 'bg-red-50 text-red-700',
     ];
 

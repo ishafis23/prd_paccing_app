@@ -11,6 +11,9 @@
   (link Google Maps + geser pin), Import Excel customer massal (~4000 baris).
 - Data Unit AC per customer company: tab "Unit AC" di Data Customer +
   Import Excel (§3.10, master data saja).
+- Tombol Terkendala/Gagal + aksi "Jadwalkan Ulang" (§3.9) — admin bisa
+  jadwalkan ulang order yg dilaporkan kendala oleh teknisi, tetap bisa
+  dibatalkan kalau tidak jadi dilanjutkan.
 
 ## Belum dikerjakan (butuh kerja Admin-side)
 
@@ -22,14 +25,14 @@
 | §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — **bergantung §3.10 lanjutan** (riwayat per unit), ditunda sampai fitur input orderan disentuh. |
 | §3.5 | Re-assign PIC hari-H | Ganti teknisi penanggung jawab di hari-H kalau berhalangan — perlu dicek kelengkapan di OrderResource. |
 | §3.7 | Bukti pembayaran + instansi/rumahan | Admin set flag instansi/rumahan saat bikin SPK (nentukan wajib/tidaknya upload bukti bayar teknisi). |
-| §3.9 | Tombol Terkendala/Gagal + reschedule | Admin jadwalkan ulang order yg gagal/terkendala di lapangan. |
 | §3.11 | Verifikasi laporan teknisi | Admin klik acc/verifikasi tiap laporan masuk sebelum order lanjut ke tahap berikut. |
 | §3.12 | Surat Jalan (korporat) | Cetak/kirim daftar unit yg akan dikerjakan ke nomor order — pola spt fitur resi yg sudah ada. |
 | §3.13 | Tim Teknisi permanen (SPK) | Menu buat tim tetap (1 tim = 2 teknisi), assign order ke tim bukan pilih orang satu-satu. |
 
 ## Prioritas (mengikuti §4 di dokumen sumber)
-Wajib sebelum 1 Okt: §3.9, §3.7, §3.11, §3.3. Sisanya (§3.1, §3.2, §3.4,
-§3.12, §3.13) realistis Stage 2 kecuali diputuskan lain oleh client.
+Wajib sebelum 1 Okt: ~~§3.9~~ (selesai), §3.7, §3.11, §3.3. Sisanya
+(§3.1, §3.2, §3.4, §3.12, §3.13) realistis Stage 2 kecuali diputuskan
+lain oleh client.
 
 ## Pertanyaan terbuka yang perlu client
 Lihat §5 di dokumen sumber (foto laporan, kategori pekerjaan, nominal

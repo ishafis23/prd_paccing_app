@@ -221,6 +221,45 @@ class TeknisiService
     }
 
     /**
+     * Tombol "Terkendala / Gagal": teknisi lapor order tidak bisa
+     * dilanjutkan di lapangan (mis. customer tidak jadi / tidak ada di
+     * lokasi). Menutup attendance terbuka (kalau ada) dan menunggu admin
+     * menjadwalkan ulang lewat OrderService::reschedule().
+     */
+    public function tandaiKendala(Order $order, User $teknisi, string $alasan): Order
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (! in_array($order->status, [OrderStatus::Terjadwal, OrderStatus::MenujuLokasi, OrderStatus::Dikerjakan], true)) {
+            throw new BusinessRuleException('Order harus berstatus terjadwal/menuju lokasi/dikerjakan untuk ditandai terkendala.');
+        }
+
+        $alasan = trim($alasan);
+        if ($alasan === '') {
+            throw new BusinessRuleException('Alasan kendala wajib diisi.');
+        }
+
+        return DB::transaction(function () use ($order, $alasan): Order {
+            $order->status = OrderStatus::Terkendala;
+            $order->alasan_kendala = $alasan;
+            $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[KENDALA] ".$alasan);
+            $order->save();
+
+            // B21: attendance terbuka (kalau order sempat dikerjakan) ikut ditutup.
+            $anggotaIds = $this->anggotaTimIds($order);
+            if ($anggotaIds !== []) {
+                $order->attendances()
+                    ->whereIn('user_id', $anggotaIds)
+                    ->whereNull('jam_keluar')
+                    ->update(['jam_keluar' => now()]);
+            }
+
+            return $order->fresh();
+        });
+    }
+
+    /**
      * Teknisi menutup order yang sudah selesai & metode sudah ditandai (B32).
      * Slider "Selesaikan Order": metode pembayaran terkunci (tak bisa diubah)
      * dan waktu penutupan tercatat di `orders.ditutup_pada`.

@@ -152,6 +152,18 @@
         ></div>
     @endif
 
+    {{-- Order terkendala (B-kendala-lapangan): menunggu admin menjadwalkan
+         ulang, sembunyikan aksi lanjutan sampai itu terjadi. --}}
+    @if ($order->status === $orderStatus::Terkendala)
+        <div class="rounded-2xl bg-rose-50 p-4 ring-1 ring-rose-100">
+            <p class="flex items-center gap-2 font-bold text-rose-700">
+                <x-heroicon-o-exclamation-triangle class="h-5 w-5" /> Order Terkendala
+            </p>
+            <p class="mt-1 text-sm text-rose-900/80">{{ $order->alasan_kendala }}</p>
+            <p class="mt-2 text-xs text-rose-600">Menunggu admin menjadwalkan ulang order ini.</p>
+        </div>
+    @endif
+
     @if ($order->status === $orderStatus::Terjadwal)
         <x-teknisi-slider
             hint="Geser untuk mulai berangkat ke lokasi customer."
@@ -166,6 +178,34 @@
             label="Check-in Sekarang"
             action="checkIn"
         />
+    @endif
+
+    {{-- Tombol Terkendala/Gagal: tersedia selama order masih berjalan aktif
+         (belum submit laporan), utk lapor kendala lapangan mis. customer
+         tidak jadi / tidak ada di lokasi. --}}
+    @if (in_array($order->status, [$orderStatus::Terjadwal, $orderStatus::MenujuLokasi, $orderStatus::Dikerjakan]))
+        <div x-data="{ buka: false }" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <button type="button" x-show="!buka" @click="buka = true"
+                class="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 py-2.5 text-sm font-bold text-rose-700 active:bg-rose-100">
+                <x-heroicon-o-exclamation-triangle class="h-4 w-4" /> Terkendala / Gagal
+            </button>
+            <div x-show="buka" x-cloak class="space-y-2">
+                <label class="block text-sm font-semibold text-gray-700">Alasan kendala</label>
+                <textarea wire:model="alasanKendala" rows="3" placeholder="mis. customer tidak jadi / tidak ada di lokasi"
+                    class="w-full rounded-xl border border-gray-300 text-sm"></textarea>
+                @error('alasanKendala') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                <div class="flex gap-2">
+                    <button type="button" @click="buka = false"
+                        class="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-600 active:bg-gray-200">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="tandaiKendala" wire:loading.attr="disabled"
+                        class="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-bold text-white active:bg-rose-700">
+                        Kirim
+                    </button>
+                </div>
+            </div>
+        </div>
     @endif
 
     @if (in_array($order->status, [$orderStatus::Dikerjakan, $orderStatus::ButuhFollowup]))

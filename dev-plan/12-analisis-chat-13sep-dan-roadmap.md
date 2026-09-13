@@ -117,8 +117,13 @@ multi-select per order + slot foto berbeda per kategori + per-unit kalau
 order multi-unit.
 
 ### 3.9 Tombol "Terkendala/Gagal" + reschedule
-❌ MISSING — tidak ada status/alasan gagal di order, tidak ada alur
-reschedule dari kendala lapangan.
+✅ **Selesai** — status baru `OrderStatus::Terkendala`, kolom
+`alasan_kendala`, tombol "Terkendala/Gagal" di portal teknisi
+(`TeknisiService::tandaiKendala`, dari Terjadwal/MenujuLokasi/Dikerjakan,
+alasan wajib diisi, attendance terbuka ikut ditutup), aksi "Jadwalkan
+Ulang" di admin (`OrderService::reschedule`, kembali ke Terjadwal dgn
+jadwal baru) + tetap bisa dibatalkan dari status ini. 17 test baru,
+lihat `tests/Feature/OrderKendalaTest.php`.
 
 ### 3.10 Data AC Unit per customer (terutama korporat)
 🟡 PARTIAL — **✅ master data selesai** (commit `23bac43`): model
@@ -149,8 +154,7 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 
 **Wajib sebelum 1 Okt (blocking "running well" versi client):**
 1. ~~Penyesuaian Import Customer (`jenis` + kolom map)~~ — §2, **✅ selesai**.
-2. Tombol Terkendala/Gagal + reschedule dasar — §3.9, dipakai tiap hari di
-   lapangan. **❌ belum dikerjakan.**
+2. ~~Tombol Terkendala/Gagal + reschedule dasar~~ — §3.9, **✅ selesai**.
 3. Bukti pembayaran per laporan (minimal upload, rumahan vs instansi) —
    §3.7. **❌ belum dikerjakan.**
 4. Verifikasi admin per laporan — §3.11 (client tegas: *"tidak bisa jalan ke

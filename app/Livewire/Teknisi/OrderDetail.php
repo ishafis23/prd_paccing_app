@@ -25,6 +25,8 @@ class OrderDetail extends Component
 
     public array $materials = [];
 
+    public string $alasanKendala = '';
+
     public string $catatan = '';
 
     public bool $butuhFollowup = false;
@@ -72,6 +74,22 @@ class OrderDetail extends Component
         try {
             app(TeknisiService::class)->berangkat($this->order, auth()->user());
             session()->flash('status', 'Status diperbarui: menuju lokasi.');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Tombol "Terkendala / Gagal": order tidak bisa dilanjutkan (mis.
+     * customer tidak jadi / tidak ada di lokasi). Menunggu admin
+     * menjadwalkan ulang.
+     */
+    public function tandaiKendala(): void
+    {
+        try {
+            app(TeknisiService::class)->tandaiKendala($this->order, auth()->user(), $this->alasanKendala);
+            session()->flash('status', 'Order ditandai terkendala. Admin akan menjadwalkan ulang.');
+            $this->reset('alasanKendala');
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }

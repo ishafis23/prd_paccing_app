@@ -31,6 +31,7 @@ class Order extends Model
         'resi_token',
         'ditutup_pada',
         'catatan_admin',
+        'alasan_kendala',
         'created_by',
     ];
 
