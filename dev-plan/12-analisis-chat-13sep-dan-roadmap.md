@@ -92,12 +92,18 @@ ke detail order. Akses Admin/Finance/HR spt PetaTeknisi. 8 test baru
 (`tests/Feature/OrderanHarianPageTest.php`).
 
 ### 3.4 Import Excel dispatch massal (100 ruangan sekaligus assign)
-❌ MISSING — beda dari Import Customer. Ini bulk-create **Order** + assign
-teknisi/tim sekaligus, untuk klien korporat banyak unit/ruangan.
-**Kerja besar** — butuh: kolom ruangan/kode unit, referensi customer yg
-sudah ada, assign PIC/tim, validasi per baris. §3.10 (data AC unit +
-penautan ke order) yg jadi prasyaratnya **sudah selesai** — tinggal
-bangun alur bulk-create order dari file Excel.
+✅ **Selesai** — `OrderDispatchImportService`, header action "Buat Order
+Massal" di tab "Unit AC" customer (berdampingan dgn "Import Excel" unit).
+Beda dari Import Customer/Import Unit AC: ini bulk-create **SATU Order**
+dgn **banyak `order_items`** sekaligus (1 baris file = 1 unit AC yg
+SUDAH terdaftar, §3.10) — cocok utk 1 kunjungan/trip yg mencakup banyak
+ruangan sekaligus (semua order_item boleh didokumentasikan fotonya
+masing-masing lewat fitur foto-per-kategori, §3.8). Form (bukan per
+baris file): Jenis Layanan (katalog, wajib), harga default (opsional,
+override per unit di file), tanggal/jam jadwal, Assign Tim (opsional,
+pakai §3.13). File cuma perlu kolom `kode_unit` (wajib, harus match Unit
+AC customer ini) + `harga`/`catatan` opsional per baris. Maks 500 baris.
+8 test baru (`tests/Feature/OrderDispatchImportTest.php`).
 
 ### 3.5 Re-assign PIC fleksibel di hari-H
 ✅ **Selesai** — aksi baru "Ganti PIC" (`OrderService::gantiPic()`),
@@ -120,6 +126,18 @@ banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Butuh:
   1 bulan (`ServiceReminder` sudah ada, cuma interval & pemicu perlu
   disesuaikan per `jenis` customer — pemicunya sekarang cuma dari
   pembayaran lunas, bukan dari kategori customer).
+
+**Blocker akses login** (lihat
+[`portal-customer/01-konsep-portal-customer.md`](portal-customer/01-konsep-portal-customer.md)
+§4): keputusan 13 Sept sudah final pakai akun login sungguhan
+(email+password, guard Laravel terpisah dari Admin/Teknisi) — TAPI satu
+pertanyaan desain masih terbuka & belum dijawab client: **1 customer
+company boleh punya beberapa akun staf (multi-user), atau cukup 1 akun
+per customer?** Ini menentukan skema tabel (kolom login langsung di
+`customers` vs tabel `customer_users` terpisah) — jangan mulai
+implementasi auth-nya sebelum ini terjawab, supaya tidak perlu migrasi
+ulang skema. Bagian non-login (histori per unit, auto-reminder) TIDAK
+terhalang pertanyaan ini & bisa dikerjakan duluan.
 
 ### 3.7 Bukti pembayaran per laporan teknisi + beda instansi/rumahan
 ✅ **Selesai** — kolom `orders.jenis_pelanggan` (default dari `customer.jenis`
@@ -217,11 +235,12 @@ belum punya PIC). 8 test baru (`tests/Feature/TeamTest.php`).
 5. ~~Halaman Orderan Harian admin~~ — §3.3, **✅ selesai**.
 
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
-6. Portal Klien/Corporate + auto-reminder per kategori — §3.6 (Unit AC +
-   penautannya sendiri, §3.10, **sudah selesai** — jadi ini tinggal
-   halaman histori & pemicu reminder-nya).
-7. Import Excel dispatch massal (100 ruangan) — §3.4 (prasyarat §3.10
-   sudah selesai, tinggal alur bulk-create order-nya).
+6. Portal Klien/Corporate + auto-reminder per kategori — §3.6. Prasyarat
+   teknis (Unit AC + penautan ke order §3.10, order multi-unit §3.4)
+   **sudah selesai semua** — sisa: halaman histori per unit, pemicu
+   reminder per kategori customer, DAN **akun login customer** (blocked,
+   lihat catatan di §3.6 — perlu keputusan client dulu sebelum mulai).
+7. ~~Import Excel dispatch massal (100 ruangan)~~ — §3.4, **✅ selesai**.
 8. ~~Surat Jalan~~ — §3.12, **✅ selesai**.
 9. ~~Tim Teknisi permanen (SPK)~~ — §3.13, **✅ selesai**.
 10. ~~Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran

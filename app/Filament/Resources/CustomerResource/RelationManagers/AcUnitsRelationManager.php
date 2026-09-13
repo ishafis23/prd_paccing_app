@@ -3,7 +3,11 @@
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
 use App\Enums\UnitType;
+use App\Exceptions\BusinessRuleException;
+use App\Models\ServiceCatalog;
+use App\Models\Team;
 use App\Services\CustomerAcUnitImportService;
+use App\Services\OrderDispatchImportService;
 use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -12,6 +16,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -120,6 +125,91 @@ class AcUnitsRelationManager extends RelationManager
                                 ->warning()
                                 ->send();
                         }
+                    }),
+
+                Action::make('unduhTemplateOrderMassal')
+                    ->label('Unduh Template Order Massal')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('gray')
+                    ->action(fn () => app(OrderDispatchImportService::class)->unduhTemplate()),
+                Action::make('importOrderMassal')
+                    ->label('Buat Order Massal')
+                    ->icon('heroicon-o-truck')
+                    ->color('success')
+                    ->modalHeading('Buat Order Massal dari Unit AC')
+                    ->modalDescription('Satu order utk banyak unit sekaligus (dev-plan/12 §3.4) — kode_unit di file harus sudah terdaftar di tab ini. Jenis layanan/harga/jadwal/tim berlaku sama utk semua unit (kecuali harga di-override per baris).')
+                    ->modalSubmitActionLabel('Buat Order')
+                    ->modalWidth('xl')
+                    ->form([
+                        Forms\Components\Select::make('service_catalog_id')
+                            ->label('Jenis Layanan')
+                            ->options(fn () => ServiceCatalog::query()->where('aktif', true)->get()
+                                ->mapWithKeys(fn (ServiceCatalog $c) => [$c->id => "{$c->jenis_layanan->value} - {$c->jenis_unit?->value} {$c->pk} (Rp".number_format($c->harga, 0, ',', '.').')']))
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\TextInput::make('harga')
+                            ->label('Harga per Unit (opsional, override harga katalog)')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->minValue(0),
+                        Forms\Components\DatePicker::make('tanggal_jadwal'),
+                        Forms\Components\TimePicker::make('jam_jadwal'),
+                        Forms\Components\Select::make('team_id')
+                            ->label('Assign Tim (opsional)')
+                            ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
+                            ->searchable(),
+                        Forms\Components\Textarea::make('catatan_admin')
+                            ->columnSpanFull(),
+                        Forms\Components\FileUpload::make('file')
+                            ->label('File Excel / CSV')
+                            ->disk('local')
+                            ->directory('import-order-massal')
+                            ->maxSize(5120)
+                            ->required()
+                            ->columnSpanFull()
+                            ->helperText('.xlsx / .csv — maks. '.OrderDispatchImportService::MAX_BARIS.' baris. Unduh Template dulu untuk format kolom yang benar.'),
+                    ])
+                    ->action(function (array $data): void {
+                        $service = app(OrderDispatchImportService::class);
+
+                        try {
+                            $hasil = $service->import(
+                                Storage::disk('local')->path($data['file']),
+                                $this->getOwnerRecord(),
+                                [
+                                    'service_catalog_id' => $data['service_catalog_id'],
+                                    'harga' => $data['harga'] ?? null,
+                                    'tanggal_jadwal' => $data['tanggal_jadwal'] ?? null,
+                                    'jam_jadwal' => $data['jam_jadwal'] ?? null,
+                                    'team_id' => $data['team_id'] ?? null,
+                                    'catatan_admin' => $data['catatan_admin'] ?? null,
+                                ],
+                                auth()->user(),
+                            );
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Storage::disk('local')->delete($data['file']);
+                            Notification::make()->danger()->title('Gagal membuat order massal')->body($e->getMessage())->send();
+
+                            return;
+                        }
+
+                        Storage::disk('local')->delete($data['file']);
+
+                        if ($hasil['order'] === null) {
+                            Notification::make()
+                                ->warning()
+                                ->title('Tidak ada baris valid, order tidak dibuat')
+                                ->body(implode("\n", array_slice($hasil['rincian'], 0, 15)))
+                                ->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title("Order #{$hasil['order']->id} dibuat: {$hasil['berhasil']} unit, {$hasil['gagal']} gagal")
+                            ->body($hasil['rincian'] !== [] ? implode("\n", array_slice($hasil['rincian'], 0, 15)) : null)
+                            ->{$hasil['gagal'] > 0 ? 'warning' : 'success'}()
+                            ->send();
                     }),
             ])
             ->actions([

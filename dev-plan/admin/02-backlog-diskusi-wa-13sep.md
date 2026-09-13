@@ -62,17 +62,26 @@
   ad-hoc yg sudah ada tetap jadi sumber kebenaran siapa yg bertugas;
   `orders.team_id` cuma jejak tim mana yg dipakai. 8 test baru
   (`tests/Feature/TeamTest.php`).
+- Import Excel dispatch massal (§3.4) — `OrderDispatchImportService`,
+  header action "Buat Order Massal" di tab "Unit AC" (berdampingan dgn
+  "Import Excel" unit). Bikin SATU order dgn banyak `order_items`
+  sekaligus (1 baris file = 1 unit AC yg sudah terdaftar) — cocok utk 1
+  kunjungan/trip yg mencakup banyak ruangan. Form pilih Jenis Layanan
+  (katalog), harga default, jadwal, Assign Tim (opsional); file cuma
+  perlu kolom `kode_unit` + `harga`/`catatan` opsional per baris. 8 test
+  baru (`tests/Feature/OrderDispatchImportTest.php`).
 
 ## Belum dikerjakan (realistis Stage 2)
 
-| Ref | Item | Ringkas |
-|---|---|---|
-| §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — prasyarat §3.10 sudah selesai, tinggal bangun alur bulk-create order dari Excel. |
-
-Kecuali diputuskan lain oleh client, item di atas boleh menyusul setelah
-1 Okt.
+Semua item wajib & backlog admin dari diskusi 13 Sept sudah selesai.
+Sisa: Portal Klien/Corporate (§3.6) — bagian non-login (histori per
+unit, auto-reminder per kategori) belum dikerjakan, dan bagian
+login/akun customer **blocked** menunggu keputusan client (1 akun per
+corporate vs multi-user staf) — lihat dev-plan/12 §3.6.
 
 ## Pertanyaan terbuka yang perlu client
 §3.1, §3.2, §3.8 sudah terjawab & selesai diimplementasikan (lihat
-dev-plan/13). Sisa pertanyaan terbuka §5 di dokumen sumber (kalau ada)
-sudah tidak menghalangi item wajib manapun.
+dev-plan/13). Satu pertanyaan baru masih terbuka: **skema akun login
+Portal Customer** (§3.6) — 1 akun per customer company, atau boleh
+banyak akun staf per customer? Ini menentukan skema tabel sebelum mulai
+dikerjakan.
