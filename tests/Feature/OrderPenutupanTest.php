@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CustomerJenis;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
@@ -26,9 +27,13 @@ beforeEach(function () {
     };
 
     $this->mkOrder = function (User $teknisi, OrderStatus $status, array $ekstra = []): Order {
+        // jenis_pelanggan default Company: tes di file ini bukan tentang
+        // guard bukti pembayaran (§3.7) — itu ditest di
+        // OrderBuktiPembayaranTest.php — jadi dibebaskan dari syarat itu.
         return Order::factory()->create(array_merge([
             'teknisi_id' => $teknisi->id,
             'status' => $status,
+            'jenis_pelanggan' => CustomerJenis::Company,
         ], $ekstra));
     };
 });

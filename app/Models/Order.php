@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CustomerJenis;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,10 +25,12 @@ class Order extends Model
         'teknisi_id',
         'jumlah_unit',
         'alamat_pengerjaan',
+        'jenis_pelanggan',
         'tanggal_jadwal',
         'jam_jadwal',
         'status',
         'metode_dipilih',
+        'bukti_pembayaran',
         'resi_token',
         'ditutup_pada',
         'catatan_admin',
@@ -39,6 +42,7 @@ class Order extends Model
     {
         return [
             'status' => OrderStatus::class,
+            'jenis_pelanggan' => CustomerJenis::class,
             'metode_dipilih' => PaymentMethod::class,
             'jumlah_unit' => 'integer',
             'tanggal_jadwal' => 'date:Y-m-d',

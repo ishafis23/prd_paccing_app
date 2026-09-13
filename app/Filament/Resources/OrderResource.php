@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\CustomerJenis;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
@@ -53,7 +54,9 @@ class OrderResource extends Resource
                     ->required()
                     ->live()
                     ->afterStateUpdated(function (Forms\Set $set, $state) {
-                        $set('alamat_pengerjaan', Customer::find($state)?->alamat);
+                        $customer = Customer::find($state);
+                        $set('alamat_pengerjaan', $customer?->alamat);
+                        $set('jenis_pelanggan', $customer?->jenis?->value);
                     }),
                 Forms\Components\Select::make('service_catalog_id')
                     ->label('Jenis Layanan')
@@ -72,6 +75,14 @@ class OrderResource extends Resource
                     ->searchable(),
                 Forms\Components\Textarea::make('alamat_pengerjaan')
                     ->columnSpanFull(),
+                Forms\Components\Select::make('jenis_pelanggan')
+                    ->label('Jenis Pelanggan')
+                    ->options([
+                        CustomerJenis::Perorangan->value => 'Rumahan',
+                        CustomerJenis::Company->value => 'Instansi',
+                    ])
+                    ->helperText('Menentukan wajib/tidaknya upload bukti pembayaran oleh teknisi. Default mengikuti data customer, bisa diubah di sini.')
+                    ->required(),
                 Forms\Components\DatePicker::make('tanggal_jadwal'),
                 Forms\Components\TimePicker::make('jam_jadwal'),
                 Forms\Components\Textarea::make('catatan_admin')
@@ -90,6 +101,15 @@ class OrderResource extends Resource
                         TextEntry::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
                         TextEntry::make('teknisi.name')->label('Teknisi')->placeholder('— belum di-assign —'),
                         TextEntry::make('status')->badge(),
+                        TextEntry::make('jenis_pelanggan')
+                            ->label('Jenis Pelanggan')
+                            ->badge()
+                            ->formatStateUsing(fn (?CustomerJenis $state): ?string => match ($state) {
+                                CustomerJenis::Company => 'Instansi',
+                                CustomerJenis::Perorangan => 'Rumahan',
+                                default => null,
+                            })
+                            ->placeholder('—'),
                         TextEntry::make('tanggal_jadwal')->date('d M Y'),
                         TextEntry::make('total')->label('Total')->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.')),
                         TextEntry::make('alamat_pengerjaan')->columnSpanFull(),
@@ -129,6 +149,10 @@ class OrderResource extends Resource
                             ->badge()
                             ->placeholder('—')
                             ->formatStateUsing(fn (?PaymentMethod $state): ?string => $state ? ucfirst($state->value) : null),
+                        ImageEntry::make('bukti_pembayaran')
+                            ->label('Bukti Pembayaran')
+                            ->disk('public')
+                            ->visible(fn (Order $record): bool => filled($record->bukti_pembayaran)),
                     ])
                     ->columns(2),
                 Section::make('Laporan Pengerjaan')

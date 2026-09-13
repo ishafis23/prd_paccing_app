@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\CustomerJenis;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
@@ -289,6 +290,12 @@ class TeknisiService
             throw new BusinessRuleException('Tandai dulu metode pembayaran pilihan customer sebelum menutup order.');
         }
 
+        // B-bukti-bayar: wajib utk rumahan (termasuk data lama tanpa
+        // jenis_pelanggan), opsional kalau customer-nya instansi.
+        if ($order->jenis_pelanggan !== CustomerJenis::Company && blank($order->bukti_pembayaran)) {
+            throw new BusinessRuleException('Upload bukti pembayaran dulu sebelum menutup order (wajib untuk customer rumahan).');
+        }
+
         $order->ditutup_pada = now();
         $order->save();
 
@@ -323,6 +330,25 @@ class TeknisiService
         }
 
         $order->metode_dipilih = $metode?->value;
+        $order->save();
+
+        return $order->fresh();
+    }
+
+    /**
+     * Upload/ganti bukti pembayaran (foto) — wajib utk customer rumahan
+     * sebelum order bisa ditutup (lihat tutupOrder), opsional utk instansi.
+     */
+    public function uploadBuktiPembayaran(Order $order, User $teknisi, string $path): Order
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if ($order->sudahDitutup()) {
+            throw new BusinessRuleException('Order sudah ditutup — bukti pembayaran tidak bisa diubah.');
+        }
+
+        $order->bukti_pembayaran = $path;
         $order->save();
 
         return $order->fresh();

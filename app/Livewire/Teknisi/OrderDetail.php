@@ -35,6 +35,8 @@ class OrderDetail extends Component
 
     public $fotoSesudah;
 
+    public $buktiPembayaran;
+
     public function mount(Order $order): void
     {
         abort_if(! $order->diassignkanKe(auth()->user()), 403, 'Order ini bukan tugas Anda.');
@@ -192,6 +194,33 @@ class OrderDetail extends Component
             session()->flash('status', $metode === null
                 ? 'Tanda metode pembayaran customer dihapus.'
                 : 'Metode yang dipilih customer diperbarui.');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Upload/ganti bukti pembayaran (B-bukti-bayar) — wajib utk customer
+     * rumahan sebelum order bisa ditutup, opsional utk instansi.
+     */
+    public function uploadBuktiPembayaran(): void
+    {
+        $this->validate(['buktiPembayaran' => ['required', 'image', 'max:5120']]);
+
+        try {
+            app(StorageQuotaService::class)->pastikanCukup((int) $this->buktiPembayaran->getSize());
+        } catch (BusinessRuleException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        try {
+            $path = $this->buktiPembayaran->store('bukti-pembayaran', 'public');
+            app(TeknisiService::class)->uploadBuktiPembayaran($this->order, auth()->user(), $path);
+            StorageQuotaService::lupakanCache();
+            session()->flash('status', 'Bukti pembayaran tersimpan.');
+            $this->reset('buktiPembayaran');
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }

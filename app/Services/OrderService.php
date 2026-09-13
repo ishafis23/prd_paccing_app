@@ -47,6 +47,7 @@ class OrderService
             'teknisi_id' => $teknisi?->id,
             'jumlah_unit' => $jumlahUnit,
             'alamat_pengerjaan' => $data['alamat_pengerjaan'] ?? $customer->alamat,
+            'jenis_pelanggan' => $data['jenis_pelanggan'] ?? $customer->jenis?->value,
             'tanggal_jadwal' => $data['tanggal_jadwal'] ?? null,
             'jam_jadwal' => $data['jam_jadwal'] ?? null,
             'status' => $teknisi ? OrderStatus::Terjadwal : OrderStatus::Baru,

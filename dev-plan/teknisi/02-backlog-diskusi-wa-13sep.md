@@ -12,6 +12,9 @@
 - Tombol "Terkendala/Gagal" (§3.9) — teknisi lapor kendala lapangan
   (alasan wajib diisi), order masuk status Terkendala menunggu admin
   jadwalkan ulang, tetap muncul di Jadwal Saya selama menunggu.
+- Upload bukti pembayaran (§3.7) — foto bisa diunggah/diganti sebelum
+  order ditutup, wajib utk rumahan (slider "Selesaikan Order" ditolak
+  kalau belum ada), opsional utk instansi.
 
 ## Belum dikerjakan (butuh kerja sisi Teknisi/portal HP)
 
@@ -19,11 +22,10 @@
 |---|---|---|
 | §3.1 | Lapor kebutuhan sparepart | Teknisi lapor ke admin saat cuci AC ternyata butuh perbaikan/sparepart. |
 | §3.2 | Input pengeluaran per trip | Teknisi (atau admin dari laporan teknisi) catat uang operasional & biaya tak terduga per order. |
-| §3.7 | Upload bukti pembayaran | Upload bukti transfer via portal (bukan kirim WA) — wajib utk rumahan, opsional utk instansi (ditentukan admin di SPK). |
 | §3.8 | Foto laporan per kategori | Ganti dari 1 pasang foto sebelum/sesudah jadi beberapa slot foto sesuai kategori pekerjaan (cuci ac/tambah freon/service/dst) — **masih ada 2 versi requirement beda, nunggu klarifikasi client (lihat §5 dokumen sumber)**. |
 | §3.13 | Tim Teknisi permanen | Teknisi lihat keanggotaan tim tetapnya (bukan cuma anggota ad-hoc per order). |
 
 ## Prioritas (mengikuti §4 di dokumen sumber)
-Wajib sebelum 1 Okt: ~~§3.9~~ (selesai), §3.7. §3.8 & §3.1/§3.2 nunggu
-jawaban client dulu (§5 dokumen sumber) sebelum bisa mulai desain
-teknisnya.
+Wajib sebelum 1 Okt: ~~§3.9~~ (selesai), ~~§3.7~~ (selesai). §3.8 &
+§3.1/§3.2 nunggu jawaban client dulu (§5 dokumen sumber) sebelum bisa
+mulai desain teknisnya.

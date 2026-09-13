@@ -101,10 +101,14 @@ banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Butuh:
   pembayaran lunas, bukan dari kategori customer).
 
 ### 3.7 Bukti pembayaran per laporan teknisi + beda instansi/rumahan
-❌ MISSING — `Payment` model **belum ada kolom bukti/foto sama sekali**.
-Perlu: upload bukti transfer via portal teknisi (bukan WA), wajib untuk
-rumahan, opsional untuk instansi — pengaturan ini di-set admin saat bikin
-SPK/assign (butuh `jenis` di order, turunan dari `jenis` customer §2).
+✅ **Selesai** — kolom `orders.jenis_pelanggan` (default dari `customer.jenis`
+saat order dibuat, bisa di-override admin di form Order/SPK) dan
+`orders.bukti_pembayaran` (foto, upload via portal teknisi, bukan WA).
+`TeknisiService::uploadBuktiPembayaran()` — bisa diganti bebas sebelum
+order ditutup. Guard di `tutupOrder()`: wajib ada bukti utk rumahan
+(termasuk order lama tanpa jenis_pelanggan — default konservatif),
+opsional utk instansi. 11 test baru
+(`tests/Feature/OrderBuktiPembayaranTest.php`).
 
 ### 3.8 Foto laporan per kategori pekerjaan (bukan cuma before/after)
 ❌ MISSING, dan **ada 2 versi requirement yang beda** dari Isha vs teknisi
@@ -155,8 +159,8 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 **Wajib sebelum 1 Okt (blocking "running well" versi client):**
 1. ~~Penyesuaian Import Customer (`jenis` + kolom map)~~ — §2, **✅ selesai**.
 2. ~~Tombol Terkendala/Gagal + reschedule dasar~~ — §3.9, **✅ selesai**.
-3. Bukti pembayaran per laporan (minimal upload, rumahan vs instansi) —
-   §3.7. **❌ belum dikerjakan.**
+3. ~~Bukti pembayaran per laporan (minimal upload, rumahan vs instansi)~~
+   — §3.7, **✅ selesai**. **❌ belum dikerjakan.**
 4. Verifikasi admin per laporan — §3.11 (client tegas: *"tidak bisa jalan ke
    titik berikutnya jika laporan kerja belum selesai"*). **❌ belum dikerjakan.**
 5. Halaman Orderan Harian admin — §3.3, kebutuhan operasional harian.

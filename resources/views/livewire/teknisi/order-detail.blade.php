@@ -424,6 +424,48 @@
                         @endif
                     </div>
 
+                    {{-- (1b) Bukti Pembayaran (B-bukti-bayar): wajib utk rumahan,
+                         opsional utk instansi — di-set admin di form Order. --}}
+                    @php
+                        $wajibBukti = $order->jenis_pelanggan?->value !== 'company';
+                        $buktiUrl = $order->bukti_pembayaran ? asset('storage/'.ltrim($order->bukti_pembayaran, '/')) : null;
+                    @endphp
+                    <div class="border-t border-gray-100 pt-4">
+                        <p class="text-sm font-bold text-gray-800">
+                            Bukti Pembayaran
+                            @if ($wajibBukti)
+                                <span class="text-red-500">*wajib</span>
+                            @else
+                                <span class="text-xs font-normal text-gray-400">(opsional utk instansi)</span>
+                            @endif
+                        </p>
+
+                        @if ($order->sudahDitutup())
+                            @if ($buktiUrl)
+                                <img src="{{ $buktiUrl }}" alt="Bukti pembayaran order {{ $order->id }}"
+                                    class="mt-2 h-40 w-full rounded-xl object-cover ring-1 ring-gray-100">
+                            @else
+                                <p class="mt-1 text-xs text-gray-400">Tidak ada bukti pembayaran diunggah.</p>
+                            @endif
+                        @else
+                            @if ($buktiUrl)
+                                <img src="{{ $buktiUrl }}" alt="Bukti pembayaran order {{ $order->id }}"
+                                    class="mt-2 h-40 w-full rounded-xl object-cover ring-1 ring-gray-100">
+                                <p class="mt-1 text-xs text-gray-400">Pilih file baru di bawah untuk mengganti.</p>
+                            @endif
+                            <div class="mt-2 flex items-center gap-2">
+                                <input type="file" wire:model="buktiPembayaran" accept="image/*"
+                                    class="flex-1 text-xs text-gray-500">
+                                <button type="button" wire:click="uploadBuktiPembayaran" wire:loading.attr="disabled" wire:target="buktiPembayaran,uploadBuktiPembayaran"
+                                    class="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white active:bg-blue-700">
+                                    Simpan
+                                </button>
+                            </div>
+                            <div wire:loading wire:target="buktiPembayaran,uploadBuktiPembayaran" class="mt-1 text-xs text-gray-400">Mengunggah...</div>
+                            @error('buktiPembayaran') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        @endif
+                    </div>
+
                     {{-- (2) Channel aktif QRIS/rekening --}}
                     @if ($paymentChannels->isNotEmpty())
                         <p class="text-sm font-bold text-gray-800">Bayar Pakai QRIS / Rekening</p>
