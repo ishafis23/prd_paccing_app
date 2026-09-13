@@ -143,6 +143,11 @@ class Order extends Model
         return $this->hasMany(Income::class);
     }
 
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     public function total(): float
     {
         $price = $this->serviceCatalog?->harga ?? 0;

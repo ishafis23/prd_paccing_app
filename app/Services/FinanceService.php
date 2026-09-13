@@ -24,7 +24,8 @@ class FinanceService
         User $by,
         ?string $tanggal = null,
         ?string $keterangan = null,
-        ?string $bukti = null
+        ?string $bukti = null,
+        ?int $orderId = null
     ): Expense {
         $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
 
@@ -33,6 +34,7 @@ class FinanceService
         }
 
         return Expense::create([
+            'order_id' => $orderId,
             'kategori' => $kategori,
             'nominal' => $nominal,
             'tanggal' => $tanggal ?? now()->toDateString(),

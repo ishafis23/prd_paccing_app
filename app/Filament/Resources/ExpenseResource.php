@@ -5,12 +5,14 @@ namespace App\Filament\Resources;
 use App\Enums\ExpenseCategory;
 use App\Filament\Resources\ExpenseResource\Pages;
 use App\Models\Expense;
+use App\Models\Order;
 use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ExpenseResource extends Resource
 {
@@ -20,6 +22,11 @@ class ExpenseResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with('order.customer');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -27,6 +34,16 @@ class ExpenseResource extends Resource
                 Forms\Components\Select::make('kategori')
                     ->options(EnumOptions::for(ExpenseCategory::class))
                     ->required(),
+                Forms\Components\Select::make('order_id')
+                    ->label('Order Terkait (opsional)')
+                    ->helperText('Isi kalau pengeluaran ini terkait trip/order tertentu (mis. uang jalan, tambahan minuman) — kosongkan utk pengeluaran umum.')
+                    ->options(fn () => Order::query()
+                        ->with('customer')
+                        ->latest('id')
+                        ->limit(200)
+                        ->get()
+                        ->mapWithKeys(fn (Order $o) => [$o->id => "#{$o->id} — {$o->customer?->nama} ({$o->tanggal_jadwal?->format('d M Y')})"]))
+                    ->searchable(),
                 Forms\Components\TextInput::make('nominal')
                     ->numeric()
                     ->prefix('Rp')
@@ -51,6 +68,10 @@ class ExpenseResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('tanggal')->date('d M Y')->sortable(),
                 Tables\Columns\TextColumn::make('kategori')->badge(),
+                Tables\Columns\TextColumn::make('order.customer.nama')
+                    ->label('Order Terkait')
+                    ->placeholder('—')
+                    ->formatStateUsing(fn ($state, Expense $record) => $record->order_id ? "#{$record->order_id} — {$state}" : null),
                 Tables\Columns\TextColumn::make('nominal')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('keterangan')->limit(40),
                 Tables\Columns\TextColumn::make('recordedBy.name')->label('Dicatat oleh'),

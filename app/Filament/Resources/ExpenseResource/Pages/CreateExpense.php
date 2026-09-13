@@ -25,6 +25,7 @@ class CreateExpense extends CreateRecord
                 $data['tanggal'] ?? null,
                 $data['keterangan'] ?? null,
                 $data['bukti'] ?? null,
+                $data['order_id'] ?? null,
             );
         } catch (BusinessRuleException|AuthorizationException $e) {
             Notification::make()->danger()->title('Gagal mencatat pengeluaran')->body($e->getMessage())->send();

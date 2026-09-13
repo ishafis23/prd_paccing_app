@@ -12,6 +12,7 @@ class Expense extends Model
     use HasFactory;
 
     protected $fillable = [
+        'order_id',
         'kategori',
         'nominal',
         'tanggal',
@@ -32,5 +33,10 @@ class Expense extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'dicatat_oleh');
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 }

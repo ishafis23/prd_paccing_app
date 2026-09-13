@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Expense;
 use App\Models\Income;
+use App\Models\Order;
 use App\Models\User;
 use App\Services\FinanceService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -47,6 +48,26 @@ it('nominal pengeluaran harus positif', function () {
 
     $this->financeService->createExpense(ExpenseCategory::Material, 0, $admin);
 })->throws(BusinessRuleException::class);
+
+it('pengeluaran bisa dikaitkan ke order (uang jalan/trip) atau dibiarkan umum', function () {
+    $admin = userBerRole(RoleName::Admin);
+    $order = Order::factory()->create();
+
+    $terkaitOrder = $this->financeService->createExpense(
+        ExpenseCategory::Operasional,
+        50000,
+        $admin,
+        null,
+        'Uang jalan tim',
+        null,
+        $order->id,
+    );
+    expect($terkaitOrder->order_id)->toBe($order->id);
+    expect($order->expenses()->count())->toBe(1);
+
+    $umum = $this->financeService->createExpense(ExpenseCategory::Operasional, 100000, $admin, null, 'Sewa bulanan');
+    expect($umum->order_id)->toBeNull();
+});
 
 it('teknisi tidak boleh mencatat pengeluaran', function () {
     $teknisi = userBerRole(RoleName::Teknisi);
@@ -108,3 +129,11 @@ it('teknisi tidak boleh menghapus pengeluaran', function () {
 
     $this->financeService->hapusExpense($expense, $teknisi);
 })->throws(AuthorizationException::class);
+
+it('form Expense di admin menampilkan field Order Terkait', function () {
+    $admin = userBerRole(RoleName::Admin);
+
+    $this->actingAs($admin)->get('/admin/expenses/create')
+        ->assertOk()
+        ->assertSee('Order Terkait');
+});
