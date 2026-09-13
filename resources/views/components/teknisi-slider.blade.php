@@ -6,17 +6,22 @@
         offset: 0,
         max: 0,
         done: false,
+        // Touch/mouse dipakai terpisah (bukan Pointer Events) — beberapa
+        // browser/WebView HP tidak konsisten mendukung pointer events,
+        // sehingga tombol geser sempat tidak merespons sama sekali di HP.
+        clientX(e) {
+            return e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX ?? e.clientX;
+        },
         start(e) {
-            e.preventDefault();
+            if (this.done) return;
+            if (e.cancelable) e.preventDefault();
             this.dragging = true;
             this.max = this.$refs.track.offsetWidth - this.$refs.thumb.offsetWidth;
-            // Semua event pointer berikutnya diarahkan ke thumb —
-            // drag tetap mulus walau kursor keluar dari kotak (mouse & sentuh).
-            this.$refs.thumb.setPointerCapture(e.pointerId);
         },
         move(e) {
             if (!this.dragging || this.done) return;
-            const x = e.clientX - this.$refs.track.getBoundingClientRect().left;
+            if (e.cancelable) e.preventDefault();
+            const x = this.clientX(e) - this.$refs.track.getBoundingClientRect().left;
             this.offset = Math.max(0, Math.min(x - (this.$refs.thumb.offsetWidth / 2), this.max));
         },
         end() {
@@ -38,6 +43,8 @@
             $wire.{{ $action }}();
         }
     }"
+    @mousemove.window="move($event)"
+    @mouseup.window="end()"
     class="rounded-2xl bg-white p-4 shadow-sm select-none"
 >
     <p class="mb-3 text-sm text-gray-600">{{ $hint }}</p>
@@ -47,10 +54,11 @@
             role="button"
             tabindex="0"
             aria-label="{{ $label }}"
-            @pointerdown="start"
-            @pointermove="move"
-            @pointerup="end"
-            @pointercancel="end"
+            @mousedown="start($event)"
+            @touchstart="start($event)"
+            @touchmove="move($event)"
+            @touchend="end()"
+            @touchcancel="end()"
             @keydown.enter.prevent="keyConfirm"
             @keydown.space.prevent="keyConfirm"
             :class="done ? 'bg-green-600 cursor-default' : 'cursor-grab active:cursor-grabbing'"
