@@ -115,9 +115,17 @@ terkait - modal material`) — nilai tambah yg tidak ada sebelumnya.
    field "Order Terkait" (opsional) di form Expense, `FinanceService::
    createExpense()` terima `orderId`, `Order::expenses()` relasi baru.
    9 test (`tests/Feature/FinanceTest.php`).
-2. **`order_items` + refactor `Order::total()`** — struktural, effort
-   besar, sentuh banyak tempat (PaymentService, resi, OrderResource,
-   portal teknisi).
+2. ~~**`order_items` + refactor `Order::total()`**~~ — **✅ selesai**:
+   tabel `order_items`, `Order::orderItems()`, baris pertama dibuat
+   otomatis via `Order::booted()` (semua jalur — OrderService, factory,
+   seeder — konsisten tanpa perlu diingat manual), `Order::total()`
+   dihitung dari sum `order_items` (fallback ke cara lama kalau kosong).
+   Migrasi backfill 1 baris per order lama. Admin bisa tambah baris baru
+   via aksi "Tambah Layanan" (`OrderService::tambahLayanan`, harga
+   manual, Admin/Owner saja, ditolak utk order selesai/batal) — infolist
+   Order dapat section "Rincian Layanan". 10 test baru
+   (`tests/Feature/OrderItemsTest.php`), 381 test total lulus (tidak ada
+   regresi meski `total()` dipakai di puluhan tempat).
 3. **Tombol "Ada Perbaikan" + flag konfirmasi** (teknisi + admin) —
    bergantung pada #2 selesai duluan (butuh `order_items` sbg tempat
    nampung baris baru).

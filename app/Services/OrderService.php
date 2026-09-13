@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
 use App\Models\User;
@@ -143,6 +145,43 @@ class OrderService
         $order->save();
 
         return $order->fresh();
+    }
+
+    /**
+     * Admin menambah baris layanan ke order yg sedang jalan (dev-plan/13
+     * §1/§2 "Ada Perbaikan") — mis. sparepart pengganti yg disepakati
+     * dgn customer setelah teknisi lapor kebutuhan perbaikan. Harga
+     * SELALU diisi manual (hasil nego per kasus), bukan dari katalog.
+     */
+    public function tambahLayanan(Order $order, array $data, User $actor): OrderItem
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
+            throw new BusinessRuleException('Order selesai/batal tidak bisa ditambah layanan.');
+        }
+
+        $namaLayanan = trim((string) ($data['nama_layanan'] ?? ''));
+        if ($namaLayanan === '') {
+            throw new BusinessRuleException('Nama layanan wajib diisi.');
+        }
+
+        $harga = (float) ($data['harga'] ?? -1);
+        if ($harga < 0) {
+            throw new BusinessRuleException('Harga tidak valid.');
+        }
+
+        $jumlah = max(1, (int) ($data['jumlah'] ?? 1));
+        $kategori = filled($data['kategori'] ?? null) ? ServiceType::from($data['kategori']) : null;
+
+        return $order->orderItems()->create([
+            'nama_layanan' => $namaLayanan,
+            'kategori' => $kategori,
+            'harga' => $harga,
+            'jumlah' => $jumlah,
+            'catatan' => filled($data['catatan'] ?? null) ? $data['catatan'] : null,
+            'ditambahkan_oleh' => $actor->id,
+        ]);
     }
 
     /**

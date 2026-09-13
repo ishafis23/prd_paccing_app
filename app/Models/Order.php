@@ -148,11 +148,58 @@ class Order extends Model
         return $this->hasMany(Expense::class);
     }
 
+    /**
+     * Baris layanan order (dev-plan/13) — baris pertama dibuat otomatis
+     * saat order dibuat (lihat booted()), baris tambahan (mis. sparepart
+     * hasil "Ada Perbaikan") lewat OrderService::tambahLayanan().
+     */
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * Total tagihan = jumlah seluruh order_items. Fallback ke
+     * harga-katalog-lama kalau entah kenapa order belum punya order_items
+     * sama sekali (mestinya tidak terjadi berkat booted(), tapi dijaga
+     * agar data lama sebelum migrasi backfill tetap tampil benar).
+     */
     public function total(): float
     {
+        $items = $this->orderItems;
+
+        if ($items->isNotEmpty()) {
+            return (float) $items->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+        }
+
         $price = $this->serviceCatalog?->harga ?? 0;
 
         return (float) $price * (int) $this->jumlah_unit;
+    }
+
+    /**
+     * Baris order_items pertama dibuat otomatis dari service_catalog_id/
+     * jumlah_unit saat order dibuat — supaya Order::total() konsisten
+     * lintas semua jalur pembuatan order (OrderService, factory, seeder)
+     * tanpa perlu tiap caller ingat bikin order_items manual.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Order $order): void {
+            if ($order->orderItems()->exists()) {
+                return;
+            }
+
+            $catalog = $order->serviceCatalog;
+
+            $order->orderItems()->create([
+                'service_catalog_id' => $catalog?->id,
+                'nama_layanan' => $catalog !== null ? str($catalog->jenis_layanan->value)->headline()->toString() : 'Layanan',
+                'kategori' => $catalog?->jenis_layanan,
+                'harga' => $catalog?->harga ?? 0,
+                'jumlah' => $order->jumlah_unit ?? 1,
+            ]);
+        });
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Enums\CustomerJenis;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Customer;
@@ -39,8 +40,8 @@ class OrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        // Hindari N+1 untuk kolom Tim, kolom Laporan & seksi infolist (B21/§3.11).
-        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports']);
+        // Hindari N+1 utk kolom Tim, Laporan, Total & seksi infolist (B21/§3.11/dev-plan13).
+        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports', 'orderItems']);
     }
 
     public static function form(Form $form): Form
@@ -120,6 +121,26 @@ class OrderResource extends Resource
                             ->visible(fn (Order $record): bool => filled($record->alasan_kendala)),
                         TextEntry::make('catatan_admin')->columnSpanFull()->placeholder('—'),
                     ]),
+                Section::make('Rincian Layanan')
+                    ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan" (mis. sparepart hasil "Ada Perbaikan").')
+                    ->schema([
+                        RepeatableEntry::make('orderItems')
+                            ->label('')
+                            ->columns(4)
+                            ->schema([
+                                TextEntry::make('nama_layanan')->label('Layanan'),
+                                TextEntry::make('kategori')->badge()->placeholder('—'),
+                                TextEntry::make('jumlah')->label('Jumlah'),
+                                TextEntry::make('harga')->label('Harga')->money('IDR'),
+                                TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
+                                    ->visible(fn ($record): bool => filled($record?->catatan)),
+                                TextEntry::make('ditambahkanOleh.name')
+                                    ->label('Ditambahkan oleh')
+                                    ->columnSpanFull()
+                                    ->visible(fn ($record): bool => filled($record?->ditambahkan_oleh)),
+                            ]),
+                    ])
+                    ->collapsible(),
                 Section::make('Tim Teknisi (B21)')
                     ->schema([
                         TextEntry::make('anggota_tim')
@@ -229,6 +250,43 @@ class OrderResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+
+                Tables\Actions\Action::make('tambahLayanan')
+                    ->label('Tambah Layanan')
+                    ->icon('heroicon-o-plus-circle')
+                    ->color('gray')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal]))
+                    ->modalHeading('Tambah Layanan ke Order')
+                    ->modalDescription('Mis. sparepart pengganti yg sudah disepakati dgn customer (alur "Ada Perbaikan"). Harga diisi manual sesuai hasil nego.')
+                    ->form([
+                        Forms\Components\TextInput::make('nama_layanan')
+                            ->label('Nama Layanan/Sparepart')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\Select::make('kategori')
+                            ->options(EnumOptions::for(ServiceType::class)),
+                        Forms\Components\TextInput::make('harga')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->required()
+                            ->minValue(0),
+                        Forms\Components\TextInput::make('jumlah')
+                            ->numeric()
+                            ->default(1)
+                            ->minValue(1)
+                            ->required(),
+                        Forms\Components\Textarea::make('catatan')
+                            ->columnSpanFull(),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        try {
+                            app(OrderService::class)->tambahLayanan($record, $data, auth()->user());
+                            Notification::make()->success()->title('Layanan ditambahkan')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal menambah layanan')->body($e->getMessage())->send();
+                        }
+                    }),
 
                 Tables\Actions\Action::make('assignTeknisi')
                     ->label('Assign Teknisi')
