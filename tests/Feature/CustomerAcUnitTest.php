@@ -2,6 +2,8 @@
 
 use App\Enums\CustomerJenis;
 use App\Enums\RoleName;
+use App\Exceptions\BusinessRuleException;
+use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\AcUnitsRelationManager;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
@@ -12,6 +14,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -41,12 +44,13 @@ function cauBuatFile(array $baris, array $header = CustomerAcUnitImportService::
     return $path;
 }
 
-it('relation manager Unit AC hanya tampil utk customer jenis company', function () {
+it('relation manager Unit AC tampil utk semua jenis customer (dev-plan/12 §3.10 lanjutan)', function () {
+    $this->actingAs(cauAdmin());
     $company = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
     $perorangan = Customer::factory()->create(['jenis' => CustomerJenis::Perorangan]);
 
     expect(AcUnitsRelationManager::canViewForRecord($company, ''))->toBeTrue();
-    expect(AcUnitsRelationManager::canViewForRecord($perorangan, ''))->toBeFalse();
+    expect(AcUnitsRelationManager::canViewForRecord($perorangan, ''))->toBeTrue();
 });
 
 it('bukan admin ditolak melakukan import unit ac', function () {
@@ -132,13 +136,13 @@ it('menolak file lebih dari MAX_BARIS baris', function () {
     $path = cauBuatFile($baris);
 
     expect(fn () => app(CustomerAcUnitImportService::class)->import($path, $customer, $admin))
-        ->toThrow(\App\Exceptions\BusinessRuleException::class);
+        ->toThrow(BusinessRuleException::class);
 });
 
 it('unduh template unit ac menghasilkan streamed response', function () {
     $response = app(CustomerAcUnitImportService::class)->unduhTemplate();
 
-    expect($response)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
+    expect($response)->toBeInstanceOf(StreamedResponse::class);
 });
 
 it('halaman edit customer company memuat tanpa error (relation manager Unit AC lazy-load via JS, dicek terpisah)', function () {
@@ -163,7 +167,7 @@ it('livewire component Unit AC menampilkan data & aksi import utk customer compa
 
     Livewire::test(AcUnitsRelationManager::class, [
         'ownerRecord' => $customer,
-        'pageClass' => \App\Filament\Resources\CustomerResource\Pages\EditCustomer::class,
+        'pageClass' => EditCustomer::class,
     ])
         ->assertSee('AC-001')
         ->assertSee('Kelas 3A')

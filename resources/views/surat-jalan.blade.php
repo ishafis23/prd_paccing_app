@@ -88,6 +88,7 @@
             <thead>
                 <tr class="border-b border-gray-200 text-left text-gray-500">
                     <th class="py-1.5 pr-2">Layanan</th>
+                    <th class="py-1.5 pr-2">Unit AC</th>
                     <th class="py-1.5 pr-2">Kategori</th>
                     <th class="py-1.5 text-right">Jumlah</th>
                 </tr>
@@ -96,12 +97,13 @@
                 @forelse ($order->orderItems as $item)
                     <tr>
                         <td class="py-1.5 pr-2">{{ $item->nama_layanan }}</td>
+                        <td class="py-1.5 pr-2 text-gray-500">{{ $item->acUnit?->labelTampil() ?? '—' }}</td>
                         <td class="py-1.5 pr-2 text-gray-500">{{ $item->kategori ? \Illuminate\Support\Str::headline($item->kategori->value) : '—' }}</td>
                         <td class="py-1.5 text-right">{{ $item->jumlah }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="3" class="py-2 text-center text-gray-400">Belum ada rincian layanan.</td>
+                        <td colspan="4" class="py-2 text-center text-gray-400">Belum ada rincian layanan.</td>
                     </tr>
                 @endforelse
             </tbody>

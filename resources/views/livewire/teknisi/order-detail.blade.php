@@ -304,7 +304,12 @@
                     <div class="space-y-3">
                         @foreach ($order->orderItems as $item)
                             <div class="rounded-xl bg-gray-50 p-3">
-                                <p class="mb-2 text-sm font-semibold text-gray-700">{{ $item->nama_layanan }}</p>
+                                <p class="mb-2 text-sm font-semibold text-gray-700">
+                                    {{ $item->nama_layanan }}
+                                    @if ($item->acUnit)
+                                        <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
+                                    @endif
+                                </p>
                                 <div class="grid grid-cols-2 gap-2">
                                     @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
                                         <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">

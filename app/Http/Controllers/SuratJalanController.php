@@ -18,7 +18,7 @@ class SuratJalanController extends Controller
 
         abort_unless($sah, 404);
 
-        $order->load(['customer', 'orderItems', 'timTeknisi', 'teknisi']);
+        $order->load(['customer', 'orderItems.acUnit', 'timTeknisi', 'teknisi']);
 
         return view('surat-jalan', ['order' => $order]);
     }

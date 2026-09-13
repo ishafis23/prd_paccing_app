@@ -88,8 +88,9 @@ ke detail order. Akses Admin/Finance/HR spt PetaTeknisi. 8 test baru
 ❌ MISSING — beda dari Import Customer. Ini bulk-create **Order** + assign
 teknisi/tim sekaligus, untuk klien korporat banyak unit/ruangan.
 **Kerja besar** — butuh: kolom ruangan/kode unit, referensi customer yg
-sudah ada, assign PIC/tim, validasi per baris. Bergantung pada §3.10 (data
-AC unit) kalau mau tracking per-ruangan yang benar.
+sudah ada, assign PIC/tim, validasi per baris. §3.10 (data AC unit +
+penautan ke order) yg jadi prasyaratnya **sudah selesai** — tinggal
+bangun alur bulk-create order dari file Excel.
 
 ### 3.5 Re-assign PIC fleksibel di hari-H
 ✅ **Selesai** — aksi baru "Ganti PIC" (`OrderService::gantiPic()`),
@@ -104,8 +105,10 @@ riwayat dicatat ke `catatan_admin`. 15 test baru
 ### 3.6 Portal Klien/Corporate (asset AC, histori, auto-reminder)
 ❌ MISSING (**client sendiri bilang ini Stage 2**, KECUALI utk korporat
 banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Butuh:
-- Model baru "Unit AC" per customer (kode ruangan, tipe AC) — lihat §3.10.
-- Halaman histori pencucian per unit.
+- Model "Unit AC" per customer + penautan ke order — §3.10, **sudah
+  selesai**, sudah bisa jadi dasar histori per unit di bawah ini.
+- Halaman histori pencucian per unit (query order_items by
+  customer_ac_unit_id, belum ada halamannya).
 - Auto-reminder: normal/rumahan tiap 3 bulan, komersial/sekolah/kantor tiap
   1 bulan (`ServiceReminder` sudah ada, cuma interval & pemicu perlu
   disesuaikan per `jenis` customer — pemicunya sekarang cuma dari
@@ -141,13 +144,21 @@ jadwal baru) + tetap bisa dibatalkan dari status ini. 17 test baru,
 lihat `tests/Feature/OrderKendalaTest.php`.
 
 ### 3.10 Data AC Unit per customer (terutama korporat)
-🟡 PARTIAL — **✅ master data selesai** (commit `23bac43`): model
-`CustomerAcUnit` (kode_unit, kode_ruangan, jenis_unit, pk, catatan),
-tab "Unit AC" di Data Customer (khusus jenis Company), Import Excel +
-Unduh Template. **Belum ada**: riwayat pencucian per unit (baru data
-master unit-nya, belum tersambung ke WorkReport/Order), dan assign
-teknisi/order dari unit ini (sengaja ditunda — akan dianalisis saat
-fitur input orderan disentuh).
+✅ **Selesai** — master data (commit `23bac43`) + penautan ke
+order/laporan (lanjutan, hari ini): tab "Unit AC" di Data Customer kini
+tampil utk **semua jenis customer, termasuk rumahan** (sebelumnya
+khusus Company — dibuka krn rumahan jg bisa punya beberapa AC).
+`orders.customer_ac_unit_id` (utk baris order_item pertama, sama pola
+dgn service_catalog_id/jumlah_unit) & `order_items.customer_ac_unit_id`
+(per baris, termasuk baris tambahan lewat "Tambah Layanan"/"Setujui
+Perbaikan") — opsional, backward-compatible utk customer yg belum
+punya data Unit AC terdaftar. Divalidasi harus milik customer yg sama
+(`OrderService::resolveAcUnit()`). Muncul di: form Buat Order (select
+"Unit AC" reaktif terhadap customer dipilih), form Tambah
+Layanan/Setujui Perbaikan, infolist "Rincian Layanan" & "Foto per
+Kategori", form submitLaporan teknisi (label unit di samping nama
+layanan), dan Surat Jalan (kolom Unit AC per baris pekerjaan). 12 test
+baru (`tests/Feature/OrderAcUnitLinkTest.php`), 439 test total lulus.
 
 ### 3.11 Verifikasi/approval laporan oleh admin
 ✅ **Selesai** — kolom `work_reports.diverifikasi_pada`/`diverifikasi_oleh`,
@@ -191,8 +202,11 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 5. ~~Halaman Orderan Harian admin~~ — §3.3, **✅ selesai**.
 
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
-6. Portal Klien/Corporate + Unit AC + auto-reminder per kategori — §3.6, §3.10.
-7. Import Excel dispatch massal (100 ruangan) — §3.4 (bergantung §3.10).
+6. Portal Klien/Corporate + auto-reminder per kategori — §3.6 (Unit AC +
+   penautannya sendiri, §3.10, **sudah selesai** — jadi ini tinggal
+   halaman histori & pemicu reminder-nya).
+7. Import Excel dispatch massal (100 ruangan) — §3.4 (prasyarat §3.10
+   sudah selesai, tinggal alur bulk-create order-nya).
 8. ~~Surat Jalan~~ — §3.12, **✅ selesai**.
 9. Tim Teknisi permanen (SPK) — §3.13.
 10. ~~Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran

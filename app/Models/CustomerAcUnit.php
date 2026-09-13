@@ -37,4 +37,15 @@ class CustomerAcUnit extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    /**
+     * Label ringkas utk dropdown/tampilan (dev-plan/12 §3.10 lanjutan) —
+     * mis. "AC-01 — Ruang Guru (1 PK)".
+     */
+    public function labelTampil(): string
+    {
+        $label = trim($this->kode_unit.' — '.$this->kode_ruangan);
+
+        return filled($this->pk) ? "{$label} ({$this->pk})" : $label;
+    }
 }

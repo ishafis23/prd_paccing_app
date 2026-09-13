@@ -22,6 +22,7 @@ class Order extends Model
     protected $fillable = [
         'customer_id',
         'service_catalog_id',
+        'customer_ac_unit_id',
         'teknisi_id',
         'jumlah_unit',
         'alamat_pengerjaan',
@@ -67,6 +68,16 @@ class Order extends Model
     public function serviceCatalog(): BelongsTo
     {
         return $this->belongsTo(ServiceCatalog::class);
+    }
+
+    /**
+     * Unit AC utk baris order_item pertama (dev-plan/12 §3.10 lanjutan) —
+     * sama pola dgn service_catalog_id/jumlah_unit. Nullable/opsional;
+     * customer tanpa data Unit AC terdaftar tetap bisa order spt biasa.
+     */
+    public function acUnit(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAcUnit::class, 'customer_ac_unit_id');
     }
 
     public function teknisi(): BelongsTo
@@ -212,6 +223,7 @@ class Order extends Model
 
             $order->orderItems()->create([
                 'service_catalog_id' => $catalog?->id,
+                'customer_ac_unit_id' => $order->customer_ac_unit_id,
                 'nama_layanan' => $catalog !== null ? str($catalog->jenis_layanan->value)->headline()->toString() : 'Layanan',
                 'kategori' => $catalog?->jenis_layanan,
                 'harga' => $catalog?->harga ?? 0,

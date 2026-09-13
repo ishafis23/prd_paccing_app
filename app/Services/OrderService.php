@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
+use App\Models\CustomerAcUnit;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderTechnician;
@@ -45,9 +46,12 @@ class OrderService
             $this->assertRole($teknisi, [RoleName::Teknisi]);
         }
 
+        $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $customer);
+
         $order = new Order([
             'customer_id' => $customer->id,
             'service_catalog_id' => $catalog->id,
+            'customer_ac_unit_id' => $acUnit?->id,
             'teknisi_id' => $teknisi?->id,
             'jumlah_unit' => $jumlahUnit,
             'alamat_pengerjaan' => $data['alamat_pengerjaan'] ?? $customer->alamat,
@@ -226,8 +230,10 @@ class OrderService
 
         $jumlah = max(1, (int) ($data['jumlah'] ?? 1));
         $kategori = filled($data['kategori'] ?? null) ? ServiceType::from($data['kategori']) : null;
+        $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $order->customer);
 
         return $order->orderItems()->create([
+            'customer_ac_unit_id' => $acUnit?->id,
             'nama_layanan' => $namaLayanan,
             'kategori' => $kategori,
             'harga' => $harga,
@@ -235,6 +241,25 @@ class OrderService
             'catatan' => filled($data['catatan'] ?? null) ? $data['catatan'] : null,
             'ditambahkan_oleh' => $actor->id,
         ]);
+    }
+
+    /**
+     * Validasi Unit AC (dev-plan/12 §3.10 lanjutan) — kalau diisi, harus
+     * milik customer yg sama dgn order/customer terkait. `null` = tidak
+     * ditautkan ke unit manapun (opsional, backward-compatible).
+     */
+    private function resolveAcUnit(?int $acUnitId, Customer $customer): ?CustomerAcUnit
+    {
+        if ($acUnitId === null) {
+            return null;
+        }
+
+        $unit = CustomerAcUnit::find($acUnitId);
+        if ($unit === null || (int) $unit->customer_id !== (int) $customer->id) {
+            throw new BusinessRuleException('Unit AC tidak ditemukan atau bukan milik customer ini.');
+        }
+
+        return $unit;
     }
 
     /**

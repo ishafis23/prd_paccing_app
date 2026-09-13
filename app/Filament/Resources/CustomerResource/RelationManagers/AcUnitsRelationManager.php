@@ -2,9 +2,7 @@
 
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
-use App\Enums\CustomerJenis;
 use App\Enums\UnitType;
-use App\Models\Customer;
 use App\Services\CustomerAcUnitImportService;
 use App\Support\EnumOptions;
 use Filament\Forms;
@@ -14,24 +12,20 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Daftar Unit AC milik customer company (mis. sekolah/kantor banyak
- * unit) — dasar histori pencucian per unit & portal corporate (menyusul,
- * lihat dev-plan/12 §3.6/§3.10). Hanya tampil utk customer jenis Company.
+ * Daftar Unit AC milik customer — awalnya khusus Company (sekolah/kantor
+ * banyak unit), sekarang dibuka utk semua jenis customer termasuk rumahan
+ * (dev-plan/12 §3.10 lanjutan) supaya order/laporan bisa menunjuk ke unit
+ * spesifik kalau customer punya lebih dari satu AC. Dasar histori
+ * pencucian per unit & portal corporate (menyusul, lihat §3.6).
  */
 class AcUnitsRelationManager extends RelationManager
 {
     protected static string $relationship = 'acUnits';
 
     protected static ?string $title = 'Unit AC';
-
-    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
-    {
-        return $ownerRecord instanceof Customer && $ownerRecord->jenis === CustomerJenis::Company;
-    }
 
     public function form(Form $form): Form
     {

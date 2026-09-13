@@ -21,6 +21,7 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'service_catalog_id',
+        'customer_ac_unit_id',
         'nama_layanan',
         'kategori',
         'harga',
@@ -46,6 +47,15 @@ class OrderItem extends Model
     public function serviceCatalog(): BelongsTo
     {
         return $this->belongsTo(ServiceCatalog::class);
+    }
+
+    /**
+     * Unit AC spesifik yg dikerjakan baris ini (dev-plan/12 §3.10 lanjutan)
+     * — penting kalau customer punya lebih dari satu unit AC.
+     */
+    public function acUnit(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAcUnit::class, 'customer_ac_unit_id');
     }
 
     public function ditambahkanOleh(): BelongsTo

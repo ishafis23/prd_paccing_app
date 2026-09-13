@@ -10,6 +10,7 @@ use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Customer;
+use App\Models\CustomerAcUnit;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\User;
@@ -41,7 +42,7 @@ class OrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         // Hindari N+1 utk kolom Tim, Laporan, Total & seksi infolist (B21/§3.11/dev-plan13).
-        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports.photos.orderItem', 'orderItems', 'pelaporPerbaikan']);
+        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports.photos.orderItem.acUnit', 'orderItems.acUnit', 'pelaporPerbaikan']);
     }
 
     public static function form(Form $form): Form
@@ -70,6 +71,14 @@ class OrderResource extends Resource
                     ->default(1)
                     ->minValue(1)
                     ->required(),
+                Forms\Components\Select::make('customer_ac_unit_id')
+                    ->label('Unit AC (opsional)')
+                    ->helperText('Pilih unit spesifik kalau customer punya lebih dari satu AC terdaftar — supaya laporan teknisi menunjuk ke unit yang benar.')
+                    ->options(fn (Forms\Get $get) => CustomerAcUnit::query()
+                        ->where('customer_id', $get('customer_id'))
+                        ->get()
+                        ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
+                    ->searchable(),
                 Forms\Components\Select::make('teknisi_id')
                     ->label('Assign Teknisi (opsional)')
                     ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
@@ -142,6 +151,11 @@ class OrderResource extends Resource
                                 TextEntry::make('kategori')->badge()->placeholder('—'),
                                 TextEntry::make('jumlah')->label('Jumlah'),
                                 TextEntry::make('harga')->label('Harga')->money('IDR'),
+                                TextEntry::make('acUnit')
+                                    ->label('Unit AC')
+                                    ->columnSpanFull()
+                                    ->state(fn ($record) => $record?->acUnit?->labelTampil())
+                                    ->visible(fn ($record): bool => $record?->customer_ac_unit_id !== null),
                                 TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
                                     ->visible(fn ($record): bool => filled($record?->catatan)),
                                 TextEntry::make('ditambahkanOleh.name')
@@ -206,7 +220,11 @@ class OrderResource extends Resource
                                     ->columnSpanFull()
                                     ->columns(4)
                                     ->schema([
-                                        TextEntry::make('orderItem.nama_layanan')->label('Layanan'),
+                                        TextEntry::make('orderItem.nama_layanan')
+                                            ->label('Layanan')
+                                            ->formatStateUsing(fn (?string $state, $record): string => $record?->orderItem?->acUnit
+                                                ? $state.' — '.$record->orderItem->acUnit->labelTampil()
+                                                : (string) $state),
                                         TextEntry::make('slot')->label('Slot')->formatStateUsing(fn (?string $state): string => str($state ?? '')->headline()->toString()),
                                         ImageEntry::make('path')->label('')->disk('public')->columnSpan(2),
                                     ])
@@ -295,6 +313,13 @@ class OrderResource extends Resource
                             ->maxLength(255),
                         Forms\Components\Select::make('kategori')
                             ->options(EnumOptions::for(ServiceType::class)),
+                        Forms\Components\Select::make('customer_ac_unit_id')
+                            ->label('Unit AC (opsional)')
+                            ->options(fn (Order $record) => CustomerAcUnit::query()
+                                ->where('customer_id', $record->customer_id)
+                                ->get()
+                                ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
+                            ->searchable(),
                         Forms\Components\TextInput::make('harga')
                             ->numeric()
                             ->prefix('Rp')
@@ -333,6 +358,13 @@ class OrderResource extends Resource
                             ->maxLength(255),
                         Forms\Components\Select::make('kategori')
                             ->options(EnumOptions::for(ServiceType::class)),
+                        Forms\Components\Select::make('customer_ac_unit_id')
+                            ->label('Unit AC (opsional)')
+                            ->options(fn (Order $record) => CustomerAcUnit::query()
+                                ->where('customer_id', $record->customer_id)
+                                ->get()
+                                ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
+                            ->searchable(),
                         Forms\Components\TextInput::make('harga')
                             ->label('Harga hasil deal')
                             ->numeric()

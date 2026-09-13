@@ -53,7 +53,7 @@ class OrderDetail extends Component
 
     public function getOrderProperty(): Order
     {
-        return Order::with(['customer', 'serviceCatalog', 'orderItems', 'workReports.materials.stockItem', 'workReports.photos.orderItem', 'latestPayment'])
+        return Order::with(['customer', 'serviceCatalog', 'orderItems.acUnit', 'workReports.materials.stockItem', 'workReports.photos.orderItem.acUnit', 'latestPayment'])
             ->findOrFail($this->orderId);
     }
 

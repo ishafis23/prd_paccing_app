@@ -9,8 +9,13 @@
 ## Sudah selesai
 - Data Customer: kolom `jenis` (company/perorangan), `email`, lokasi peta
   (link Google Maps + geser pin), Import Excel customer massal (~4000 baris).
-- Data Unit AC per customer company: tab "Unit AC" di Data Customer +
-  Import Excel (§3.10, master data saja).
+- Data Unit AC per customer (§3.10) — tab "Unit AC" di Data Customer,
+  kini tampil utk **semua jenis customer termasuk rumahan** (sebelumnya
+  cuma Company), + Import Excel. **Ditautkan ke order/laporan**: field
+  "Unit AC" (opsional) di form Buat Order, "Tambah Layanan", & "Setujui
+  Perbaikan" — supaya laporan teknisi & Surat Jalan menunjuk ke unit AC
+  spesifik kalau customer punya lebih dari satu. 12 test baru
+  (`tests/Feature/OrderAcUnitLinkTest.php`).
 - Tombol Terkendala/Gagal + aksi "Jadwalkan Ulang" (§3.9) — admin bisa
   jadwalkan ulang order yg dilaporkan kendala oleh teknisi, tetap bisa
   dibatalkan kalau tidak jadi dilanjutkan.
@@ -55,7 +60,7 @@
 
 | Ref | Item | Ringkas |
 |---|---|---|
-| §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — **bergantung §3.10 lanjutan** (riwayat per unit), ditunda sampai fitur input orderan disentuh. |
+| §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — prasyarat §3.10 sudah selesai, tinggal bangun alur bulk-create order dari Excel. |
 | §3.13 | Tim Teknisi permanen (SPK) | Menu buat tim tetap (1 tim = 2 teknisi), assign order ke tim bukan pilih orang satu-satu. |
 
 Kecuali diputuskan lain oleh client, item di atas boleh menyusul setelah
