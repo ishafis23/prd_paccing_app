@@ -89,6 +89,42 @@
         </div>
     </div>
 
+    {{-- Peta lokasi customer (dari koordinat yg diisi Admin di Data Customer) --}}
+    @if ($order->customer->latitude !== null && $order->customer->longitude !== null)
+        @php
+            $custLat = (float) $order->customer->latitude;
+            $custLng = (float) $order->customer->longitude;
+            $rute = 'https://www.google.com/maps/dir/?api=1&destination='.$custLat.','.$custLng;
+        @endphp
+        <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <div
+                wire:ignore
+                x-data="{
+                    map: null,
+                    init() {
+                        this.map = L.map(this.$el, { zoomControl: false }).setView([{{ $custLat }}, {{ $custLng }}], 16);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors',
+                            maxZoom: 19,
+                        }).addTo(this.map);
+                        L.marker([{{ $custLat }}, {{ $custLng }}]).addTo(this.map);
+                    },
+                    destroy() {
+                        if (this.map) this.map.remove();
+                    },
+                }"
+                x-init="init()"
+                class="h-40 w-full"
+            ></div>
+            <a href="{{ $rute }}" target="_blank" rel="noopener"
+                class="flex items-center justify-center gap-2 border-t border-gray-100 py-3 text-sm font-bold text-blue-700 active:bg-blue-50">
+                <x-heroicon-o-map class="h-4 w-4" /> Buka Rute ke Lokasi Customer
+            </a>
+        </div>
+    @endif
+
     {{-- Ping GPS latar belakang (B-lacak-lokasi): aktif hanya selagi menuju
          lokasi/mengerjakan order ini. wire:key berganti tiap status supaya
          Alpine bikin ulang timer & bersih-bersih interval lama lewat destroy(). --}}

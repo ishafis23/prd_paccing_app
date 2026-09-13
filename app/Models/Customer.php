@@ -18,6 +18,8 @@ class Customer extends Model
         'nama',
         'no_hp',
         'alamat',
+        'latitude',
+        'longitude',
         'area',
         'sumber_lead',
         'status',
