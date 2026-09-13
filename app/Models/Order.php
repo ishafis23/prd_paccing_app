@@ -23,6 +23,7 @@ class Order extends Model
         'customer_id',
         'service_catalog_id',
         'customer_ac_unit_id',
+        'team_id',
         'teknisi_id',
         'jumlah_unit',
         'alamat_pengerjaan',
@@ -78,6 +79,16 @@ class Order extends Model
     public function acUnit(): BelongsTo
     {
         return $this->belongsTo(CustomerAcUnit::class, 'customer_ac_unit_id');
+    }
+
+    /**
+     * Tim baku yg dipakai saat assign (dev-plan/12 §3.13) — jejak
+     * traceability saja, bukan sumber kebenaran anggota (lihat
+     * `orderTechnicians()`/`timTeknisi()`).
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 
     public function teknisi(): BelongsTo

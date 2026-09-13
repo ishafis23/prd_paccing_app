@@ -55,13 +55,19 @@
   `order_items`), kolom tanda tangan. Aksi "Surat Jalan" di tabel admin
   cuma muncul utk customer instansi (`jenis_pelanggan = company`) & order
   belum batal. 5 test baru (`tests/Feature/SuratJalanTest.php`).
+- Tim Teknisi permanen (§3.13) — menu baru "Tim Teknisi" (`TeamResource`):
+  buat tim tetap (nama + anggota, PIC = anggota pertama dipilih). Aksi
+  "Assign Tim" di tabel Order (berdampingan dgn "Assign Teknisi") —
+  pilih tim, seluruh anggotanya otomatis ditugaskan. `order_technicians`
+  ad-hoc yg sudah ada tetap jadi sumber kebenaran siapa yg bertugas;
+  `orders.team_id` cuma jejak tim mana yg dipakai. 8 test baru
+  (`tests/Feature/TeamTest.php`).
 
 ## Belum dikerjakan (realistis Stage 2)
 
 | Ref | Item | Ringkas |
 |---|---|---|
 | §3.4 | Import Excel dispatch massal | Assign order/teknisi massal utk klien banyak unit — prasyarat §3.10 sudah selesai, tinggal bangun alur bulk-create order dari Excel. |
-| §3.13 | Tim Teknisi permanen (SPK) | Menu buat tim tetap (1 tim = 2 teknisi), assign order ke tim bukan pilih orang satu-satu. |
 
 Kecuali diputuskan lain oleh client, item di atas boleh menyusul setelah
 1 Okt.

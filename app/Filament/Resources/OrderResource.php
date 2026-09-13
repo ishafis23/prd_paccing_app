@@ -13,6 +13,7 @@ use App\Models\Customer;
 use App\Models\CustomerAcUnit;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\OrderService;
 use App\Services\PaymentService;
@@ -42,7 +43,7 @@ class OrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         // Hindari N+1 utk kolom Tim, Laporan, Total & seksi infolist (B21/§3.11/dev-plan13).
-        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports.photos.orderItem.acUnit', 'orderItems.acUnit', 'pelaporPerbaikan']);
+        return parent::getEloquentQuery()->with(['timTeknisi', 'workReports.photos.orderItem.acUnit', 'orderItems.acUnit', 'pelaporPerbaikan', 'team']);
     }
 
     public static function form(Form $form): Form
@@ -182,6 +183,9 @@ class OrderResource extends Resource
 
                                 return $tim->isEmpty() ? null : $tim->implode(', ');
                             }),
+                        TextEntry::make('team.nama')
+                            ->label('Di-assign lewat tim')
+                            ->placeholder('— assign manual —'),
                     ])
                     ->collapsible(),
                 Section::make('Pembayaran')
@@ -456,6 +460,31 @@ class OrderResource extends Resource
                             ->title('Teknisi di-assign')
                             ->body(implode(', ', $berhasil).($dilewati !== [] ? ' — sudah anggota: '.implode(', ', $dilewati) : ''))
                             ->send();
+                    }),
+
+                Tables\Actions\Action::make('assignTim')
+                    ->label('Assign Tim')
+                    ->icon('heroicon-o-user-group')
+                    ->color('gray')
+                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                        && $record->teknisi_id === null)
+                    ->modalHeading('Assign Tim Teknisi')
+                    ->modalDescription('Pilih tim tetap (dev-plan/12 §3.13) — seluruh anggotanya (termasuk PIC) otomatis ditugaskan ke order ini.')
+                    ->form([
+                        Forms\Components\Select::make('team_id')
+                            ->label('Tim')
+                            ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        try {
+                            app(OrderService::class)->assignTeam($record, Team::findOrFail($data['team_id']), auth()->user());
+                            Notification::make()->success()->title('Tim di-assign')->send();
+                        } catch (BusinessRuleException|AuthorizationException $e) {
+                            Notification::make()->danger()->title('Gagal assign tim')->body($e->getMessage())->send();
+                        }
                     }),
 
                 Tables\Actions\Action::make('gantiPic')

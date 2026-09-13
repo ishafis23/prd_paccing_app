@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\WorkReport;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +97,47 @@ class OrderService
         ]);
 
         return $order->fresh();
+    }
+
+    /**
+     * Assign tim baku ke order (dev-plan/12 §3.13) — alternatif dari
+     * assignTechnician/tambahTeknisi manual satu-satu. Seluruh anggota tim
+     * (PIC + lainnya) langsung tercatat sbg anggota order_technicians;
+     * `orders.team_id` cuma jejak traceability, bukan sumber kebenaran.
+     */
+    public function assignTeam(Order $order, Team $team, User $actor): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if (! $team->aktif) {
+            throw new BusinessRuleException('Tim ini sudah nonaktif.');
+        }
+
+        $anggota = $team->members;
+        if ($anggota->isEmpty() || $team->pic_teknisi_id === null) {
+            throw new BusinessRuleException('Tim ini belum punya anggota.');
+        }
+
+        return DB::transaction(function () use ($order, $team, $actor, $anggota): Order {
+            $order = $this->assignTechnician($order, $team->picTeknisi, $actor);
+
+            foreach ($anggota as $teknisi) {
+                if ((int) $teknisi->id === (int) $team->pic_teknisi_id) {
+                    continue;
+                }
+
+                try {
+                    $this->tambahTeknisi($order, $teknisi, $actor);
+                } catch (BusinessRuleException) {
+                    // sudah anggota (idempotent) -> lewati diam-diam.
+                }
+            }
+
+            $order->team_id = $team->id;
+            $order->save();
+
+            return $order->fresh();
+        });
     }
 
     /**

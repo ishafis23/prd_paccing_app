@@ -14,6 +14,7 @@ use App\Models\ServiceCatalog;
 use App\Models\ServiceReminder;
 use App\Models\StockItem;
 use App\Models\StockMovement;
+use App\Models\Team;
 use App\Policies\CustomerAcUnitPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\ExpensePolicy;
@@ -25,6 +26,7 @@ use App\Policies\ServiceCatalogPolicy;
 use App\Policies\ServiceReminderPolicy;
 use App\Policies\StockItemPolicy;
 use App\Policies\StockMovementPolicy;
+use App\Policies\TeamPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -44,6 +46,7 @@ class AuthServiceProvider extends ServiceProvider
         ServiceReminder::class => ServiceReminderPolicy::class,
         Expense::class => ExpensePolicy::class,
         Income::class => IncomePolicy::class,
+        Team::class => TeamPolicy::class,
     ];
 
     /**

@@ -61,20 +61,27 @@ Dua penyesuaian yang relevan ke pekerjaan yang **sedang berjalan**
 Legenda: ✅ EXISTS · 🟡 PARTIAL (ada tapi beda dari yg diminta) · ❌ MISSING
 
 ### 3.1 Status order dinamis ("Ada Perbaikan")
-🟡 PARTIAL — `OrderStatus` sekarang: `Baru, Terjadwal, MenujuLokasi,
-Dikerjakan, Selesai, ButuhFollowup, Batal`. Belum ada status "Ada Perbaikan"
-yang terpisah dgn estimasi selesai baru (nunggu part). `ButuhFollowup` cuma
-flag generik dari teknisi.
-**Kerja**: state baru + field estimasi selesai + alur admin ubah status +
-catat sparepart yg dipakai jadi pengeluaran otomatis (lihat §3.2 & §3.9).
+✅ **Selesai** — bukan status terpisah (keputusan final 13 Sept beda dari
+usulan awal di sini, lihat
+[`13-ada-perbaikan-kategori-dan-pengeluaran-trip.md`](13-ada-perbaikan-kategori-dan-pengeluaran-trip.md)
+§2): order TETAP `dikerjakan`, cuma dapat flag
+`orders.perbaikan_menunggu_konfirmasi` + catatan/estimasi dari teknisi
+(tombol "Ada Perbaikan"). Admin lihat notice di Orderan Harian & detail
+order, lalu Setujui (`OrderService::setujuiPerbaikan` — tambah baris
+`order_items` baru, harga hasil deal) atau Tolak
+(`tolakPerbaikan`). Sparepart yg dipakai teknisi tetap dicatat terpisah
+lewat `WorkReportMaterial` (§3.9) — sengaja tidak digabung otomatis ke
+biaya jual di atas (keputusan 13 Sept: modal stok vs harga jual customer
+independen).
 
 ### 3.2 Pengeluaran operasional per order/trip
-🟡 PARTIAL — sudah ada `Expense`/`ExpenseCategory` (Material, Perawatan,
-Operasional) tapi **tidak terhubung ke order/trip tertentu** — masih buku
-besar umum. Client minta granular: uang operasional (makan+bensin) per
-tim/perjalanan, plus biaya tak terduga per order.
-**Kerja**: tambah `order_id` (nullable) ke `expenses`, form input per
-trip/tim, kemungkinan pra-isi nominal default (Rp 50rb) yg bisa diedit.
+✅ **Selesai** — `expenses.order_id` (nullable) + field "Order Terkait"
+opsional di form Expense (`ExpenseResource`, dipakai admin utk SEMUA
+pengeluaran). Nominal selalu manual/bisa diedit (bukan dikunci Rp50rb —
+keputusan 13 Sept: beda kasus beda nominal), admin tetap satu-satunya
+yg input (konsisten dgn kebijakan sekarang, teknisi tidak mencatat
+pengeluaran). `Order::expenses()` relasi baru; margin per order kini
+bisa dihitung (`total() - biaya operasional terkait - modal material`).
 
 ### 3.3 Halaman Orderan Harian (admin)
 ✅ **Selesai** — `App\Filament\Pages\OrderanHarian` (menu "Orderan Harian"):
@@ -125,14 +132,17 @@ opsional utk instansi. 11 test baru
 (`tests/Feature/OrderBuktiPembayaranTest.php`).
 
 ### 3.8 Foto laporan per kategori pekerjaan (bukan cuma before/after)
-❌ MISSING, dan **ada 2 versi requirement yang beda** dari Isha vs teknisi
-lapangan (14:59-16:35) — perlu diklarifikasi ke client mana yang final
-(lihat §5). `WorkReport` sekarang cuma `foto_sebelum`/`foto_sesudah` — satu
-pasang saja, tidak per kategori/unit.
-**Kerja besar**: `ServiceType` enum diperluas (tambah freon, instalasi,
-relokasi, bongkar — sekarang cuma CuciAc/ServiceAc/PengadaanAc) + jadi
-multi-select per order + slot foto berbeda per kategori + per-unit kalau
-order multi-unit.
+✅ **Selesai** — perbedaan requirement Isha vs teknisi lapangan sudah
+diklarifikasi & diputuskan final 13 Sept (urutan slot Cuci AC pakai
+usulan teknisi lapangan: `outdoor_proses → indoor_proses →
+indoor_sebelum → indoor_sesudah_suhu`), detail di dev-plan/13 §3.
+`ServiceType` diperluas (`TambahFreon, Instalasi, Relokasi, Bongkar`).
+Tabel baru `work_report_photos` (`work_report_id`, `order_item_id`,
+`slot`, `path`, `urutan`) — per **order_item**, bukan per order
+(jawaban §5 pertanyaan 2: multi-kategori dalam satu order lewat baris
+`order_items`, bukan order terpisah). Template slot per kategori di
+`App\Support\FotoLaporanSlot`. `WorkReport.foto_sebelum`/`foto_sesudah`
+lama tetap dipertahankan utk data lama.
 
 ### 3.9 Tombol "Terkendala/Gagal" + reschedule
 ✅ **Selesai** — status baru `OrderStatus::Terkendala`, kolom
@@ -182,11 +192,16 @@ company` & order belum batal, buka link publik di tab baru. 5 test baru
 (`tests/Feature/SuratJalanTest.php`).
 
 ### 3.13 Tim Teknisi permanen (1 tim = 2 teknisi, assign by tim bukan pilih orang)
-🟡 PARTIAL — assignment tim SEKARANG ad-hoc per order (`order_technicians`
-dibuat manual tiap order dibuat), **bukan** entitas "Tim" permanen yang bisa
-dipilih sekali lalu dipakai berulang. Client minta menu SPK dgn tim baku.
-**Kerja**: model `Team`/`TimTeknisi` (nama tim, anggota tetap), lalu Order
-assign ke `team_id` alih-alih pilih teknisi satu-satu.
+✅ **Selesai** — model baru `Team` (nama, aktif, anggota via
+`team_members`, PIC = anggota pertama dipilih saat create/edit) + menu
+admin "Tim Teknisi" (`TeamResource`, di grup Manajemen). Aksi baru
+"Assign Tim" di tabel Order (`OrderService::assignTeam()`) — pilih tim,
+seluruh anggotanya (PIC + lainnya) otomatis ditugaskan lewat
+`assignTechnician`/`tambahTeknisi` yg sudah ada (`order_technicians`
+ad-hoc TETAP jadi sumber kebenaran siapa yg benar-benar bertugas;
+`orders.team_id` cuma jejak tim baku mana yg dipakai). Muncul
+berdampingan dgn "Assign Teknisi" (keduanya cuma tampil kalau order
+belum punya PIC). 8 test baru (`tests/Feature/TeamTest.php`).
 
 ## 4. Usulan pentahapan (mengingat deadline 1 Okt)
 
@@ -208,7 +223,7 @@ assign ke `team_id` alih-alih pilih teknisi satu-satu.
 7. Import Excel dispatch massal (100 ruangan) — §3.4 (prasyarat §3.10
    sudah selesai, tinggal alur bulk-create order-nya).
 8. ~~Surat Jalan~~ — §3.12, **✅ selesai**.
-9. Tim Teknisi permanen (SPK) — §3.13.
+9. ~~Tim Teknisi permanen (SPK)~~ — §3.13, **✅ selesai**.
 10. ~~Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran
     per-trip~~ — §3.1, §3.2, §3.8, **✅ selesai** (lihat dev-plan/13).
 
