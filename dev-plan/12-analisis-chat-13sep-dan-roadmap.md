@@ -116,16 +116,27 @@ riwayat dicatat ke `catatan_admin`. 15 test baru
 (`tests/Feature/OrderGantiPicTest.php`).
 
 ### 3.6 Portal Klien/Corporate (asset AC, histori, auto-reminder)
-❌ MISSING (**client sendiri bilang ini Stage 2**, KECUALI utk korporat
-banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Butuh:
-- Model "Unit AC" per customer + penautan ke order — §3.10, **sudah
-  selesai**, sudah bisa jadi dasar histori per unit di bawah ini.
-- Halaman histori pencucian per unit (query order_items by
-  customer_ac_unit_id, belum ada halamannya).
-- Auto-reminder: normal/rumahan tiap 3 bulan, komersial/sekolah/kantor tiap
-  1 bulan (`ServiceReminder` sudah ada, cuma interval & pemicu perlu
-  disesuaikan per `jenis` customer — pemicunya sekarang cuma dari
-  pembayaran lunas, bukan dari kategori customer).
+🟡 PARTIAL (**client sendiri bilang ini Stage 2**, KECUALI utk korporat
+banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Bagian
+non-login sudah selesai, portal login-nya sendiri masih blocked:
+- Model "Unit AC" per customer + penautan ke order — §3.10, **✅
+  selesai**.
+- Halaman histori pencucian per unit — **✅ selesai**: aksi "Histori" per
+  baris di tab "Unit AC" (`CustomerAcUnit::orderItems()`, modal tabel
+  tanggal/layanan/status order/teknisi/harga, `resources/views/filament/
+  customer-ac-unit-histori.blade.php`).
+- Auto-reminder per kategori customer — **✅ selesai**:
+  `PaymentService::buatReminder()` (trigger otomatis dari pembayaran
+  lunas) sekarang pakai interval 1 bulan utk `CustomerJenis::Company`,
+  3 bulan utk lainnya (rumahan/perorangan) — sebelumnya selalu ambil
+  angka tetap dari `service_catalog.interval_bulan`. Katalog tetap jadi
+  gerbang boolean "perlu reminder berkala atau tidak" (`interval_bulan
+  === null` → tanpa reminder, mis. PengadaanAc). `buatReminderManual`
+  (§B35, admin manual) TIDAK diubah — override manual sudah tersedia di
+  situ. 3 test baru (`tests/Feature/ServiceReminderKategoriTest.php`), +
+  2 test baru utk histori (`tests/Feature/CustomerAcUnitHistoriTest.php`).
+- **Portal login customer sendiri (akun, dashboard) — BELUM dikerjakan**,
+  lihat blocker di bawah.
 
 **Blocker akses login** (lihat
 [`portal-customer/01-konsep-portal-customer.md`](portal-customer/01-konsep-portal-customer.md)
@@ -235,18 +246,18 @@ belum punya PIC). 8 test baru (`tests/Feature/TeamTest.php`).
 5. ~~Halaman Orderan Harian admin~~ — §3.3, **✅ selesai**.
 
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
-6. Portal Klien/Corporate + auto-reminder per kategori — §3.6. Prasyarat
-   teknis (Unit AC + penautan ke order §3.10, order multi-unit §3.4)
-   **sudah selesai semua** — sisa: halaman histori per unit, pemicu
-   reminder per kategori customer, DAN **akun login customer** (blocked,
-   lihat catatan di §3.6 — perlu keputusan client dulu sebelum mulai).
+6. Portal Klien/Corporate + auto-reminder per kategori — §3.6. Histori
+   per unit & auto-reminder per kategori customer **✅ selesai**. Sisa
+   HANYA portal login customer sendiri (akun, dashboard) — **blocked**,
+   perlu keputusan client dulu (1 akun per corporate vs multi-user staf)
+   sebelum mulai, lihat catatan di §3.6.
 7. ~~Import Excel dispatch massal (100 ruangan)~~ — §3.4, **✅ selesai**.
 8. ~~Surat Jalan~~ — §3.12, **✅ selesai**.
 9. ~~Tim Teknisi permanen (SPK)~~ — §3.13, **✅ selesai**.
 10. ~~Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran
     per-trip~~ — §3.1, §3.2, §3.8, **✅ selesai** (lihat dev-plan/13).
 
-Item 6, 7, 9 **bisa digeser** kalau target 1 Okt cuma "running well" untuk
+Item 6 (portal login) **bisa digeser** kalau target 1 Okt cuma "running well" untuk
 alur inti (order → teknisi kerja → bayar → laporan), bukan seluruh
 corporate portal.
 

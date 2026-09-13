@@ -6,6 +6,7 @@ use App\Enums\UnitType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Unit AC fisik milik satu Customer (khususnya company dengan banyak
@@ -36,6 +37,15 @@ class CustomerAcUnit extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Riwayat pengerjaan (baris order_items) yg pernah menautkan unit ini
+     * — dasar histori pencucian per unit (dev-plan/12 §3.6).
+     */
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class, 'customer_ac_unit_id');
     }
 
     /**

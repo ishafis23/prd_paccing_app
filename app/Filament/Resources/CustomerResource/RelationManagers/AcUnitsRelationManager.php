@@ -4,6 +4,7 @@ namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
 use App\Enums\UnitType;
 use App\Exceptions\BusinessRuleException;
+use App\Models\CustomerAcUnit;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Services\CustomerAcUnitImportService;
@@ -213,6 +214,19 @@ class AcUnitsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
+                Action::make('histori')
+                    ->label('Histori')
+                    ->icon('heroicon-o-clock')
+                    ->color('gray')
+                    ->modalHeading(fn (CustomerAcUnit $record): string => "Histori Pencucian — {$record->kode_unit}")
+                    ->modalContent(fn (CustomerAcUnit $record) => view('filament.customer-ac-unit-histori', [
+                        'items' => $record->orderItems()
+                            ->with(['order.teknisi'])
+                            ->latest('id')
+                            ->get(),
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup'),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])

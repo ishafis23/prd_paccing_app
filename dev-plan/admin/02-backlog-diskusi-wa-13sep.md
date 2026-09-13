@@ -70,14 +70,21 @@
   (katalog), harga default, jadwal, Assign Tim (opsional); file cuma
   perlu kolom `kode_unit` + `harga`/`catatan` opsional per baris. 8 test
   baru (`tests/Feature/OrderDispatchImportTest.php`).
+- Histori pencucian per unit + auto-reminder per kategori (§3.6, bagian
+  non-login) — aksi "Histori" per baris di tab "Unit AC" (tabel
+  tanggal/layanan/status order/teknisi/harga dari `order_items` unit
+  itu). `PaymentService::buatReminder()` (trigger otomatis dari
+  pembayaran lunas) kini pakai interval 1 bulan utk customer company,
+  3 bulan utk rumahan/perorangan (sebelumnya angka tetap dari katalog).
+  5 test baru (`ServiceReminderKategoriTest.php`,
+  `CustomerAcUnitHistoriTest.php`).
 
 ## Belum dikerjakan (realistis Stage 2)
 
 Semua item wajib & backlog admin dari diskusi 13 Sept sudah selesai.
-Sisa: Portal Klien/Corporate (§3.6) — bagian non-login (histori per
-unit, auto-reminder per kategori) belum dikerjakan, dan bagian
-login/akun customer **blocked** menunggu keputusan client (1 akun per
-corporate vs multi-user staf) — lihat dev-plan/12 §3.6.
+Sisa HANYA portal login customer sendiri (§3.6) — **blocked** menunggu
+keputusan client (1 akun per corporate vs multi-user staf) — lihat
+dev-plan/12 §3.6.
 
 ## Pertanyaan terbuka yang perlu client
 §3.1, §3.2, §3.8 sudah terjawab & selesai diimplementasikan (lihat

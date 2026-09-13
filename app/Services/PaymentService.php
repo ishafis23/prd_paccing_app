@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\CustomerJenis;
 use App\Enums\IncomeCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -138,9 +139,7 @@ class PaymentService
 
     private function buatReminder(Order $order, Payment $payment): void
     {
-        $interval = $order->serviceCatalog?->interval_bulan;
-
-        if (! $interval) {
+        if ($order->serviceCatalog?->interval_bulan === null) {
             return; // layanan tanpa servis berkala (service/pengadaan).
         }
 
@@ -149,6 +148,11 @@ class PaymentService
         if ($already) {
             return;
         }
+
+        // dev-plan/12 §3.6: interval ikut kategori customer, bukan angka
+        // tetap dari katalog — rumahan/perorangan 3 bulan, company
+        // (sekolah/kantor dll) 1 bulan (lebih sering butuh servis berkala).
+        $interval = $order->customer?->jenis === CustomerJenis::Company ? 1 : 3;
 
         $tanggalBayar = CarbonImmutable::parse($payment->tanggal_bayar ?? now());
 
