@@ -12,11 +12,15 @@ dev-plan/
 ├── 00-overview.md              ← urutan pengerjaan & dependency lintas modul
 ├── 02-keputusan-eksekusi.md    ← jawaban final semua pertanyaan terbuka (acuan implementasi)
 ├── 03-tech-setup.md            ← langkah setup Laravel, environment, konvensi kode
+├── 12-analisis-chat-13sep-dan-roadmap.md ← audit fitur diminta client vs status kode (sumber lengkap)
 ├── database-schema.md          ← skema tabel & relasi (satu sumber kebenaran, lintas modul)
 ├── admin/01-konsep-admin.md    ← konsep, alur, checklist modul Admin
+│   └── 02-backlog-diskusi-wa-13sep.md ← irisan Admin dari 12-analisis-...md
 ├── teknisi/01-konsep-teknisi.md
+│   └── 02-backlog-diskusi-wa-13sep.md ← irisan Teknisi dari 12-analisis-...md
 ├── hrd/01-konsep-hrd.md
-└── finance/01-konsep-finance.md
+├── finance/01-konsep-finance.md
+└── portal-customer/01-konsep-portal-customer.md ← DRAFT, portal corporate (Stage 2 utk sebagian besar)
 ```
 
 Konsep & fitur dipecah **per folder modul** (Admin, Teknisi, HRD, Finance) supaya bisa dibahas terpisah dengan client per bagian. Skema database tetap **satu file gabungan** karena tabel-tabelnya saling terhubung lintas modul (mis. `orders` disentuh Admin, Teknisi, dan Finance sekaligus) — alasannya dijelaskan di `00-overview.md`.

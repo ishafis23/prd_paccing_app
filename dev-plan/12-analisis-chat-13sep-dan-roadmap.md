@@ -121,10 +121,13 @@ order multi-unit.
 reschedule dari kendala lapangan.
 
 ### 3.10 Data AC Unit per customer (terutama korporat)
-❌ MISSING — model baru: unit AC (customer_id, kode_ruangan/lokasi, tipe
-AC, riwayat cuci). Ini fondasi utk §3.4, §3.6, §3.8 (foto per-unit) — kalau
-mau dikerjakan, **ini sebaiknya lebih dulu** dari yang lain krn banyak
-bergantung padanya.
+🟡 PARTIAL — **✅ master data selesai** (commit `23bac43`): model
+`CustomerAcUnit` (kode_unit, kode_ruangan, jenis_unit, pk, catatan),
+tab "Unit AC" di Data Customer (khusus jenis Company), Import Excel +
+Unduh Template. **Belum ada**: riwayat pencucian per unit (baru data
+master unit-nya, belum tersambung ke WorkReport/Order), dan assign
+teknisi/order dari unit ini (sengaja ditunda — akan dianalisis saat
+fitur input orderan disentuh).
 
 ### 3.11 Verifikasi/approval laporan oleh admin
 ❌ MISSING — `WorkReport` tidak ada status approval. Client mau admin bisa
