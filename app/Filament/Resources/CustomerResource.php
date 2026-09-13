@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\CustomerArea;
+use App\Enums\CustomerJenis;
 use App\Enums\CustomerStatus;
 use App\Enums\LeadSource;
 use App\Exceptions\BusinessRuleException;
@@ -36,10 +37,17 @@ class CustomerResource extends Resource
                 Forms\Components\TextInput::make('nama')
                     ->required()
                     ->maxLength(255),
+                Forms\Components\Select::make('jenis')
+                    ->options(EnumOptions::for(CustomerJenis::class))
+                    ->default(CustomerJenis::Perorangan->value)
+                    ->required(),
                 Forms\Components\TextInput::make('no_hp')
                     ->label('No. HP/WA')
                     ->required()
                     ->maxLength(20),
+                Forms\Components\TextInput::make('email')
+                    ->email()
+                    ->maxLength(255),
                 Forms\Components\Textarea::make('alamat')
                     ->columnSpanFull(),
                 Forms\Components\Fieldset::make('Lokasi Customer')
@@ -132,7 +140,9 @@ class CustomerResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('nama')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('jenis')->badge()->sortable(),
                 Tables\Columns\TextColumn::make('no_hp')->label('No. HP/WA')->searchable(),
+                Tables\Columns\TextColumn::make('email')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('area')->badge()->sortable(),
                 Tables\Columns\TextColumn::make('status')->badge()->sortable()->color(fn (CustomerStatus $state): string => match ($state) {
                     CustomerStatus::Aktif => 'success',
@@ -143,6 +153,7 @@ class CustomerResource extends Resource
                 Tables\Columns\TextColumn::make('created_at')->dateTime('d M Y')->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('jenis')->options(EnumOptions::for(CustomerJenis::class)),
                 Tables\Filters\SelectFilter::make('area')->options(EnumOptions::for(CustomerArea::class)),
                 Tables\Filters\SelectFilter::make('status')->options(EnumOptions::for(CustomerStatus::class)),
                 Tables\Filters\TrashedFilter::make(),

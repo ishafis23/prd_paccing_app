@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- Full suite (300+ tests, satu proses PHP) numpuk memori lebih dari
+             default CLI 128M — bukan masalah production (tiap import jalan
+             di request terpisah), murni batas proses test lokal. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

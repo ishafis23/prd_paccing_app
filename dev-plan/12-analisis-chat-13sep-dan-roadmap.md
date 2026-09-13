@@ -1,0 +1,174 @@
+# Analisis Chat Klien (13 Sept 2026) & Roadmap Lanjutan
+
+> STATUS: **DRAFT UNTUK REVIEW** — hasil analisis `chat.md` (ekspor WA grup
+> "PACCING - ONE GATE INTEGRATED SYSTEM", 11-13 Sept 2026). Berisi requirement
+> baru di luar scope yang sudah berjalan. Perlu dikonfirmasi prioritas
+> sebelum dev lanjut — lihat "Pertanyaan Terbuka" di akhir dokumen.
+
+## 0. Konteks penting: deadline
+
+- **1 Oktober 2026**: sistem harus *"running well"* (kata Ust Ranto).
+- **Hari ini (13 Sept) s.d. 30 Sept**: tahap uji coba & pematangan sistem.
+- Artinya sisa waktu efektif **~2,5 minggu**. Daftar di bawah ini jauh lebih
+  besar dari itu kalau dikerjakan penuh — perlu pemilahan wajib-Oktober vs
+  boleh-menyusul (lihat §4).
+
+## 1. Sudah selesai dari chat ini
+
+| Item chat | Status |
+|---|---|
+| "tambah lokasi map pada admin dan tampil pada portal teknisi" | ✅ Selesai (commit `9eecc72`) |
+| "tombol geser pada teknisi tidak bisa, pada HP" | ✅ Selesai (commit `3814363`) |
+| bug pembulatan koordinat (ditemukan saat testing, bukan dari chat) | ✅ Selesai (commit `43ffab7`) |
+
+## 2. Dampak langsung ke Import Excel Customer (sedang dikerjakan)
+
+Client menyebut format data eksplisit (13:50, 14:26):
+
+> *"contoh data dibutuhkn untuk upload pakai excel: 1. database costumer,
+> (nama, wa, map, alamat, catatan, **jenis (company, perorangan)**)..."*
+
+Dua penyesuaian yang relevan ke pekerjaan yang **sedang berjalan**
+(`CustomerImportService`, belum di-commit):
+
+1. **Kolom `jenis` (company / perorangan) wajib ada di Customer** — bukan
+   cuma soal data, ini men-drive keputusan tampilan/wajib-upload di beberapa
+   fitur lain (lihat §3.7 pembayaran, §3.6 surat jalan). **Rekomendasi:
+   tambahkan sekarang** ke migration + form + import, sebelum fitur import
+   di-commit — jauh lebih murah daripada menambah field ke ribuan data yang
+   sudah terlanjur di-import tanpa `jenis`.
+2. **Kolom lokasi di file import yang sama** — client maunya link map jadi
+   satu kolom di file yang sama (bukan isi manual satu-satu di UI setelah
+   import). Bisa pakai ulang `GoogleMapsLinkService` yang sudah ada: kolom
+   opsional `link_maps` di template, di-resolve otomatis saat proses import
+   (baris yang linknya gagal di-resolve tetap masuk, cuma lokasinya kosong —
+   tidak boleh gagalkan seluruh baris).
+
+**Rekomendasi saya**: selesaikan dulu 2 penyesuaian ini di
+`CustomerImportService` yang sedang berjalan sebelum commit, supaya tidak
+perlu migrasi ulang data yang sudah kadung diimpor tanpa `jenis`.
+
+## 3. Backlog baru per modul (hasil audit kode existing)
+
+Legenda: ✅ EXISTS · 🟡 PARTIAL (ada tapi beda dari yg diminta) · ❌ MISSING
+
+### 3.1 Status order dinamis ("Ada Perbaikan")
+🟡 PARTIAL — `OrderStatus` sekarang: `Baru, Terjadwal, MenujuLokasi,
+Dikerjakan, Selesai, ButuhFollowup, Batal`. Belum ada status "Ada Perbaikan"
+yang terpisah dgn estimasi selesai baru (nunggu part). `ButuhFollowup` cuma
+flag generik dari teknisi.
+**Kerja**: state baru + field estimasi selesai + alur admin ubah status +
+catat sparepart yg dipakai jadi pengeluaran otomatis (lihat §3.2 & §3.9).
+
+### 3.2 Pengeluaran operasional per order/trip
+🟡 PARTIAL — sudah ada `Expense`/`ExpenseCategory` (Material, Perawatan,
+Operasional) tapi **tidak terhubung ke order/trip tertentu** — masih buku
+besar umum. Client minta granular: uang operasional (makan+bensin) per
+tim/perjalanan, plus biaya tak terduga per order.
+**Kerja**: tambah `order_id` (nullable) ke `expenses`, form input per
+trip/tim, kemungkinan pra-isi nominal default (Rp 50rb) yg bisa diedit.
+
+### 3.3 Halaman Orderan Harian (admin)
+❌ MISSING — cuma ada `JadwalHariIni` punya teknisi (per-user). Admin belum
+punya dashboard "semua order hari ini". **Kerja**: Filament Page/widget baru.
+
+### 3.4 Import Excel dispatch massal (100 ruangan sekaligus assign)
+❌ MISSING — beda dari Import Customer. Ini bulk-create **Order** + assign
+teknisi/tim sekaligus, untuk klien korporat banyak unit/ruangan.
+**Kerja besar** — butuh: kolom ruangan/kode unit, referensi customer yg
+sudah ada, assign PIC/tim, validasi per baris. Bergantung pada §3.10 (data
+AC unit) kalau mau tracking per-ruangan yang benar.
+
+### 3.5 Re-assign PIC fleksibel di hari-H
+🟡 PARTIAL — `order_technicians` sudah mendukung banyak teknisi per order
+(lihat `05-multi-teknisi-tim.md`), tapi UI "ganti PIC di hari H krn teknisi
+berhalangan" perlu dicek/dilengkapi di Filament OrderResource.
+
+### 3.6 Portal Klien/Corporate (asset AC, histori, auto-reminder)
+❌ MISSING (**client sendiri bilang ini Stage 2**, KECUALI utk korporat
+banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Butuh:
+- Model baru "Unit AC" per customer (kode ruangan, tipe AC) — lihat §3.10.
+- Halaman histori pencucian per unit.
+- Auto-reminder: normal/rumahan tiap 3 bulan, komersial/sekolah/kantor tiap
+  1 bulan (`ServiceReminder` sudah ada, cuma interval & pemicu perlu
+  disesuaikan per `jenis` customer — pemicunya sekarang cuma dari
+  pembayaran lunas, bukan dari kategori customer).
+
+### 3.7 Bukti pembayaran per laporan teknisi + beda instansi/rumahan
+❌ MISSING — `Payment` model **belum ada kolom bukti/foto sama sekali**.
+Perlu: upload bukti transfer via portal teknisi (bukan WA), wajib untuk
+rumahan, opsional untuk instansi — pengaturan ini di-set admin saat bikin
+SPK/assign (butuh `jenis` di order, turunan dari `jenis` customer §2).
+
+### 3.8 Foto laporan per kategori pekerjaan (bukan cuma before/after)
+❌ MISSING, dan **ada 2 versi requirement yang beda** dari Isha vs teknisi
+lapangan (14:59-16:35) — perlu diklarifikasi ke client mana yang final
+(lihat §5). `WorkReport` sekarang cuma `foto_sebelum`/`foto_sesudah` — satu
+pasang saja, tidak per kategori/unit.
+**Kerja besar**: `ServiceType` enum diperluas (tambah freon, instalasi,
+relokasi, bongkar — sekarang cuma CuciAc/ServiceAc/PengadaanAc) + jadi
+multi-select per order + slot foto berbeda per kategori + per-unit kalau
+order multi-unit.
+
+### 3.9 Tombol "Terkendala/Gagal" + reschedule
+❌ MISSING — tidak ada status/alasan gagal di order, tidak ada alur
+reschedule dari kendala lapangan.
+
+### 3.10 Data AC Unit per customer (terutama korporat)
+❌ MISSING — model baru: unit AC (customer_id, kode_ruangan/lokasi, tipe
+AC, riwayat cuci). Ini fondasi utk §3.4, §3.6, §3.8 (foto per-unit) — kalau
+mau dikerjakan, **ini sebaiknya lebih dulu** dari yang lain krn banyak
+bergantung padanya.
+
+### 3.11 Verifikasi/approval laporan oleh admin
+❌ MISSING — `WorkReport` tidak ada status approval. Client mau admin bisa
+klik acc/verifikasi tiap laporan masuk.
+
+### 3.12 Surat Jalan (khusus korporat)
+❌ MISSING — belum ada fitur serupa. Pola termudah: contek fitur "resi"
+yang sudah ada (token publik + halaman cetak/PDF) untuk daftar unit yang
+akan dikerjakan, dikirim ke nomor order.
+
+### 3.13 Tim Teknisi permanen (1 tim = 2 teknisi, assign by tim bukan pilih orang)
+🟡 PARTIAL — assignment tim SEKARANG ad-hoc per order (`order_technicians`
+dibuat manual tiap order dibuat), **bukan** entitas "Tim" permanen yang bisa
+dipilih sekali lalu dipakai berulang. Client minta menu SPK dgn tim baku.
+**Kerja**: model `Team`/`TimTeknisi` (nama tim, anggota tetap), lalu Order
+assign ke `team_id` alih-alih pilih teknisi satu-satu.
+
+## 4. Usulan pentahapan (mengingat deadline 1 Okt)
+
+**Wajib sebelum 1 Okt (blocking "running well" versi client):**
+1. Penyesuaian Import Customer (`jenis` + kolom map) — §2, kecil, lanjutkan sekarang.
+2. Tombol Terkendala/Gagal + reschedule dasar — §3.9, dipakai tiap hari di lapangan.
+3. Bukti pembayaran per laporan (minimal upload, rumahan vs instansi) — §3.7.
+4. Verifikasi admin per laporan — §3.11 (client tegas: *"tidak bisa jalan ke
+   titik berikutnya jika laporan kerja belum selesai"*).
+5. Halaman Orderan Harian admin — §3.3, kebutuhan operasional harian.
+
+**Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
+6. Portal Klien/Corporate + Unit AC + auto-reminder per kategori — §3.6, §3.10.
+7. Import Excel dispatch massal (100 ruangan) — §3.4 (bergantung §3.10).
+8. Surat Jalan — §3.12.
+9. Tim Teknisi permanen (SPK) — §3.13.
+10. Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran
+    per-trip — §3.1, §3.2, §3.8 (besar & butuh keputusan desain, lihat §5).
+
+Item 6-10 **bisa digeser** kalau target 1 Okt cuma "running well" untuk
+alur inti (order → teknisi kerja → bayar → laporan), bukan seluruh
+corporate portal.
+
+## 5. Pertanyaan terbuka (perlu dikonfirmasi ke client sebelum dev §3.1/3.2/3.8)
+
+1. **Foto laporan**: Isha usul (14:59) `outdoor sebelum → indoor proses →
+   outdoor sesudah → indoor sesudah+suhu`; teknisi lapangan usul (16:33)
+   urutan beda (`outdoor proses → indoor proses → indoor sebelum → sesudah
+   +suhu`). Mana yang final? Ini menentukan struktur kolom foto di DB.
+2. Kategori pekerjaan (cuci ac/tambah freon/service/instalasi/relokasi/
+   bongkar) — benar-benar **multi-select per order**, atau tiap kategori
+   jadi order terpisah?
+3. Pengeluaran "uang operasional" Rp50rb per tim per trip — apakah nominal
+   ini **default yang bisa diedit**, atau fixed, dan siapa yang input
+   (teknisi lapor / admin catat)?
+4. Prioritas §4 di atas — apakah urutan wajib-sebelum-1-Okt ini sesuai
+   dengan yang client maksud, atau ada yang harus digeser?

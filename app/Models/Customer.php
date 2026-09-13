@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CustomerArea;
+use App\Enums\CustomerJenis;
 use App\Enums\CustomerStatus;
 use App\Enums\LeadSource;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +17,9 @@ class Customer extends Model
 
     protected $fillable = [
         'nama',
+        'jenis',
         'no_hp',
+        'email',
         'alamat',
         'latitude',
         'longitude',
@@ -29,6 +32,7 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
+            'jenis' => CustomerJenis::class,
             'area' => CustomerArea::class,
             'sumber_lead' => LeadSource::class,
             'status' => CustomerStatus::class,
