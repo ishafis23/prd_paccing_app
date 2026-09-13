@@ -11,8 +11,10 @@ use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -40,6 +42,9 @@ class CustomerImportService
 
     private const UKURAN_CHUNK_INSERT = 500;
 
+    /** Dropdown di template cuma perlu utk baris awal — staff tinggal drag/copy ke bawah kalau data lebih banyak. */
+    private const BARIS_DROPDOWN_TEMPLATE = 1000;
+
     private const EKSTENSI_DIDUKUNG = ['xlsx', 'csv'];
 
     /**
@@ -64,7 +69,17 @@ class CustomerImportService
             $ws->getColumnDimension($kolom)->setAutoSize(true);
         }
         $ws->getStyle('A1:I1')->getFont()->setBold(true);
+        $ws->getStyle('A1:I1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('DCE6F1');
         $ws->freezePane('A2');
+
+        // Dropdown supaya staff pilih dari daftar, bukan ketik manual —
+        // hindari typo yg bikin baris dilewati/gagal saat ribuan baris diisi.
+        $this->pasangDropdown($ws, 'B', array_map(fn ($j) => $j->value, CustomerJenis::cases()));
+        $this->pasangDropdown($ws, 'F', array_map(fn ($a) => $a->value, CustomerArea::cases()));
+        $this->pasangDropdown($ws, 'G', array_map(fn ($s) => $s->value, LeadSource::cases()));
+        $this->pasangDropdown($ws, 'H', array_map(fn ($s) => $s->value, CustomerStatus::cases()));
 
         $petunjuk = $ss->createSheet();
         $petunjuk->setTitle('petunjuk');
@@ -80,6 +95,7 @@ class CustomerImportService
             ['7. Lokasi (koordinat peta) TIDAK diisi lewat import ini — isi manual per customer di menu Data Customer setelah import (fitur "Link Google Maps" / geser pin).'],
             ['8. Maksimal '.self::MAX_BARIS.' baris data per file; format .xlsx atau .csv (UTF-8).'],
             ['9. Baris contoh di sheet "customer" bisa dihapus sebelum diisi.'],
+            ['10. Kolom jenis/area/sumber_lead/status sudah dropdown (klik sel -> muncul panah pilihan) utk baris 2-'.self::BARIS_DROPDOWN_TEMPLATE.'. Kalau data lebih banyak dari itu: blok salah satu sel di baris ber-dropdown, lalu drag kotak kecil di pojok kanan-bawah sel ke bawah sejumlah baris yg dibutuhkan.'],
         ], null, 'A1');
         $petunjuk->getColumnDimension('A')->setWidth(110);
 
@@ -246,6 +262,30 @@ class CustomerImportService
         }
 
         return compact('berhasil', 'dilewati', 'gagal', 'rincian');
+    }
+
+    /**
+     * Pasang dropdown pilihan (data validation) pada satu kolom, baris 2
+     * s.d. BARIS_DROPDOWN_TEMPLATE — cukup drag/copy ke bawah di Excel bila
+     * baris data lebih banyak dari itu.
+     *
+     * @param  array<int, string>  $pilihan
+     */
+    private function pasangDropdown(Worksheet $ws, string $kolom, array $pilihan): void
+    {
+        $validasi = new DataValidation;
+        $validasi->setType(DataValidation::TYPE_LIST);
+        $validasi->setErrorStyle(DataValidation::STYLE_STOP);
+        $validasi->setAllowBlank(true);
+        $validasi->setShowDropDown(true);
+        $validasi->setShowErrorMessage(true);
+        $validasi->setErrorTitle('Pilihan tidak valid');
+        $validasi->setError('Pilih salah satu dari daftar dropdown.');
+        $validasi->setFormula1('"'.implode(',', $pilihan).'"');
+
+        for ($baris = 2; $baris <= self::BARIS_DROPDOWN_TEMPLATE; $baris++) {
+            $ws->getCell("{$kolom}{$baris}")->setDataValidation(clone $validasi);
+        }
     }
 
     /**
