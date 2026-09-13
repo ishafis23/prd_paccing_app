@@ -49,6 +49,11 @@ class Customer extends Model
         return $this->hasMany(ServiceReminder::class);
     }
 
+    public function acUnits(): HasMany
+    {
+        return $this->hasMany(CustomerAcUnit::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', CustomerStatus::Aktif->value);

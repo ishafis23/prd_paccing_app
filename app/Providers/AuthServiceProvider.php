@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\RoleName;
 use App\Models\Customer;
+use App\Models\CustomerAcUnit;
 use App\Models\Expense;
 use App\Models\Income;
 use App\Models\Order;
@@ -13,6 +14,7 @@ use App\Models\ServiceCatalog;
 use App\Models\ServiceReminder;
 use App\Models\StockItem;
 use App\Models\StockMovement;
+use App\Policies\CustomerAcUnitPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\ExpensePolicy;
 use App\Policies\IncomePolicy;
@@ -32,6 +34,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         User::class => UserPolicy::class,
         Customer::class => CustomerPolicy::class,
+        CustomerAcUnit::class => CustomerAcUnitPolicy::class,
         ServiceCatalog::class => ServiceCatalogPolicy::class,
         Order::class => OrderPolicy::class,
         Payment::class => PaymentPolicy::class,
