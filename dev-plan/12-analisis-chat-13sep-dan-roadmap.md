@@ -1,12 +1,11 @@
 # Analisis Chat Klien (13 Sept 2026) & Roadmap Lanjutan
 
-> STATUS: **SEMUA ITEM WAJIB-SEBELUM-1-OKT SELESAI** — hasil analisis
-> `chat.md` (ekspor WA grup "PACCING - ONE GATE INTEGRATED SYSTEM",
-> 11-13 Sept 2026). §4 poin 1-5 (Import Customer+jenis, Terkendala/Gagal,
-> Bukti Pembayaran, Verifikasi Admin, Orderan Harian) ✅ selesai semua.
-> Sisa item (§3.1, §3.2, §3.4, §3.6, §3.8, §3.10 lanjutan, §3.12, §3.13)
-> realistis Stage 2 — sebagian masih menunggu jawaban client atas
-> "Pertanyaan Terbuka" di §5 sebelum bisa mulai desain teknisnya.
+> STATUS: **SEMUA ITEM §3.1–§3.13 SELESAI** — hasil analisis `chat.md`
+> (ekspor WA grup "PACCING - ONE GATE INTEGRATED SYSTEM", 11-13 Sept
+> 2026). §4 poin 1-5 (wajib-sebelum-1-Okt) maupun poin 6-10 (realistis
+> Stage 2) sudah selesai semua, termasuk Portal Customer (§3.6) setelah
+> keputusan multi-user dijawab client (1 akun per customer). Tidak ada
+> lagi item terbuka dari roadmap ini.
 
 ## 0. Konteks penting: deadline
 
@@ -116,9 +115,8 @@ riwayat dicatat ke `catatan_admin`. 15 test baru
 (`tests/Feature/OrderGantiPicTest.php`).
 
 ### 3.6 Portal Klien/Corporate (asset AC, histori, auto-reminder)
-🟡 PARTIAL (**client sendiri bilang ini Stage 2**, KECUALI utk korporat
-banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga). Bagian
-non-login sudah selesai, portal login-nya sendiri masih blocked:
+✅ **Selesai** (**client sendiri bilang ini Stage 2**, KECUALI utk
+korporat banyak unit spt Dafi/Kalla — itu disetujui masuk tahap 1 juga).
 - Model "Unit AC" per customer + penautan ke order — §3.10, **✅
   selesai**.
 - Halaman histori pencucian per unit — **✅ selesai**: aksi "Histori" per
@@ -135,20 +133,21 @@ non-login sudah selesai, portal login-nya sendiri masih blocked:
   (§B35, admin manual) TIDAK diubah — override manual sudah tersedia di
   situ. 3 test baru (`tests/Feature/ServiceReminderKategoriTest.php`), +
   2 test baru utk histori (`tests/Feature/CustomerAcUnitHistoriTest.php`).
-- **Portal login customer sendiri (akun, dashboard) — BELUM dikerjakan**,
-  lihat blocker di bawah.
-
-**Blocker akses login** (lihat
-[`portal-customer/01-konsep-portal-customer.md`](portal-customer/01-konsep-portal-customer.md)
-§4): keputusan 13 Sept sudah final pakai akun login sungguhan
-(email+password, guard Laravel terpisah dari Admin/Teknisi) — TAPI satu
-pertanyaan desain masih terbuka & belum dijawab client: **1 customer
-company boleh punya beberapa akun staf (multi-user), atau cukup 1 akun
-per customer?** Ini menentukan skema tabel (kolom login langsung di
-`customers` vs tabel `customer_users` terpisah) — jangan mulai
-implementasi auth-nya sebelum ini terjawab, supaya tidak perlu migrasi
-ulang skema. Bagian non-login (histori per unit, auto-reminder) TIDAK
-terhalang pertanyaan ini & bisa dikerjakan duluan.
+- **Portal login customer — ✅ selesai.** Keputusan 13 Sept soal
+  multi-user **dijawab final: 1 akun per customer** (bukan multi-user
+  staf) — lihat
+  [`portal-customer/01-konsep-portal-customer.md`](portal-customer/01-konsep-portal-customer.md)
+  §4 (update). Login pakai data customer yg sudah ada: kolom
+  `customers.password` baru (nullable — null = portal belum diaktifkan
+  utk customer itu), `customers.email` jadi username. Guard Laravel
+  terpisah `customer` (`config/auth.php`), route `/portal/login` &
+  `/portal` (dashboard: daftar Unit AC + kapan terakhir dikerjakan +
+  notice servis berikutnya), `/portal/logout`. Admin aktifkan/reset lewat
+  aksi "Atur Password Portal"/"Cabut Akses Portal" di `CustomerResource`
+  (`CustomerPortalService`). Tamu yg akses `/portal/*` diarahkan ke
+  `/portal/login` sendiri (bukan `/login` admin/teknisi) via
+  `redirectGuestsTo` di `bootstrap/app.php`. 14 test baru
+  (`tests/Feature/CustomerPortalTest.php`).
 
 ### 3.7 Bukti pembayaran per laporan teknisi + beda instansi/rumahan
 ✅ **Selesai** — kolom `orders.jenis_pelanggan` (default dari `customer.jenis`
@@ -246,20 +245,17 @@ belum punya PIC). 8 test baru (`tests/Feature/TeamTest.php`).
 5. ~~Halaman Orderan Harian admin~~ — §3.3, **✅ selesai**.
 
 **Realistis Stage 2 (client sendiri sudah bilang, KECUALI korporat besar):**
-6. Portal Klien/Corporate + auto-reminder per kategori — §3.6. Histori
-   per unit & auto-reminder per kategori customer **✅ selesai**. Sisa
-   HANYA portal login customer sendiri (akun, dashboard) — **blocked**,
-   perlu keputusan client dulu (1 akun per corporate vs multi-user staf)
-   sebelum mulai, lihat catatan di §3.6.
+6. ~~Portal Klien/Corporate + auto-reminder per kategori~~ — §3.6,
+   **✅ selesai semua** (histori per unit, auto-reminder per kategori,
+   DAN portal login-nya sendiri — keputusan 13 Sept soal multi-user
+   sudah dijawab: 1 akun per customer).
 7. ~~Import Excel dispatch massal (100 ruangan)~~ — §3.4, **✅ selesai**.
 8. ~~Surat Jalan~~ — §3.12, **✅ selesai**.
 9. ~~Tim Teknisi permanen (SPK)~~ — §3.13, **✅ selesai**.
 10. ~~Foto laporan per kategori + status "Ada Perbaikan" + pengeluaran
     per-trip~~ — §3.1, §3.2, §3.8, **✅ selesai** (lihat dev-plan/13).
 
-Item 6 (portal login) **bisa digeser** kalau target 1 Okt cuma "running well" untuk
-alur inti (order → teknisi kerja → bayar → laporan), bukan seluruh
-corporate portal.
+**Semua item §3.1–§3.13 dari roadmap 13 Sept sudah selesai.**
 
 ## 5. Pertanyaan terbuka (perlu dikonfirmasi ke client sebelum dev §3.1/3.2/3.8)
 

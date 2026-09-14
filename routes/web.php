@@ -4,6 +4,8 @@ use App\Http\Controllers\LandingController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
 use App\Livewire\Auth\Login;
+use App\Livewire\Portal\Dashboard as PortalDashboard;
+use App\Livewire\Portal\Login as PortalLogin;
 use App\Livewire\Teknisi\Akun;
 use App\Livewire\Teknisi\CapaianKerja;
 use App\Livewire\Teknisi\JadwalHariIni;
@@ -37,3 +39,19 @@ Route::get('/resi/{order}/{token}', [ResiController::class, 'show'])->name('resi
 
 // Surat Jalan publik (dev-plan/12 §3.12) — read-only tanpa login, khusus korporat.
 Route::get('/surat-jalan/{order}/{token}', [SuratJalanController::class, 'show'])->name('surat-jalan.show');
+
+// Portal Customer (dev-plan/12 §3.6) — guard 'customer' terpisah dari
+// admin/teknisi, 1 akun login per customer (keputusan 13 Sept).
+Route::get('/portal/login', PortalLogin::class)->name('portal.login');
+
+Route::post('/portal/logout', function () {
+    Auth::guard('customer')->logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+
+    return redirect()->route('portal.login');
+})->middleware('auth:customer')->name('portal.logout');
+
+Route::middleware('auth:customer')->prefix('portal')->group(function () {
+    Route::get('/', PortalDashboard::class)->name('portal.dashboard');
+});

@@ -6,9 +6,11 @@ use App\Enums\CustomerArea;
 use App\Enums\CustomerJenis;
 use App\Enums\CustomerStatus;
 use App\Enums\LeadSource;
+use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Models\Customer;
+use App\Services\CustomerPortalService;
 use App\Services\GoogleMapsLinkService;
 use App\Support\EnumOptions;
 use Filament\Forms;
@@ -150,6 +152,11 @@ class CustomerResource extends Resource
                     CustomerStatus::Nonaktif => 'gray',
                 }),
                 Tables\Columns\TextColumn::make('sumber_lead')->label('Sumber Lead')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('akses_portal')
+                    ->label('Portal')
+                    ->boolean()
+                    ->state(fn (Customer $record): bool => $record->bisaLoginPortal())
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')->dateTime('d M Y')->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
@@ -161,6 +168,43 @@ class CustomerResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+
+                Tables\Actions\Action::make('aturPasswordPortal')
+                    ->label('Atur Password Portal')
+                    ->icon('heroicon-o-key')
+                    ->color('gray')
+                    ->visible(fn () => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value]))
+                    ->modalHeading('Atur Password Portal Customer')
+                    ->modalDescription('Aktifkan/reset akses login Portal Customer (dev-plan/12 §3.6) — customer login pakai email ini + password yang diatur di sini.')
+                    ->form([
+                        Forms\Components\TextInput::make('password')
+                            ->label('Password Baru')
+                            ->password()
+                            ->revealable()
+                            ->required()
+                            ->minLength(8),
+                    ])
+                    ->action(function (Customer $record, array $data) {
+                        try {
+                            app(CustomerPortalService::class)->aturPassword($record, $data['password'], auth()->user());
+                            Notification::make()->success()->title('Password Portal diatur')->send();
+                        } catch (BusinessRuleException $e) {
+                            Notification::make()->danger()->title('Gagal mengatur password')->body($e->getMessage())->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('cabutAksesPortal')
+                    ->label('Cabut Akses Portal')
+                    ->icon('heroicon-o-lock-closed')
+                    ->color('danger')
+                    ->visible(fn (Customer $record) => $record->bisaLoginPortal()
+                        && auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value]))
+                    ->requiresConfirmation()
+                    ->modalDescription('Customer tidak akan bisa login ke Portal lagi sampai diaktifkan ulang. Data customer tidak dihapus.')
+                    ->action(function (Customer $record) {
+                        app(CustomerPortalService::class)->cabutAkses($record, auth()->user());
+                        Notification::make()->success()->title('Akses Portal dicabut')->send();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

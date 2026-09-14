@@ -78,17 +78,21 @@
   3 bulan utk rumahan/perorangan (sebelumnya angka tetap dari katalog).
   5 test baru (`ServiceReminderKategoriTest.php`,
   `CustomerAcUnitHistoriTest.php`).
+- Portal login Customer (§3.6) — keputusan client: **1 akun per
+  customer** (bukan multi-user staf). Kolom `customers.password`
+  (nullable, hashed) + `customers.email` sbg username, guard Laravel
+  baru `customer`. Halaman `/portal/login`, dashboard `/portal` (daftar
+  Unit AC + terakhir dikerjakan + notice servis berikutnya),
+  `/portal/logout`. Admin kelola aktivasi lewat aksi "Atur Password
+  Portal"/"Cabut Akses Portal" di `CustomerResource`
+  (`CustomerPortalService`). 14 test baru
+  (`tests/Feature/CustomerPortalTest.php`).
 
 ## Belum dikerjakan (realistis Stage 2)
 
-Semua item wajib & backlog admin dari diskusi 13 Sept sudah selesai.
-Sisa HANYA portal login customer sendiri (§3.6) — **blocked** menunggu
-keputusan client (1 akun per corporate vs multi-user staf) — lihat
-dev-plan/12 §3.6.
+Semua item wajib & backlog admin dari diskusi 13 Sept sudah selesai —
+tidak ada sisa item dari roadmap ini.
 
 ## Pertanyaan terbuka yang perlu client
-§3.1, §3.2, §3.8 sudah terjawab & selesai diimplementasikan (lihat
-dev-plan/13). Satu pertanyaan baru masih terbuka: **skema akun login
-Portal Customer** (§3.6) — 1 akun per customer company, atau boleh
-banyak akun staf per customer? Ini menentukan skema tabel sebelum mulai
-dikerjakan.
+Tidak ada lagi. §3.1, §3.2, §3.8, dan skema akun Portal Customer (§3.6)
+semua sudah terjawab & selesai diimplementasikan.

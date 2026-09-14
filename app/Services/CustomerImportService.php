@@ -149,7 +149,12 @@ class CustomerImportService
             throw new BusinessRuleException('Maksimal '.self::MAX_BARIS.' baris data per file (file Anda '.count($baris).' baris).');
         }
 
-        if (function_exists('set_time_limit')) {
+        // Jangan reset time limit saat testing — set_time_limit() memotong
+        // sisa waktu proses PHP CLI yg dipakai satu-satunya utk seluruh
+        // test suite (Pest/PHPUnit jalan dlm satu proses), bukan cuma
+        // request ini; suite jadi mati "Maximum execution time exceeded"
+        // begitu total durasinya (test lain sesudah import ini) lewat 120s.
+        if (! app()->runningUnitTests() && function_exists('set_time_limit')) {
             @set_time_limit(120);
         }
 
