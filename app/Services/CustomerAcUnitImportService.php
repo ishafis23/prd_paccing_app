@@ -7,6 +7,7 @@ use App\Enums\UnitType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
@@ -26,8 +27,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *
  * Aturan:
  * - Importir: Admin (mengikuti CustomerAcUnitPolicy::create).
+ * - Alamat tujuan: pilih lewat modal sebelum upload (dev-plan/14) —
+ *   SELURUH baris masuk ke alamat itu; `kode_unit` unik PER ALAMAT.
  * - Kolom: kode_unit* | kode_ruangan* | jenis_unit | pk | catatan.
- * - Idempoten: kode_unit duplikat (DB utk customer ybs / antar baris)
+ * - Idempoten: kode_unit duplikat (DB utk alamat ybs / antar baris)
  *   DILEWATI, tidak ada unit lama yang diubah.
  * - Batas: 2000 baris data per file; ekstensi .xlsx/.csv.
  */
@@ -75,12 +78,12 @@ class CustomerAcUnitImportService
         $petunjuk->fromArray([
             ['PETUNJUK IMPORT UNIT AC'],
             [],
-            ['1. File ini utk SATU customer (company) sekaligus — pilih customer-nya dulu di halaman Unit AC sebelum upload.'],
+            ['1. Pilih dulu customer & ALAMAT tujuan di modal sebelum upload — seluruh baris masuk ke alamat itu (dev-plan/14).'],
             ['2. Kolom wajib: kode_unit, kode_ruangan. Kolom lain opsional.'],
-            ['3. kode_unit harus unik utk customer ini (mis. AC-001, AC-002, ...) — dipakai sbg identitas unit fisik utk riwayat pencucian nantinya.'],
+            ['3. kode_unit harus unik utk alamat ini (mis. AC-001, AC-002, ...) — dipakai sbg identitas unit fisik utk riwayat pencucian nantinya.'],
             ['4. jenis_unit yang valid: '.implode(', ', array_map(fn ($j) => $j->value, UnitType::cases())).'.'],
             ['5. pk diisi bebas (mis. "1/2 PK", "1 PK", "1.5 PK", "2 PK").'],
-            ['6. kode_unit yang sudah ada utk customer ini -> baris dilewati, data lama tidak diubah.'],
+            ['6. kode_unit yang sudah ada utk alamat ini -> baris dilewati, data lama tidak diubah.'],
             ['7. Maksimal '.self::MAX_BARIS.' baris data per file; format .xlsx atau .csv (UTF-8).'],
         ], null, 'A1');
         $petunjuk->getColumnDimension('A')->setWidth(110);
@@ -100,13 +103,18 @@ class CustomerAcUnitImportService
     }
 
     /**
-     * Proses file import utk satu customer.
+     * Proses file import utk satu customer & SATU alamat tujuan.
      *
      * @return array{berhasil: int, dilewati: int, gagal: int, rincian: array<int, string>}
      */
-    public function import(string $pathFile, Customer $customer, User $by): array
+    public function import(string $pathFile, Customer $customer, ?CustomerAddress $alamat, User $by): array
     {
         $this->assertRole($by, [RoleName::Admin]);
+
+        $alamat ??= $customer->alamatUtama();
+        if ($alamat === null) {
+            throw new BusinessRuleException('Customer belum punya alamat — buat alamat dulu di tab "Alamat", lalu impor.');
+        }
 
         $ekstensi = strtolower(pathinfo($pathFile, PATHINFO_EXTENSION));
         if (! in_array($ekstensi, self::EKSTENSI_DIDUKUNG, true)) {
@@ -132,7 +140,7 @@ class CustomerAcUnitImportService
             throw new BusinessRuleException('Maksimal '.self::MAX_BARIS.' baris data per file (file Anda '.count($baris).' baris).');
         }
 
-        $kodeTerdaftar = $customer->acUnits()->pluck('kode_unit')
+        $kodeTerdaftar = $alamat->acUnits()->pluck('kode_unit')
             ->map(fn ($k) => strtolower($k))
             ->flip();
 
@@ -161,12 +169,14 @@ class CustomerAcUnitImportService
             if ($kodeUnit === '') {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: kode_unit wajib diisi.";
+
                 continue;
             }
 
             if ($kodeRuangan === '') {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: kode_ruangan wajib diisi.";
+
                 continue;
             }
 
@@ -176,6 +186,7 @@ class CustomerAcUnitImportService
                 if ($jenisUnit === null) {
                     $gagal++;
                     $rincian[] = "Baris {$nomorExcel}: jenis_unit tidak valid ('{$jenisUnitStr}').";
+
                     continue;
                 }
             }
@@ -184,13 +195,15 @@ class CustomerAcUnitImportService
 
             if (isset($kodeTerdaftar[$kunciKode]) || isset($kodeDilihat[$kunciKode])) {
                 $dilewati++;
-                $rincian[] = "Baris {$nomorExcel}: kode_unit {$kodeUnit} sudah terdaftar utk customer ini — dilewati.";
+                $rincian[] = "Baris {$nomorExcel}: kode_unit {$kodeUnit} sudah terdaftar utk alamat ini — dilewati.";
+
                 continue;
             }
             $kodeDilihat[$kunciKode] = true;
 
             $antrianInsert[] = [
                 'customer_id' => $customer->id,
+                'customer_address_id' => $alamat->id,
                 'kode_unit' => $kodeUnit,
                 'kode_ruangan' => $kodeRuangan,
                 'jenis_unit' => $jenisUnit?->value,

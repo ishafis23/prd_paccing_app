@@ -2,6 +2,7 @@
 
 use App\Enums\RoleName;
 use App\Models\Customer;
+use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -18,27 +19,31 @@ function clUser(string $role): User
     return $user;
 }
 
-it('loads customer create page with lokasi picker', function () {
+it('loads customer create page with alamat utama (peta dipindah ke tab Alamat)', function () {
     $admin = clUser(RoleName::Admin->value);
 
     $response = $this->actingAs($admin)->get('/admin/customers/create');
 
     $response->assertOk();
-    $response->assertSee('Ambil Koordinat');
-    $response->assertSee('Link Google Maps');
+    $response->assertSee('Alamat Utama');
+    $response->assertDontSee('Ambil Koordinat');
 });
 
-it('loads customer edit page and can save latitude/longitude', function () {
+it('loads customer edit page and can save latitude/longitude pada alamat', function () {
     $admin = clUser(RoleName::Admin->value);
     $customer = Customer::factory()->create(['latitude' => null, 'longitude' => null]);
 
     $this->actingAs($admin)->get("/admin/customers/{$customer->id}/edit")
         ->assertOk();
 
-    $customer->update(['latitude' => -5.1476651, 'longitude' => 119.4327324]);
+    $alamat = CustomerAddress::factory()->create([
+        'customer_id' => $customer->id,
+        'latitude' => -5.1476651,
+        'longitude' => 119.4327324,
+    ]);
 
-    expect($customer->fresh()->latitude)->toEqual(-5.1476651);
-    expect($customer->fresh()->longitude)->toEqual(119.4327324);
+    expect($alamat->fresh()->latitude)->toEqual(-5.1476651);
+    expect($alamat->fresh()->longitude)->toEqual(119.4327324);
 });
 
 it('teknisi melihat peta lokasi customer saat koordinat sudah diisi admin', function () {

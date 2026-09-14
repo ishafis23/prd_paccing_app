@@ -78,6 +78,34 @@ class Customer extends Model implements AuthenticatableContract
         return $this->hasMany(CustomerAcUnit::class);
     }
 
+    /**
+     * Semua alamat customer (dev-plan/14) — sumber kebenaran alamat.
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class);
+    }
+
+    /**
+     * Alamat utama (yang ditandai is_utama) — fallback ke alamat pertama
+     * kalau belum ada yg ditandai. Dipakai sbg default saat buat order.
+     */
+    public function alamatUtama(): ?CustomerAddress
+    {
+        return $this->addresses()
+            ->orderByDesc('is_utama')
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Alamat pertama (fallback bila belum ada yg is_utama).
+     */
+    public function alamatPertama(): ?CustomerAddress
+    {
+        return $this->addresses()->orderBy('id')->first();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', CustomerStatus::Aktif->value);

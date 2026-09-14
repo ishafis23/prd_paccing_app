@@ -5,10 +5,11 @@ namespace App\Filament\Resources\CustomerResource\RelationManagers;
 use App\Enums\UnitType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Services\CustomerAcUnitImportService;
-use App\Services\OrderDispatchImportService;
+use App\Services\OrderService;
 use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -18,6 +19,7 @@ use Filament\Tables;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -37,6 +39,13 @@ class AcUnitsRelationManager extends RelationManager
     {
         return $form
             ->schema([
+                Forms\Components\Select::make('customer_address_id')
+                    ->label('Alamat')
+                    ->helperText('Alamat mana unit ini berada — otomatis "Alamat Utama" utk alamat pertama.')
+                    ->options(fn () => $this->getOwnerRecord()->addresses()->orderBy('id')->get()
+                        ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()]))
+                    ->default(fn () => $this->getOwnerRecord()->alamatUtama()?->id)
+                    ->searchable(),
                 Forms\Components\TextInput::make('kode_unit')
                     ->label('Kode Unit')
                     ->required()
@@ -64,9 +73,20 @@ class AcUnitsRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('kode_unit')->label('Kode Unit')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('kode_ruangan')->label('Ruangan/Lokasi')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('customerAddress.nama_lokasi')
+                    ->label('Alamat')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('jenis_unit')->label('Jenis Unit')->badge(),
                 Tables\Columns\TextColumn::make('pk')->label('PK'),
                 Tables\Columns\TextColumn::make('catatan')->limit(40)->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('customer_address_id')
+                    ->label('Alamat')
+                    ->options(fn () => $this->getOwnerRecord()->addresses()->orderBy('id')->get()
+                        ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->nama_lokasi ?: $a->alamat])),
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make(),
@@ -83,13 +103,21 @@ class AcUnitsRelationManager extends RelationManager
                     ->modalSubmitActionLabel('Import Sekarang')
                     ->modalWidth('xl')
                     ->form([
+                        Forms\Components\Select::make('customer_address_id')
+                            ->label('Alamat Tujuan')
+                            ->helperText('SELURUH baris pada file ini masuk ke alamat tersebut (per-alamat, lihat dev-plan/14).')
+                            ->options(fn () => $this->getOwnerRecord()->addresses()->orderBy('id')->get()
+                                ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()]))
+                            ->default(fn () => $this->getOwnerRecord()->alamatUtama()?->id)
+                            ->searchable()
+                            ->required(),
                         Forms\Components\FileUpload::make('file')
                             ->label('File Excel / CSV')
                             ->disk('local')
                             ->directory('import-unit-ac')
                             ->maxSize(5120)
                             ->required()
-                            ->helperText('.xlsx / .csv — maks. 5 MB & '.CustomerAcUnitImportService::MAX_BARIS.' baris. Data akan ditambahkan ke customer ini. Unduh Template dulu untuk format kolom yang benar.'),
+                            ->helperText('.xlsx / .csv — maks. 5 MB & '.CustomerAcUnitImportService::MAX_BARIS.' baris. Data akan ditambahkan ke customer ini & alamat terpilih. Unduh Template dulu untuk format kolom yang benar.'),
                     ])
                     ->action(function (array $data): void {
                         $service = app(CustomerAcUnitImportService::class);
@@ -97,6 +125,7 @@ class AcUnitsRelationManager extends RelationManager
                         $hasil = $service->import(
                             Storage::disk('local')->path($data['file']),
                             $this->getOwnerRecord(),
+                            CustomerAddress::findOrFail($data['customer_address_id']),
                             auth()->user(),
                         );
 
@@ -127,91 +156,6 @@ class AcUnitsRelationManager extends RelationManager
                                 ->send();
                         }
                     }),
-
-                Action::make('unduhTemplateOrderMassal')
-                    ->label('Unduh Template Order Massal')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->color('gray')
-                    ->action(fn () => app(OrderDispatchImportService::class)->unduhTemplate()),
-                Action::make('importOrderMassal')
-                    ->label('Buat Order Massal')
-                    ->icon('heroicon-o-truck')
-                    ->color('success')
-                    ->modalHeading('Buat Order Massal dari Unit AC')
-                    ->modalDescription('Satu order utk banyak unit sekaligus (dev-plan/12 §3.4) — kode_unit di file harus sudah terdaftar di tab ini. Jenis layanan/harga/jadwal/tim berlaku sama utk semua unit (kecuali harga di-override per baris).')
-                    ->modalSubmitActionLabel('Buat Order')
-                    ->modalWidth('xl')
-                    ->form([
-                        Forms\Components\Select::make('service_catalog_id')
-                            ->label('Jenis Layanan')
-                            ->options(fn () => ServiceCatalog::query()->where('aktif', true)->get()
-                                ->mapWithKeys(fn (ServiceCatalog $c) => [$c->id => "{$c->jenis_layanan->value} - {$c->jenis_unit?->value} {$c->pk} (Rp".number_format($c->harga, 0, ',', '.').')']))
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\TextInput::make('harga')
-                            ->label('Harga per Unit (opsional, override harga katalog)')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->minValue(0),
-                        Forms\Components\DatePicker::make('tanggal_jadwal'),
-                        Forms\Components\TimePicker::make('jam_jadwal'),
-                        Forms\Components\Select::make('team_id')
-                            ->label('Assign Tim (opsional)')
-                            ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
-                            ->searchable(),
-                        Forms\Components\Textarea::make('catatan_admin')
-                            ->columnSpanFull(),
-                        Forms\Components\FileUpload::make('file')
-                            ->label('File Excel / CSV')
-                            ->disk('local')
-                            ->directory('import-order-massal')
-                            ->maxSize(5120)
-                            ->required()
-                            ->columnSpanFull()
-                            ->helperText('.xlsx / .csv — maks. '.OrderDispatchImportService::MAX_BARIS.' baris. Unduh Template dulu untuk format kolom yang benar.'),
-                    ])
-                    ->action(function (array $data): void {
-                        $service = app(OrderDispatchImportService::class);
-
-                        try {
-                            $hasil = $service->import(
-                                Storage::disk('local')->path($data['file']),
-                                $this->getOwnerRecord(),
-                                [
-                                    'service_catalog_id' => $data['service_catalog_id'],
-                                    'harga' => $data['harga'] ?? null,
-                                    'tanggal_jadwal' => $data['tanggal_jadwal'] ?? null,
-                                    'jam_jadwal' => $data['jam_jadwal'] ?? null,
-                                    'team_id' => $data['team_id'] ?? null,
-                                    'catatan_admin' => $data['catatan_admin'] ?? null,
-                                ],
-                                auth()->user(),
-                            );
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Storage::disk('local')->delete($data['file']);
-                            Notification::make()->danger()->title('Gagal membuat order massal')->body($e->getMessage())->send();
-
-                            return;
-                        }
-
-                        Storage::disk('local')->delete($data['file']);
-
-                        if ($hasil['order'] === null) {
-                            Notification::make()
-                                ->warning()
-                                ->title('Tidak ada baris valid, order tidak dibuat')
-                                ->body(implode("\n", array_slice($hasil['rincian'], 0, 15)))
-                                ->send();
-
-                            return;
-                        }
-
-                        Notification::make()
-                            ->title("Order #{$hasil['order']->id} dibuat: {$hasil['berhasil']} unit, {$hasil['gagal']} gagal")
-                            ->body($hasil['rincian'] !== [] ? implode("\n", array_slice($hasil['rincian'], 0, 15)) : null)
-                            ->{$hasil['gagal'] > 0 ? 'warning' : 'success'}()
-                            ->send();
-                    }),
             ])
             ->actions([
                 Action::make('histori')
@@ -232,6 +176,53 @@ class AcUnitsRelationManager extends RelationManager
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('buatOrderDariUnit')
+                        ->label('Buat Order dari Unit Terpilih')
+                        ->icon('heroicon-o-truck')
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->modalHeading('Buat Order dari Unit AC Terpilih')
+                        ->modalDescription('Satu order = satu kunjungan: seluruh unit tercentang masuk sebagai baris layanan (order_items). Pilih unit dari SATU alamat agar alamat pengerjaan order benar.')
+                        ->modalSubmitActionLabel('Buat Order')
+                        ->modalWidth('xl')
+                        ->form([
+                            Forms\Components\Select::make('service_catalog_id')
+                                ->label('Jenis Layanan')
+                                ->options(fn () => ServiceCatalog::query()->where('aktif', true)->get()
+                                    ->mapWithKeys(fn (ServiceCatalog $c) => [$c->id => "{$c->jenis_layanan->value} - {$c->jenis_unit?->value} {$c->pk} (Rp".number_format($c->harga, 0, ',', '.').')']))
+                                ->searchable()
+                                ->required(),
+                            Forms\Components\TextInput::make('harga')
+                                ->label('Harga per Unit (opsional, override harga katalog)')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->minValue(0),
+                            Forms\Components\DatePicker::make('tanggal_jadwal'),
+                            Forms\Components\TimePicker::make('jam_jadwal'),
+                            Forms\Components\Select::make('team_id')
+                                ->label('Assign Tim (opsional)')
+                                ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
+                                ->searchable(),
+                            Forms\Components\Textarea::make('catatan_admin')
+                                ->columnSpanFull(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            try {
+                                $order = app(OrderService::class)->createOrderDariUnits(
+                                    $this->getOwnerRecord(),
+                                    $records->pluck('id')->all(),
+                                    $data,
+                                    auth()->user(),
+                                );
+
+                                Notification::make()->success()
+                                    ->title("Order #{$order->id} dibuat")
+                                    ->body(count($records).' unit menjadi satu order/kunjungan.')
+                                    ->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal membuat order')->body($e->getMessage())->send();
+                            }
+                        }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

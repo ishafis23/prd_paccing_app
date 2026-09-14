@@ -21,6 +21,7 @@ class Order extends Model
 
     protected $fillable = [
         'customer_id',
+        'customer_address_id',
         'service_catalog_id',
         'customer_ac_unit_id',
         'team_id',
@@ -64,6 +65,16 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Alamat customer yg dikerjakan order ini (dev-plan/14) — nullable utk
+     * order lama / customer tanpa data alamat. `alamat_pengerjaan` tetap
+     * snapshot teks (surat jalan/teknisi tidak berubah).
+     */
+    public function customerAddress(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAddress::class);
     }
 
     public function serviceCatalog(): BelongsTo

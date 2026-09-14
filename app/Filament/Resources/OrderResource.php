@@ -11,6 +11,7 @@ use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
@@ -60,6 +61,22 @@ class OrderResource extends Resource
                         $customer = Customer::find($state);
                         $set('alamat_pengerjaan', $customer?->alamat);
                         $set('jenis_pelanggan', $customer?->jenis?->value);
+                        $set('customer_address_id', $customer?->alamatUtama()?->id);
+                        $set('customer_ac_unit_id', null);
+                    }),
+                Forms\Components\Select::make('customer_address_id')
+                    ->label('Alamat (opsional)')
+                    ->helperText('Alamat mana yg akan dikerjakan — default alamat utama customer (dev-plan/14).')
+                    ->options(fn (Forms\Get $get) => filled($get('customer_id'))
+                        ? CustomerAddress::query()->where('customer_id', $get('customer_id'))->orderBy('id')->get()
+                            ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()])
+                        : [])
+                    ->searchable()
+                    ->live()
+                    ->afterStateUpdated(function (Forms\Set $set, $state) {
+                        $alamat = CustomerAddress::find($state);
+                        $set('alamat_pengerjaan', $alamat?->alamat);
+                        $set('customer_ac_unit_id', null);
                     }),
                 Forms\Components\Select::make('service_catalog_id')
                     ->label('Jenis Layanan')
@@ -74,11 +91,15 @@ class OrderResource extends Resource
                     ->required(),
                 Forms\Components\Select::make('customer_ac_unit_id')
                     ->label('Unit AC (opsional)')
-                    ->helperText('Pilih unit spesifik kalau customer punya lebih dari satu AC terdaftar — supaya laporan teknisi menunjuk ke unit yang benar.')
-                    ->options(fn (Forms\Get $get) => CustomerAcUnit::query()
-                        ->where('customer_id', $get('customer_id'))
-                        ->get()
-                        ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
+                    ->helperText('Pilih unit spesifik di ALAMAT terpilih — supaya laporan teknisi menunjuk ke unit yang benar.')
+                    ->options(function (Forms\Get $get) {
+                        return CustomerAcUnit::query()
+                            ->where('customer_id', $get('customer_id'))
+                            ->when(filled($get('customer_address_id')), fn ($q) => $q->where('customer_address_id', $get('customer_address_id')))
+                            ->orderBy('kode_unit')
+                            ->get()
+                            ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]);
+                    })
                     ->searchable(),
                 Forms\Components\Select::make('teknisi_id')
                     ->label('Assign Teknisi (opsional)')
@@ -109,6 +130,10 @@ class OrderResource extends Resource
                     ->columns(3)
                     ->schema([
                         TextEntry::make('customer.nama')->label('Customer'),
+                        TextEntry::make('customerAddress.nama_lokasi')
+                            ->label('Alamat')
+                            ->badge()
+                            ->placeholder('—'),
                         TextEntry::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
                         TextEntry::make('teknisi.name')->label('Teknisi')->placeholder('— belum di-assign —'),
                         TextEntry::make('status')->badge(),

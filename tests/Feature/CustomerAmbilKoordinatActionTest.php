@@ -1,50 +1,36 @@
 <?php
 
 use App\Enums\RoleName;
-use App\Filament\Resources\CustomerResource\Pages\CreateCustomer;
+use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
+use App\Filament\Resources\CustomerResource\RelationManagers\AddressesRelationManager;
 use App\Models\Customer;
+use App\Models\CustomerAddress;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
 });
 
-it('tombol Ambil Koordinat mengisi latitude/longitude di form dan tersimpan ke database', function () {
-    Http::fake([
-        // Presisi panjang spt kasus nyata (dulu gagal krn validasi step form).
-        'maps.app.goo.gl/*' => Http::response('<html>...!3d-5.1603181!4d119.44289239999999...</html>', 200),
-    ]);
-
+it('membuat alamat dgn latitude/longitude lewat tab Alamat tersimpan ke database', function () {
     $admin = User::factory()->create();
     $admin->assignRole(RoleName::Admin->value);
+    $customer = Customer::factory()->create();
 
-    $response = Livewire::actingAs($admin)->test(CreateCustomer::class)
-        ->fillForm([
-            'nama' => 'Budi Test',
-            'no_hp' => '081234567890',
+    Livewire::actingAs($admin)->test(AddressesRelationManager::class, [
+        'ownerRecord' => $customer,
+        'pageClass' => EditCustomer::class,
+    ])
+        ->callTableAction('create', data: [
+            'nama_lokasi' => 'Rumah',
             'alamat' => 'Jl Mawar 4',
-            'area' => 'makassar',
-            'sumber_lead' => 'whatsapp',
-            'status' => 'lead',
-            'maps_link' => 'https://maps.app.goo.gl/3F7MPCjWWm8fnGVa7',
-        ]);
+            'latitude' => -5.1603181,
+            'longitude' => 119.4428924,
+        ])
+        ->assertHasNoTableActionErrors();
 
-    $response->callFormComponentAction('maps_link', 'ambilKoordinat');
-
-    $response->assertFormSet([
-        'latitude' => -5.1603181,
-        'longitude' => 119.4428924,
-    ]);
-
-    $response->call('create');
-    $response->assertHasNoFormErrors();
-
-    $customer = Customer::where('nama', 'Budi Test')->first();
-
-    expect($customer)->not->toBeNull();
-    expect((float) $customer->latitude)->toBe(-5.1603181);
-    expect((float) $customer->longitude)->toBe(119.4428924);
+    $alamat = CustomerAddress::where('customer_id', $customer->id)->sole();
+    expect((float) $alamat->latitude)->toBe(-5.1603181);
+    expect((float) $alamat->longitude)->toBe(119.4428924);
 });

@@ -8,6 +8,7 @@ use App\Filament\Resources\CustomerResource\Pages\ListCustomers;
 use App\Livewire\Portal\Login as PortalLogin;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ServiceReminder;
@@ -168,6 +169,45 @@ it('dashboard portal menampilkan unit AC customer & histori terakhir dikerjakan'
         ->assertSee('Cuci AC Ruang Guru')
         ->assertSee($teknisi->name)
         ->assertSee('Jadwal Servis Berikutnya');
+});
+
+it('dashboard portal mengelompokkan unit AC per alamat (dev-plan/14)', function () {
+    $admin = ($this->mkAdmin)();
+    $customer = Customer::factory()->create(['email' => 'multi@contoh.id', 'jenis' => CustomerJenis::Company]);
+    app(CustomerPortalService::class)->aturPassword($customer, 'rahasia123', $admin);
+
+    $alamatRumah = CustomerAddress::factory()->create([
+        'customer_id' => $customer->id,
+        'nama_lokasi' => 'Rumah',
+        'alamat' => 'Jl. Rumah No. 1',
+    ]);
+    $alamatUsaha = CustomerAddress::factory()->create([
+        'customer_id' => $customer->id,
+        'nama_lokasi' => 'Usaha',
+        'alamat' => 'Jl. Usaha No. 2',
+    ]);
+
+    CustomerAcUnit::factory()->create([
+        'customer_id' => $customer->id,
+        'customer_address_id' => $alamatRumah->id,
+        'kode_unit' => 'AC-RUMAH',
+        'kode_ruangan' => 'Kamar Utama',
+    ]);
+    CustomerAcUnit::factory()->create([
+        'customer_id' => $customer->id,
+        'customer_address_id' => $alamatUsaha->id,
+        'kode_unit' => 'AC-USAHA',
+        'kode_ruangan' => 'Lobby',
+    ]);
+
+    Auth::guard('customer')->login($customer);
+
+    $this->get('/portal')
+        ->assertOk()
+        ->assertSee('AC-RUMAH')
+        ->assertSee('AC-USAHA')
+        ->assertSee('Rumah')
+        ->assertSee('Usaha');
 });
 
 it('logout portal menghapus sesi customer', function () {

@@ -7,6 +7,7 @@ use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\AcUnitsRelationManager;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
 use App\Models\User;
 use App\Services\CustomerAcUnitImportService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -60,58 +61,68 @@ it('bukan admin ditolak melakukan import unit ac', function () {
 
     $path = cauBuatFile([['AC-001', 'Kelas 1', '', '', '']]);
 
-    expect(fn () => app(CustomerAcUnitImportService::class)->import($path, $customer, $bukanAdmin))
+    expect(fn () => app(CustomerAcUnitImportService::class)->import($path, $customer, null, $bukanAdmin))
         ->toThrow(AuthorizationException::class);
 });
 
-it('import baris valid membuat unit ac terhubung ke customer', function () {
+it('import baris valid membuat unit ac terhubung ke customer & alamat', function () {
     $admin = cauAdmin();
     $customer = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
+    $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
 
     $path = cauBuatFile([
         ['AC-001', 'Kelas 3A', 'split', '1 PK', 'lantai 2'],
         ['AC-002', 'Ruang Guru', 'cassette', '2 PK', ''],
     ]);
 
-    $hasil = app(CustomerAcUnitImportService::class)->import($path, $customer, $admin);
+    $hasil = app(CustomerAcUnitImportService::class)->import($path, $customer, $alamat, $admin);
 
     expect($hasil['berhasil'])->toBe(2);
     expect($hasil['gagal'])->toBe(0);
     expect($customer->acUnits()->count())->toBe(2);
+    expect($alamat->acUnits()->count())->toBe(2);
 
     $unit = CustomerAcUnit::where('kode_unit', 'AC-001')->first();
     expect($unit->kode_ruangan)->toBe('Kelas 3A');
     expect($unit->jenis_unit->value)->toBe('split');
     expect($unit->pk)->toBe('1 PK');
     expect($unit->customer_id)->toBe($customer->id);
+    expect($unit->customer_address_id)->toBe($alamat->id);
 });
 
-it('kode_unit duplikat utk customer yg sama dilewati, tidak ganggu customer lain', function () {
+it('kode_unit duplikat utk alamat yg sama dilewati, tidak ganggu alamat lain', function () {
     $admin = cauAdmin();
     $customerA = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
     $customerB = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
+    $alamatA = CustomerAddress::factory()->create(['customer_id' => $customerA->id]);
+    $alamatB = CustomerAddress::factory()->create(['customer_id' => $customerB->id]);
 
-    CustomerAcUnit::factory()->create(['customer_id' => $customerA->id, 'kode_unit' => 'AC-001']);
+    CustomerAcUnit::factory()->create([
+        'customer_id' => $customerA->id,
+        'customer_address_id' => $alamatA->id,
+        'kode_unit' => 'AC-001',
+    ]);
 
-    // Sama kode_unit tapi customer beda -> boleh, bukan duplikat global.
+    // Sama kode_unit tapi alamat/customer beda -> boleh, bukan duplikat global.
     $pathB = cauBuatFile([['AC-001', 'Lobby', '', '', '']]);
-    $hasilB = app(CustomerAcUnitImportService::class)->import($pathB, $customerB, $admin);
+    $hasilB = app(CustomerAcUnitImportService::class)->import($pathB, $customerB, $alamatB, $admin);
     expect($hasilB['berhasil'])->toBe(1);
 
-    // Sama kode_unit & customer sama -> dilewati.
+    // Sama kode_unit & alamat sama -> dilewati.
     $pathA = cauBuatFile([
         ['AC-001', 'Kelas Baru', '', '', ''],
         ['AC-001', 'Duplikat Dalam File', '', '', ''],
     ]);
-    $hasilA = app(CustomerAcUnitImportService::class)->import($pathA, $customerA, $admin);
+    $hasilA = app(CustomerAcUnitImportService::class)->import($pathA, $customerA, $alamatA, $admin);
     expect($hasilA['berhasil'])->toBe(0);
     expect($hasilA['dilewati'])->toBe(2);
-    expect($customerA->acUnits()->count())->toBe(1);
+    expect($alamatA->acUnits()->count())->toBe(1);
 });
 
 it('baris tanpa kode_unit/kode_ruangan atau jenis_unit tidak valid dilaporkan gagal', function () {
     $admin = cauAdmin();
     $customer = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
+    $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
 
     $path = cauBuatFile([
         ['', 'Kelas 1', '', '', ''],
@@ -119,7 +130,7 @@ it('baris tanpa kode_unit/kode_ruangan atau jenis_unit tidak valid dilaporkan ga
         ['AC-011', 'Kelas 2', 'planet_mars', '', ''],
     ]);
 
-    $hasil = app(CustomerAcUnitImportService::class)->import($path, $customer, $admin);
+    $hasil = app(CustomerAcUnitImportService::class)->import($path, $customer, $alamat, $admin);
 
     expect($hasil['berhasil'])->toBe(0);
     expect($hasil['gagal'])->toBe(3);
@@ -128,6 +139,7 @@ it('baris tanpa kode_unit/kode_ruangan atau jenis_unit tidak valid dilaporkan ga
 it('menolak file lebih dari MAX_BARIS baris', function () {
     $admin = cauAdmin();
     $customer = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
+    $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
 
     $baris = collect(range(1, CustomerAcUnitImportService::MAX_BARIS + 1))
         ->map(fn ($i) => ["AC-{$i}", "Ruangan {$i}", '', '', ''])
@@ -135,7 +147,7 @@ it('menolak file lebih dari MAX_BARIS baris', function () {
 
     $path = cauBuatFile($baris);
 
-    expect(fn () => app(CustomerAcUnitImportService::class)->import($path, $customer, $admin))
+    expect(fn () => app(CustomerAcUnitImportService::class)->import($path, $customer, $alamat, $admin))
         ->toThrow(BusinessRuleException::class);
 });
 

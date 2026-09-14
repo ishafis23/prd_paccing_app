@@ -11,12 +11,9 @@ use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Models\Customer;
 use App\Services\CustomerPortalService;
-use App\Services\GoogleMapsLinkService;
 use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -51,76 +48,9 @@ class CustomerResource extends Resource
                     ->email()
                     ->maxLength(255),
                 Forms\Components\Textarea::make('alamat')
+                    ->label('Alamat Utama')
+                    ->helperText('Opsional — utk satu alamat utama saja. Multi-alamat (rumah, usaha, dst, masing-masing dgn peta sendiri) dikelola lewat tab "Alamat" di halaman edit customer.')
                     ->columnSpanFull(),
-                Forms\Components\Fieldset::make('Lokasi Customer')
-                    ->columnSpanFull()
-                    ->schema([
-                        Forms\Components\TextInput::make('maps_link')
-                            ->label('Link Google Maps')
-                            ->placeholder('Tempel link dari WhatsApp/Google Maps di sini')
-                            ->helperText('Opsional — tempel link lalu klik "Ambil Koordinat", atau isi/geser pin manual di peta.')
-                            ->dehydrated(false)
-                            ->columnSpanFull()
-                            ->suffixAction(
-                                Forms\Components\Actions\Action::make('ambilKoordinat')
-                                    ->label('Ambil Koordinat')
-                                    ->icon('heroicon-m-map-pin')
-                                    ->action(function (Get $get, Set $set) {
-                                        $link = trim((string) $get('maps_link'));
-
-                                        if ($link === '') {
-                                            Notification::make()
-                                                ->title('Isi link Google Maps dulu.')
-                                                ->warning()
-                                                ->send();
-
-                                            return;
-                                        }
-
-                                        try {
-                                            $coords = app(GoogleMapsLinkService::class)->resolveCoordinates($link);
-                                        } catch (BusinessRuleException $e) {
-                                            Notification::make()
-                                                ->title($e->getMessage())
-                                                ->danger()
-                                                ->send();
-
-                                            return;
-                                        }
-
-                                        $set('latitude', $coords['lat']);
-                                        $set('longitude', $coords['lng']);
-
-                                        Notification::make()
-                                            ->title('Koordinat berhasil diambil. Cek pin di peta di bawah.')
-                                            ->success()
-                                            ->send();
-                                    })
-                            ),
-                        Forms\Components\TextInput::make('latitude')
-                            ->numeric()
-                            ->step('0.0000001')
-                            ->live(onBlur: true),
-                        Forms\Components\TextInput::make('longitude')
-                            ->numeric()
-                            ->step('0.0000001')
-                            ->live(onBlur: true),
-                        Forms\Components\ViewField::make('peta_lokasi')
-                            ->label('Peta (klik/geser pin untuk koreksi titik)')
-                            ->columnSpanFull()
-                            ->dehydrated(false)
-                            ->view('filament.forms.components.lokasi-picker')
-                            ->viewData(function (Forms\Components\ViewField $component) {
-                                $get = $component->getGetCallback();
-
-                                return [
-                                    'lat' => $get('latitude'),
-                                    'lng' => $get('longitude'),
-                                    'latPath' => $component->generateRelativeStatePath('latitude'),
-                                    'lngPath' => $component->generateRelativeStatePath('longitude'),
-                                ];
-                            }),
-                    ]),
                 Forms\Components\Select::make('area')
                     ->options(EnumOptions::for(CustomerArea::class))
                     ->required(),
@@ -217,6 +147,7 @@ class CustomerResource extends Resource
     public static function getRelations(): array
     {
         return [
+            CustomerResource\RelationManagers\AddressesRelationManager::class,
             CustomerResource\RelationManagers\AcUnitsRelationManager::class,
         ];
     }

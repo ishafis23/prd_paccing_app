@@ -10,10 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * Unit AC fisik milik satu Customer (khususnya company dengan banyak
- * unit, mis. sekolah/kantor) — satu baris = satu unit AC, bukan agregat
- * jumlah. Dasar untuk histori pencucian per unit & portal corporate
- * (lihat dev-plan/12-analisis-chat-13sep-dan-roadmap.md §3.10).
+ * Unit AC fisik milik satu Alamat Customer (dev-plan/14) — satu baris =
+ * satu unit AC fisik, bukan agregat jumlah. Dasar untuk histori pencucian
+ * per unit & portal corporate (lihat
+ * dev-plan/12-analisis-chat-13sep-dan-roadmap.md §3.10). `customer_id`
+ * dipertahankan utk kompatibilitas/filter cepat; source of truth alamat
+ * ada di `customer_address_id`.
  */
 class CustomerAcUnit extends Model
 {
@@ -21,6 +23,7 @@ class CustomerAcUnit extends Model
 
     protected $fillable = [
         'customer_id',
+        'customer_address_id',
         'kode_unit',
         'kode_ruangan',
         'jenis_unit',
@@ -38,6 +41,11 @@ class CustomerAcUnit extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function customerAddress(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAddress::class);
     }
 
     /**

@@ -8,6 +8,8 @@ use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\AcUnitsRelationManager;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
+use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Models\User;
@@ -180,15 +182,25 @@ it('unduh template order massal menghasilkan streamed response', function () {
     expect($response)->toBeInstanceOf(StreamedResponse::class);
 });
 
-it('livewire: header aksi Buat Order Massal & Unduh Template tersedia di relation manager Unit AC', function () {
+it('livewire: bulk action Buat Order dari Unit Terpilih membuat satu order utk unit terpilih', function () {
     $admin = ($this->mkAdmin)();
     $this->actingAs($admin);
-    $customer = Customer::factory()->create();
+    $customer = Customer::factory()->create(['jenis' => CustomerJenis::Company]);
+    $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
+    $unit1 = CustomerAcUnit::factory()->create(['customer_id' => $customer->id, 'customer_address_id' => $alamat->id, 'kode_unit' => 'AC-001']);
+    $unit2 = CustomerAcUnit::factory()->create(['customer_id' => $customer->id, 'customer_address_id' => $alamat->id, 'kode_unit' => 'AC-002']);
+    $catalog = ServiceCatalog::factory()->create(['harga' => 100000]);
 
     Livewire::test(AcUnitsRelationManager::class, [
         'ownerRecord' => $customer,
         'pageClass' => EditCustomer::class,
     ])
-        ->assertTableActionExists('importOrderMassal')
-        ->assertTableActionExists('unduhTemplateOrderMassal');
+        ->assertTableBulkActionExists('buatOrderDariUnit')
+        ->callTableBulkAction('buatOrderDariUnit', [$unit1, $unit2], [
+            'service_catalog_id' => $catalog->id,
+        ]);
+
+    $order = Order::where('customer_id', $customer->id)->sole();
+    expect($order->orderItems)->toHaveCount(2);
+    expect($order->customer_address_id)->toBe($alamat->id);
 });

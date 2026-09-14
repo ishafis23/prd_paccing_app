@@ -8,6 +8,7 @@ use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
+use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderTechnician;
@@ -47,15 +48,17 @@ class OrderService
             $this->assertRole($teknisi, [RoleName::Teknisi]);
         }
 
-        $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $customer);
+        $alamat = $this->resolveAlamat($data['customer_address_id'] ?? null, $customer);
+        $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $customer, $alamat);
 
         $order = new Order([
             'customer_id' => $customer->id,
+            'customer_address_id' => $alamat?->id,
             'service_catalog_id' => $catalog->id,
             'customer_ac_unit_id' => $acUnit?->id,
             'teknisi_id' => $teknisi?->id,
             'jumlah_unit' => $jumlahUnit,
-            'alamat_pengerjaan' => $data['alamat_pengerjaan'] ?? $customer->alamat,
+            'alamat_pengerjaan' => $data['alamat_pengerjaan'] ?? $alamat?->alamat ?? $customer->alamat,
             'jenis_pelanggan' => $data['jenis_pelanggan'] ?? $customer->jenis?->value,
             'tanggal_jadwal' => $data['tanggal_jadwal'] ?? null,
             'jam_jadwal' => $data['jam_jadwal'] ?? null,
@@ -71,6 +74,100 @@ class OrderService
         }
 
         return $order->fresh();
+    }
+
+    /**
+     * Buat order dari unit AC yang dicentang (dev-plan/14 — pengganti
+     * "Order Massal via Excel"). Satu order = satu kunjungan: seluruh unit
+     * terpilih harus berada di SATU alamat yg sama (filter alamat dulu di
+     * tab Unit AC). Unit terpilih wajib milik customer tsb. Metode
+     * pembuatan = pilih katalog + harga default + jadwal + tim (opsional),
+     * lalu tiap unit menjadi satu `order_items` (backward-compatible dgn
+     * alur order multi-item yg sudah ada, dev-plan/13).
+     */
+    public function createOrderDariUnits(Customer $customer, array $unitIds, array $data, User $creator): Order
+    {
+        $this->assertRole($creator, [RoleName::Admin, RoleName::Owner]);
+
+        $catalog = ServiceCatalog::find($data['service_catalog_id'] ?? null);
+        if ($catalog === null) {
+            throw new BusinessRuleException('Jenis layanan wajib dipilih.');
+        }
+
+        if (! $catalog->aktif) {
+            throw new BusinessRuleException('Jenis layanan sedang nonaktif.');
+        }
+
+        $unitIds = array_values(array_unique(array_map('intval', $unitIds)));
+        if ($unitIds === []) {
+            throw new BusinessRuleException('Pilih minimal satu unit AC.');
+        }
+
+        $units = CustomerAcUnit::query()
+            ->where('customer_id', $customer->id)
+            ->whereIn('id', $unitIds)
+            ->get();
+
+        if ($units->count() !== count($unitIds)) {
+            throw new BusinessRuleException('Ada unit yang dipilih bukan milik customer ini.');
+        }
+
+        $alamatIds = $units->pluck('customer_address_id')->filter()->unique();
+        if ($alamatIds->count() > 1) {
+            throw new BusinessRuleException('Pilih unit dari SATU alamat utk satu order/kunjungan — filter per alamat lalu centang ulang.');
+        }
+
+        $alamat = $alamatIds->first() !== null ? CustomerAddress::find($alamatIds->first()) : null;
+
+        $hargaDefault = filled($data['harga'] ?? null) ? (float) $data['harga'] : (float) $catalog->harga;
+        if ($hargaDefault < 0) {
+            throw new BusinessRuleException('Harga default tidak valid.');
+        }
+
+        $namaLayanan = str($catalog->jenis_layanan->value)->headline()->toString();
+        $kategori = $catalog->jenis_layanan;
+
+        return DB::transaction(function () use ($customer, $alamat, $catalog, $units, $hargaDefault, $namaLayanan, $kategori, $data, $creator): Order {
+            $order = new Order([
+                'customer_id' => $customer->id,
+                'customer_address_id' => $alamat?->id,
+                'service_catalog_id' => $catalog->id,
+                'jumlah_unit' => 1,
+                'alamat_pengerjaan' => $alamat?->alamat ?? $customer->alamat,
+                'jenis_pelanggan' => $customer->jenis?->value,
+                'tanggal_jadwal' => $data['tanggal_jadwal'] ?? null,
+                'jam_jadwal' => $data['jam_jadwal'] ?? null,
+                'status' => OrderStatus::Baru,
+                'catatan_admin' => filled($data['catatan_admin'] ?? null) ? $data['catatan_admin'] : null,
+                'created_by' => $creator->id,
+            ]);
+            $order->save();
+
+            // Order::booted() otomatis bikin 1 order_item stub — baris unit
+            // pertama dipakai utk mengisi stub, sisanya di-create.
+            $stub = $order->orderItems()->first();
+            $stub->update([
+                'customer_ac_unit_id' => $units->first()->id,
+                'harga' => $hargaDefault,
+            ]);
+
+            foreach ($units->slice(1) as $unit) {
+                $order->orderItems()->create([
+                    'service_catalog_id' => $catalog->id,
+                    'customer_ac_unit_id' => $unit->id,
+                    'nama_layanan' => $namaLayanan,
+                    'kategori' => $kategori,
+                    'harga' => $hargaDefault,
+                    'jumlah' => 1,
+                ]);
+            }
+
+            if (filled($data['team_id'] ?? null)) {
+                $this->assignTeam($order, Team::findOrFail($data['team_id']), $creator);
+            }
+
+            return $order->fresh();
+        });
     }
 
     /**
@@ -286,11 +383,31 @@ class OrderService
     }
 
     /**
-     * Validasi Unit AC (dev-plan/12 §3.10 lanjutan) — kalau diisi, harus
-     * milik customer yg sama dgn order/customer terkait. `null` = tidak
-     * ditautkan ke unit manapun (opsional, backward-compatible).
+     * Resolve alamat utk createOrder (dev-plan/14) — kalau tidak diisi,
+     * fallback ke alamat utama / alamat pertama customer. Kalau diisi,
+     * wajib milik customer tsb.
      */
-    private function resolveAcUnit(?int $acUnitId, Customer $customer): ?CustomerAcUnit
+    private function resolveAlamat(?int $alamatId, Customer $customer): ?CustomerAddress
+    {
+        if ($alamatId === null) {
+            return $customer->alamatUtama() ?? $customer->alamatPertama();
+        }
+
+        $alamat = CustomerAddress::find($alamatId);
+        if ($alamat === null || (int) $alamat->customer_id !== (int) $customer->id) {
+            throw new BusinessRuleException('Alamat tidak ditemukan atau bukan milik customer ini.');
+        }
+
+        return $alamat;
+    }
+
+    /**
+     * Validasi Unit AC (dev-plan/12 §3.10 lanjutan, dev-plan/14) — kalau
+     * diisi, harus milik customer yg sama dgn order/customer terkait; jika
+     * alamat order juga diisi dan unit punya alamat, harus sama. `null` =
+     * tidak ditautkan ke unit manapun (opsional, backward-compatible).
+     */
+    private function resolveAcUnit(?int $acUnitId, Customer $customer, ?CustomerAddress $alamat = null): ?CustomerAcUnit
     {
         if ($acUnitId === null) {
             return null;
@@ -299,6 +416,10 @@ class OrderService
         $unit = CustomerAcUnit::find($acUnitId);
         if ($unit === null || (int) $unit->customer_id !== (int) $customer->id) {
             throw new BusinessRuleException('Unit AC tidak ditemukan atau bukan milik customer ini.');
+        }
+
+        if ($alamat !== null && $unit->customer_address_id !== null && (int) $unit->customer_address_id !== (int) $alamat->id) {
+            throw new BusinessRuleException('Unit AC yang dipilih tidak berada di alamat pilihan order.');
         }
 
         return $unit;

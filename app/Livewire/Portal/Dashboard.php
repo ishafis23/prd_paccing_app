@@ -18,9 +18,18 @@ class Dashboard extends Component
         $customer = Auth::guard('customer')->user();
 
         $customer->load([
-            'acUnits' => fn ($q) => $q->orderBy('kode_unit'),
-            'acUnits.latestOrderItem.order.teknisi',
+            'addresses' => fn ($q) => $q->orderBy('id'),
+            'addresses.acUnits' => fn ($q) => $q->orderBy('kode_unit'),
+            'addresses.acUnits.latestOrderItem.order.teknisi',
         ]);
+
+        // Fallback utk customer lama yg belum punya data alamat (dev-plan/14).
+        if ($customer->addresses->isEmpty()) {
+            $customer->load([
+                'acUnits' => fn ($q) => $q->orderBy('kode_unit'),
+                'acUnits.latestOrderItem.order.teknisi',
+            ]);
+        }
 
         $reminder = $customer->serviceReminders()->latest('id')->first();
 
