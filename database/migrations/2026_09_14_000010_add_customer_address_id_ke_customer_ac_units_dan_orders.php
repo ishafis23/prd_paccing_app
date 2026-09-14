@@ -24,13 +24,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('customer_ac_units', function (Blueprint $table) {
-            $table->foreignId('customer_address_id')->nullable()->after('customer_id')->constrained()->nullOnDelete();
-        });
+        if (! Schema::hasColumn('customer_ac_units', 'customer_address_id')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->foreignId('customer_address_id')->nullable()->after('customer_id')->constrained()->nullOnDelete();
+            });
+        }
 
-        Schema::table('orders', function (Blueprint $table) {
-            $table->foreignId('customer_address_id')->nullable()->after('customer_id')->constrained()->nullOnDelete();
-        });
+        if (! Schema::hasColumn('orders', 'customer_address_id')) {
+            Schema::table('orders', function (Blueprint $table) {
+                $table->foreignId('customer_address_id')->nullable()->after('customer_id')->constrained()->nullOnDelete();
+            });
+        }
 
         DB::table('customers')->select('id', 'alamat', 'latitude', 'longitude')->orderBy('id')->chunkById(200, function ($customers): void {
             $sekarang = now();
@@ -44,16 +48,26 @@ return new class extends Migration
                     continue;
                 }
 
-                $alamatId = DB::table('customer_addresses')->insertGetId([
-                    'customer_id' => $customer->id,
-                    'nama_lokasi' => 'Alamat Utama',
-                    'alamat' => $customer->alamat,
-                    'latitude' => $customer->latitude,
-                    'longitude' => $customer->longitude,
-                    'is_utama' => true,
-                    'created_at' => $sekarang,
-                    'updated_at' => $sekarang,
-                ]);
+                // Idempoten: pakai alamat yg sudah ada kalau migrasi pernah
+                // jalan sebagian sebelum gagal (jangan bikin alamat dobel).
+                $alamatId = DB::table('customer_addresses')
+                    ->where('customer_id', $customer->id)
+                    ->orderByDesc('is_utama')
+                    ->orderBy('id')
+                    ->value('id');
+
+                if ($alamatId === null) {
+                    $alamatId = DB::table('customer_addresses')->insertGetId([
+                        'customer_id' => $customer->id,
+                        'nama_lokasi' => 'Alamat Utama',
+                        'alamat' => $customer->alamat,
+                        'latitude' => $customer->latitude,
+                        'longitude' => $customer->longitude,
+                        'is_utama' => true,
+                        'created_at' => $sekarang,
+                        'updated_at' => $sekarang,
+                    ]);
+                }
 
                 DB::table('customer_ac_units')
                     ->where('customer_id', $customer->id)
@@ -67,27 +81,54 @@ return new class extends Migration
             }
         });
 
-        Schema::table('customer_ac_units', function (Blueprint $table) {
-            $table->dropUnique('customer_ac_units_customer_id_kode_unit_unique');
-            $table->unique(['customer_address_id', 'kode_unit']);
-        });
+        // MySQL: FK `customer_id` butuh index pendukung — index unique
+        // komposit lama kebetulan dipakai utk itu, jadi tambah index biasa
+        // dulu supaya unique lama boleh dilepas.
+        if (! Schema::hasIndex('customer_ac_units', 'customer_ac_units_customer_id_index')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->index('customer_id');
+            });
+        }
+
+        if (Schema::hasIndex('customer_ac_units', 'customer_ac_units_customer_id_kode_unit_unique')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->dropUnique('customer_ac_units_customer_id_kode_unit_unique');
+            });
+        }
+
+        if (! Schema::hasIndex('customer_ac_units', 'customer_ac_units_customer_address_id_kode_unit_unique')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->unique(['customer_address_id', 'kode_unit']);
+            });
+        }
     }
 
     public function down(): void
     {
         DB::table('customer_addresses')->delete();
 
-        Schema::table('customer_ac_units', function (Blueprint $table) {
-            $table->dropUnique('customer_ac_units_customer_address_id_kode_unit_unique');
-            $table->unique(['customer_id', 'kode_unit']);
-        });
+        if (Schema::hasIndex('customer_ac_units', 'customer_ac_units_customer_address_id_kode_unit_unique')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->dropUnique('customer_ac_units_customer_address_id_kode_unit_unique');
+            });
+        }
 
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('customer_address_id');
-        });
+        if (! Schema::hasIndex('customer_ac_units', 'customer_ac_units_customer_id_kode_unit_unique')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->unique(['customer_id', 'kode_unit']);
+            });
+        }
 
-        Schema::table('customer_ac_units', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('customer_address_id');
-        });
+        if (Schema::hasColumn('orders', 'customer_address_id')) {
+            Schema::table('orders', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('customer_address_id');
+            });
+        }
+
+        if (Schema::hasColumn('customer_ac_units', 'customer_address_id')) {
+            Schema::table('customer_ac_units', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('customer_address_id');
+            });
+        }
     }
 };
