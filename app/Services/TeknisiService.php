@@ -159,6 +159,12 @@ class TeknisiService
             $order->status = ! empty($payload['butuh_followup'])
                 ? OrderStatus::ButuhFollowup
                 : OrderStatus::Selesai;
+
+            // dev-plan/15 B50: teknisi juga bisa menandai klaim/garansi saat laporan.
+            if (array_key_exists('is_klaim', $payload)) {
+                $order->is_klaim = (bool) $payload['is_klaim'];
+            }
+
             $order->save();
 
             // Resi publik tersedia begitu order selesai (B14a).

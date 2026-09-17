@@ -64,6 +64,7 @@ class OrderService
             'jam_jadwal' => $data['jam_jadwal'] ?? null,
             'status' => $teknisi ? OrderStatus::Terjadwal : OrderStatus::Baru,
             'catatan_admin' => $data['catatan_admin'] ?? null,
+            'is_klaim' => $data['is_klaim'] ?? false,
             'created_by' => $creator->id,
         ]);
         $order->save();
@@ -515,7 +516,7 @@ class OrderService
         }
 
         $order->status = OrderStatus::Batal;
-        $order->catatan_admin = trim(($order->catatan_admin ?? '') . "\n[BATAL] " . ($alasan ?? 'dibatalkan admin'));
+        $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[BATAL] ".($alasan ?? 'dibatalkan admin'));
         $order->save();
 
         return $order->fresh();

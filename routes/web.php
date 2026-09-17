@@ -6,6 +6,7 @@ use App\Http\Controllers\SuratJalanController;
 use App\Livewire\Auth\Login;
 use App\Livewire\Portal\Dashboard as PortalDashboard;
 use App\Livewire\Portal\Login as PortalLogin;
+use App\Livewire\Teknisi\AbsensiScan;
 use App\Livewire\Teknisi\Akun;
 use App\Livewire\Teknisi\CapaianKerja;
 use App\Livewire\Teknisi\JadwalHariIni;
@@ -29,6 +30,9 @@ Route::post('/logout', function () {
 Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->group(function () {
     Route::get('/', JadwalHariIni::class)->name('teknisi.jadwal');
     Route::get('/order/{order}', OrderDetail::class)->name('teknisi.order');
+    // dev-plan/15: {kode?} opsional — dari scan QR (absen datang) atau
+    // langsung dari menu tanpa kode (absen pulang / lihat status hari ini).
+    Route::get('/absensi/{kode?}', AbsensiScan::class)->name('teknisi.absensi');
     Route::get('/riwayat', RiwayatPengerjaan::class)->name('teknisi.riwayat');
     Route::get('/capaian', CapaianKerja::class)->name('teknisi.capaian');
     Route::get('/akun', Akun::class)->name('teknisi.akun');

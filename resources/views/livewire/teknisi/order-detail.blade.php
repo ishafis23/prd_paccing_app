@@ -173,6 +173,33 @@
     @endif
 
     @if ($order->status === $orderStatus::MenujuLokasi)
+        @if ($this->butuhFotoTitikPertama)
+            <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
+                <p class="mb-1 flex items-center gap-2 text-sm font-semibold text-amber-700">
+                    <x-heroicon-o-camera class="h-5 w-5" /> Titik Pertama Hari Ini (Games 2)
+                </p>
+                <p class="mb-3 text-xs text-gray-500">Ini check-in pertama Anda hari ini — upload foto bukti (mis. buka cover AC indoor) sebelum geser check-in.</p>
+                <div x-data="{ preview: null }" class="relative h-32 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+                    <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
+                        <template x-if="!preview">
+                            <div class="flex flex-col items-center">
+                                <x-heroicon-o-camera class="h-6 w-6" />
+                                <span class="mt-1 text-xs">Ketuk untuk ambil/pilih foto</span>
+                            </div>
+                        </template>
+                        <img x-show="preview" :src="preview" alt="Pratinjau foto titik pertama" class="absolute inset-0 h-full w-full object-cover">
+                        <input type="file" wire:model="fotoTitikPertama" accept="image/*"
+                            @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
+                            class="absolute inset-0 cursor-pointer opacity-0">
+                    </label>
+                    <div wire:loading wire:target="fotoTitikPertama" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                        <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                    </div>
+                </div>
+                @error('fotoTitikPertama') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+        @endif
+
         <x-teknisi-slider
             hint="Geser jika sudah tiba di lokasi customer."
             label="Check-in Sekarang"
@@ -390,6 +417,11 @@
             <label class="flex items-center gap-2 rounded-xl bg-gray-50 p-3 text-sm font-medium text-gray-700">
                 <input type="checkbox" wire:model="butuhFollowup" class="rounded border-gray-300 text-blue-600">
                 Perlu follow-up (mis. sparepart kurang)
+            </label>
+
+            <label class="flex items-center gap-2 rounded-xl bg-gray-50 p-3 text-sm font-medium text-gray-700">
+                <input type="checkbox" wire:model="isKlaim" class="rounded border-gray-300 text-blue-600">
+                Ini pekerjaan klaim/garansi (tidak ditagih)
             </label>
 
             <button type="submit" wire:loading.attr="disabled"

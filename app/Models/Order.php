@@ -44,6 +44,7 @@ class Order extends Model
         'perbaikan_estimasi_harga',
         'perbaikan_dilaporkan_oleh',
         'perbaikan_dilaporkan_pada',
+        'is_klaim',
         'created_by',
     ];
 
@@ -59,6 +60,7 @@ class Order extends Model
             'perbaikan_menunggu_konfirmasi' => 'boolean',
             'perbaikan_estimasi_harga' => 'decimal:2',
             'perbaikan_dilaporkan_pada' => 'datetime',
+            'is_klaim' => 'boolean',
         ];
     }
 

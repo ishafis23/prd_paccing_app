@@ -1,6 +1,7 @@
 @php
     $tabs = [
         ['route' => 'teknisi.jadwal', 'label' => 'Jadwal', 'icon' => 'home'],
+        ['route' => 'teknisi.absensi', 'label' => 'Absensi', 'icon' => 'qr-code'],
         ['route' => 'teknisi.riwayat', 'label' => 'Riwayat', 'icon' => 'clock'],
         ['route' => 'teknisi.capaian', 'label' => 'Capaian', 'icon' => 'chart-bar'],
         ['route' => 'teknisi.akun', 'label' => 'Akun', 'icon' => 'user-circle'],
@@ -9,7 +10,7 @@
 
 <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur"
     style="max-width: 480px; margin: 0 auto;">
-    <div class="grid h-[68px] grid-cols-4">
+    <div class="grid h-[68px] grid-cols-5">
         @foreach ($tabs as $tab)
             @php $active = request()->routeIs($tab['route']); @endphp
             <a href="{{ route($tab['route']) }}" wire:navigate

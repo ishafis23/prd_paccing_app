@@ -119,6 +119,10 @@ class OrderResource extends Resource
                 Forms\Components\TimePicker::make('jam_jadwal'),
                 Forms\Components\Textarea::make('catatan_admin')
                     ->columnSpanFull(),
+                Forms\Components\Toggle::make('is_klaim')
+                    ->label('Pekerjaan klaim/garansi (tidak ditagih)')
+                    ->helperText('dev-plan/15 B50: order klaim dikecualikan dari hitungan titik/unit/omset skema insentif Games.')
+                    ->columnSpanFull(),
             ]);
     }
 

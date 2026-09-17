@@ -6,11 +6,14 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\BusinessRuleException;
+use App\Models\Attendance;
 use App\Models\Order;
 use App\Models\StockItem;
+use App\Services\AttendanceService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
+use App\Support\FotoLaporanSlot;
 use Illuminate\Auth\Access\AuthorizationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -34,6 +37,10 @@ class OrderDetail extends Component
     public string $catatan = '';
 
     public bool $butuhFollowup = false;
+
+    public bool $isKlaim = false;
+
+    public $fotoTitikPertama;
 
     public $fotoSebelum;
 
@@ -66,7 +73,7 @@ class OrderDetail extends Component
     public function getFotoSlotsProperty(): array
     {
         return $this->order->orderItems
-            ->mapWithKeys(fn ($item) => [$item->id => \App\Support\FotoLaporanSlot::untuk($item->kategori)])
+            ->mapWithKeys(fn ($item) => [$item->id => FotoLaporanSlot::untuk($item->kategori)])
             ->all();
     }
 
@@ -156,10 +163,41 @@ class OrderDetail extends Component
         }
     }
 
+    /**
+     * Games 2 (dev-plan/15, B48): true bila check-in ini akan jadi
+     * check-in job-site PERTAMA teknisi hari ini — perlu foto tambahan.
+     */
+    public function getButuhFotoTitikPertamaProperty(): bool
+    {
+        return ! Attendance::query()
+            ->where('user_id', auth()->id())
+            ->where('tanggal', now()->toDateString())
+            ->exists();
+    }
+
     public function checkIn(): void
     {
+        $butuhFotoTitikPertama = $this->butuhFotoTitikPertama;
+
+        if ($butuhFotoTitikPertama && $this->fotoTitikPertama === null) {
+            $this->addError('fotoTitikPertama', 'Wajib upload foto bukti (mis. buka cover AC indoor) — ini check-in pertama Anda hari ini (Games 2).');
+
+            return;
+        }
+
         try {
+            if ($butuhFotoTitikPertama) {
+                // B25: cek kuota SEBELUM status order berubah, supaya tidak nanggung.
+                app(StorageQuotaService::class)->pastikanCukup($this->fotoTitikPertama->getSize());
+            }
+
             app(TeknisiService::class)->checkIn($this->order, auth()->user());
+
+            if ($butuhFotoTitikPertama) {
+                app(AttendanceService::class)->catatTitikPertama(auth()->user(), $this->fotoTitikPertama);
+                $this->reset('fotoTitikPertama');
+            }
+
             session()->flash('status', 'Check-in berhasil. Selamat bekerja!');
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
@@ -221,6 +259,7 @@ class OrderDetail extends Component
                 ->values()
                 ->all(),
             'butuh_followup' => $this->butuhFollowup,
+            'is_klaim' => $this->isKlaim,
             'foto_sebelum' => $this->fotoSebelum?->store('work-reports', 'public'),
             'foto_sesudah' => $this->fotoSesudah?->store('work-reports', 'public'),
             'foto_kategori' => $fotoKategori,
@@ -230,7 +269,7 @@ class OrderDetail extends Component
             app(TeknisiService::class)->submitLaporan($this->order, auth()->user(), $payload);
             StorageQuotaService::lupakanCache();
             session()->flash('status', 'Laporan berhasil disubmit.');
-            $this->reset(['materials', 'catatan', 'butuhFollowup', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
+            $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }

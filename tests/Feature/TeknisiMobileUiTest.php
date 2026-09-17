@@ -7,12 +7,13 @@ use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\StockItem;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+    $this->seed(RolesAndPermissionsSeeder::class);
     $this->teknisi = User::factory()->create();
     $this->teknisi->assignRole(RoleName::Teknisi->value);
     $this->lainTeknisi = User::factory()->create();
@@ -57,10 +58,13 @@ it('slider berangkat mengubah status order jadi menuju_lokasi', function () {
 });
 
 it('check-in mengubah status jadi dikerjakan dan mencatat attendance', function () {
+    Storage::fake('public');
     $order = Order::factory()->create(['teknisi_id' => $this->teknisi->id, 'status' => OrderStatus::MenujuLokasi]);
 
     Livewire::actingAs($this->teknisi)
         ->test(OrderDetail::class, ['order' => $order])
+        // dev-plan/15 B48: check-in job-site PERTAMA hari itu wajib foto titik pertama (Games 2).
+        ->set('fotoTitikPertama', UploadedFile::fake()->image('titik-pertama.jpg'))
         ->call('checkIn');
 
     expect($order->fresh()->status)->toBe(OrderStatus::Dikerjakan);
