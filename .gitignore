@@ -25,3 +25,6 @@ Thumbs.db
 
 # Ekspor chat WA mentah (nomor HP pribadi tim client) — jangan masuk git.
 /dev-plan/chat.md
+
+# Ekspor kontak WA (.vcf, data pribadi) — disimpan sementara di project, jangan masuk git.
+/dev-plan/dataexportwa/
