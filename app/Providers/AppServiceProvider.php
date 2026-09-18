@@ -20,17 +20,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Hosting subfolder (mis. domain.com/paccing/public): tanpa ini,
-        // url()/route()/redirect()->route() memakai root request yang bisa
-        // salah di balik reverse proxy (subfolder ke-strip sebelum sampai
-        // PHP) — patokkan semuanya ke APP_URL, sama seperti asset() yang
-        // sudah begini secara default (lihat BusinessInfoService).
-        if (filled(config('app.url'))) {
-            URL::forceRootUrl(config('app.url'));
-
-            if (str_starts_with(config('app.url'), 'https://')) {
-                URL::forceScheme('https');
-            }
+        // dev-plan/17 insiden 18 Sep: URL::forceRootUrl(config('app.url'))
+        // sempat dipasang di sini utk perbaiki redirect login di hosting
+        // subfolder (domain.com/paccing/public) — TAPI merusak SEMUA upload
+        // foto Livewire (URL upload-file jadi dobel /paccing/public/paccing/
+        // public/..., 404). Sebabnya: Livewire menandatangani URL upload
+        // secara RELATIF lalu meng-absolut-kannya sendiri
+        // (GenerateSignedUploadUrl::signedRoute() di
+        // vendor/livewire/livewire) — begitu root dipaksa ke URL yang
+        // punya path (/paccing/public), path itu ikut kehitung dobel.
+        // Dicabut — root request Laravel yang asli (tanpa paksaan) sudah
+        // benar utk struktur folder bertingkat biasa (bukan lewat reverse
+        // proxy) seperti hosting ini. Kalau redirect login subfolder
+        // ternyata masih salah tanpa ini, perbaikannya HARUS lebih
+        // spesifik (bukan forceRootUrl global) — jangan pasang ulang tanpa
+        // pertimbangkan efek ke Livewire file upload.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
         }
     }
 }
