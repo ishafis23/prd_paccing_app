@@ -40,10 +40,42 @@ class TeknisiService
             throw new BusinessRuleException('Order harus berstatus terjadwal sebelum berangkat.');
         }
 
+        // dev-plan/17, B63 (revisi 18 Sep): tidak boleh berangkat ke order
+        // berikutnya selama masih ada order lain (belum ditutup) yang
+        // laporannya kurang foto wajib — dorong teknisi melengkapi dulu.
+        $tertunda = $this->orderDenganFotoBelumLengkap($teknisi);
+        if ($tertunda !== null) {
+            throw new BusinessRuleException(
+                "Lengkapi dulu foto wajib pada laporan order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya."
+            );
+        }
+
         $order->status = OrderStatus::MenujuLokasi;
         $order->save();
 
         return $order->fresh();
+    }
+
+    /**
+     * Order lain milik teknisi ini (belum ditutup — B32) yang laporannya
+     * sudah disubmit tapi masih kurang foto wajib (dev-plan/17, B63).
+     */
+    private function orderDenganFotoBelumLengkap(User $teknisi): ?Order
+    {
+        $orders = Order::query()
+            ->untukTeknisi($teknisi->id)
+            ->whereIn('status', [OrderStatus::Selesai, OrderStatus::ButuhFollowup])
+            ->whereNull('ditutup_pada')
+            ->with('orderItems')
+            ->get();
+
+        foreach ($orders as $order) {
+            if ($this->fotoWajibKurang($order) !== []) {
+                return $order;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -123,6 +155,12 @@ class TeknisiService
         // dev-plan/13 §3: foto per kategori order_item (menggantikan pola
         // foto_sebelum/foto_sesudah generik utk laporan baru).
         $fotoKategori = $this->validasiFotoKategori($order, $payload['foto_kategori'] ?? []);
+
+        // dev-plan/17, B63 (direvisi 18 Sep): foto wajib yang kurang TIDAK
+        // lagi memblokir submit di sini (supaya pembayaran tidak ikut
+        // tertahan) — sebagai gantinya, teknisi ditahan sebelum berangkat
+        // ke order berikutnya lewat berangkat() sampai laporan ini
+        // dilengkapi (lihat fotoWajibKurang()/lengkapiFotoWajib()).
 
         // B25 (lapis kedua): kalau penyimpanan sudah penuh dan laporan
         // membawa foto, tolak sejak awal.
@@ -268,6 +306,70 @@ class TeknisiService
         }
 
         return $hasil;
+    }
+
+    /**
+     * dev-plan/17, B63 (direvisi 18 Sep): daftar slot wajib (aktif, per
+     * kategori order_item) yang BELUM ada fotonya tersimpan sama sekali
+     * (dicek ke `work_report_photos`, lintas seluruh laporan order ini —
+     * bukan cuma laporan yang barusan disubmit). Balikin kosong kalau
+     * sudah lengkap. Dipakai `berangkat()` (gate) & UI "Lengkapi Foto".
+     *
+     * @return array<int, array{order_item: OrderItem, kode_slot: string, label: string}>
+     */
+    public function fotoWajibKurang(Order $order): array
+    {
+        $terisi = WorkReportPhoto::query()
+            ->whereIn('order_item_id', $order->orderItems->pluck('id'))
+            ->get()
+            ->map(fn (WorkReportPhoto $p): string => $p->order_item_id.'|'.$p->slot)
+            ->flip();
+
+        $kurang = [];
+        foreach ($order->orderItems as $item) {
+            foreach (FotoLaporanSlot::wajibUntuk($item->kategori) as $kodeSlot => $label) {
+                if (! $terisi->has($item->id.'|'.$kodeSlot)) {
+                    $kurang[] = ['order_item' => $item, 'kode_slot' => $kodeSlot, 'label' => $label];
+                }
+            }
+        }
+
+        return $kurang;
+    }
+
+    /**
+     * Lengkapi foto wajib yang kurang pada order yang laporannya SUDAH
+     * disubmit (Selesai/ButuhFollowup) — dev-plan/17, B63 (revisi). Foto
+     * baru ditautkan ke laporan TERAKHIR order ini.
+     *
+     * @param  array<int, array{order_item_id: int, slot: string, path: string}>  $fotoKategori
+     */
+    public function lengkapiFotoWajib(Order $order, User $teknisi, array $fotoKategori): WorkReport
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (! in_array($order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
+            throw new BusinessRuleException('Laporan belum disubmit — lengkapi lewat form laporan biasa.');
+        }
+
+        $report = $order->workReports()->latest('id')->first();
+        if ($report === null) {
+            throw new BusinessRuleException('Belum ada laporan tersimpan utk order ini.');
+        }
+
+        $baris = $this->validasiFotoKategori($order, $fotoKategori);
+
+        if ($baris !== []) {
+            $quota = app(StorageQuotaService::class);
+            if ($quota->pakaiBytes(segar: true) >= $quota->kuotaBytes()) {
+                throw new BusinessRuleException('Penyimpanan foto penuh — foto tidak bisa dilampirkan. Hubungi admin untuk menaikkan kuota.');
+            }
+        }
+
+        $this->catatFotoKategori($report, $baris);
+
+        return $report->fresh('photos');
     }
 
     /**

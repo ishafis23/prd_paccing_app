@@ -2,12 +2,13 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\WorkReport;
-use App\Services\StorageQuotaService;
 use App\Services\StockService;
+use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\Storage;
@@ -91,6 +92,9 @@ it('submit laporan membawa foto ditolak saat penyimpanan sudah penuh (B25)', fun
     $teknisi = User::factory()->create();
     $teknisi->assignRole(RoleName::Teknisi->value);
     $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    // dev-plan/17: kategori default Cuci AC sekarang wajib 6 foto — tes ini
+    // soal kuota penyimpanan, jadi pindah ke kategori yg belum wajib.
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
     $service = new TeknisiService(new StockService);
 
     expect(fn () => $service->submitLaporan($order, $teknisi, [

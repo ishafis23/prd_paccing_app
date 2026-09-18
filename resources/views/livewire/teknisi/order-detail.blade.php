@@ -327,7 +327,7 @@
                  layanan punya slot fotonya sendiri sesuai kategori. --}}
             @if ($order->orderItems->isNotEmpty())
                 <div>
-                    <label class="mb-2 block text-sm font-semibold text-gray-700">Foto per Layanan <span class="font-normal text-gray-400">(opsional, JPG/PNG maks 5 MB)</span></label>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700">Foto per Layanan <span class="font-normal text-gray-400">(yang ditandai "Wajib" harus dilengkapi sebelum order berikutnya, JPG/PNG maks 5 MB)</span></label>
                     <div class="space-y-3">
                         @foreach ($order->orderItems as $item)
                             <div class="rounded-xl bg-gray-50 p-3">
@@ -341,7 +341,12 @@
                                     @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
                                         <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
                                             <x-heroicon-o-camera class="h-5 w-5" />
-                                            <span class="mt-0.5 px-1 text-[11px]">{{ $slotLabel }}</span>
+                                            <span class="mt-0.5 px-1 text-[11px]">
+                                                {{ $slotLabel }}
+                                                @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
+                                                    <span class="text-rose-500">*Wajib</span>
+                                                @endif
+                                            </span>
                                             @if (! empty($fotoKategori[$item->id][$slotKey] ?? null))
                                                 <span class="mt-0.5 text-[10px] font-bold text-emerald-600">Terpilih</span>
                                             @endif
@@ -442,6 +447,38 @@
                 </div>
             @endforeach
         </div>
+    @endif
+
+    {{-- dev-plan/17, B63 (revisi): laporan bisa disubmit walau foto wajib
+         belum lengkap (supaya pembayaran tidak tertahan) — tapi teknisi
+         tidak bisa berangkat ke order berikutnya sebelum ini dilengkapi. --}}
+    @if (! empty($this->fotoWajibKurang))
+        <form wire:submit="lengkapiFotoWajib" class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+            <p class="flex items-center gap-2 text-sm font-bold text-amber-800">
+                <x-heroicon-o-exclamation-triangle class="h-5 w-5" /> Lengkapi Foto Wajib
+            </p>
+            <p class="mt-1 text-xs text-amber-700">
+                Laporan sudah tersimpan, tapi masih ada foto wajib yang belum diisi. Anda tidak bisa berangkat ke
+                order berikutnya sampai ini dilengkapi.
+            </p>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+                @foreach ($this->fotoWajibKurang as $kurang)
+                    <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
+                        <x-heroicon-o-camera class="h-5 w-5" />
+                        <span class="mt-0.5 px-1 text-[11px]">{{ $kurang['label'] }}</span>
+                        <input type="file" wire:model="fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}" accept="image/*"
+                            class="absolute inset-0 cursor-pointer opacity-0">
+                    </label>
+                    @error('fotoLengkapi.'.$kurang['order_item']->id.'.'.$kurang['kode_slot'])
+                        <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                @endforeach
+            </div>
+            <button type="submit" wire:loading.attr="disabled"
+                class="mt-3 w-full rounded-full bg-amber-600 py-2.5 text-sm font-bold text-white active:bg-amber-700">
+                Simpan Foto
+            </button>
+        </form>
     @endif
 
     {{-- Layar sukses setelah slider "Selesaikan Order" (B32) --}}

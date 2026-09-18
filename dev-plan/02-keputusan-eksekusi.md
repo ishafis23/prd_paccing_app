@@ -120,4 +120,19 @@ perubahan keputusan, catat di sini dengan tanggal revisi.
   diubah — customer baru dibuat lewat `CustomerService` (baru) lalu id-nya
   disuntik ke payload order. 13 test Pest baru. Lihat
   `16-usulan-order-pelanggan-baru-atau-terdaftar.md`.
+- 18 September 2026: B61–B64 disetujui & DIEKSEKUSI (template foto laporan
+  teknisi dipindah dari hardcode `App\Support\FotoLaporanSlot` jadi diatur
+  admin: menu "Template Foto Laporan" — checklist aktif/nonaktif per item
+  + tombol tambah item baru per kategori, tanpa perlu deploy. Cuci AC
+  diisi 6 item baru sesuai daftar client; kategori lain pakai daftar lama
+  sbg titik awal. Ditandai wajib/tidak per item (Cuci AC wajib semua).
+  **Direvisi sore hari yang sama** setelah dites langsung: awalnya foto
+  wajib memblokir submit laporan — ternyata ikut menahan upload Bukti
+  Pembayaran (baru muncul setelah laporan tersubmit). Titik penegakan
+  dipindah: laporan selalu bisa disubmit (pembayaran tidak tertahan),
+  tapi teknisi tidak bisa berangkat ke order **berikutnya** kalau ada
+  order lain miliknya yang belum ditutup & foto wajibnya masih kurang;
+  foto yang kurang dilengkapi lewat bagian baru "Lengkapi Foto Wajib".
+  33 test Pest baru + ~10 test lama disesuaikan. Lihat
+  `17-usulan-template-foto-laporan-dinamis.md`.
 - Perubahan setelah tanggal ini harus dicatat di sini.

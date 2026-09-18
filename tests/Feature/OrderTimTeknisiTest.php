@@ -2,6 +2,7 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Customer;
@@ -9,7 +10,6 @@ use App\Models\Order;
 use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
 use App\Models\User;
-use App\Models\WorkReport;
 use App\Services\OrderService;
 use App\Services\StockService;
 use App\Services\TeknisiService;
@@ -135,6 +135,7 @@ it('laporan oleh salah satu anggota menutup attendance semua yang hadir dan orde
     $pic = ($this->mkUser)(RoleName::Teknisi->value);
     $anggota = ($this->mkUser)(RoleName::Teknisi->value);
     $order = timOrderTerjadwal($pic, $anggota);
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
 
     $this->teknisiService->berangkat($order, $anggota);
     $this->teknisiService->checkIn($order, $anggota); // attendance atas nama anggota
@@ -161,6 +162,7 @@ it('anggota tim melihat order di jadwal & riwayat portalnya (HTTP)', function ()
     $customer = Customer::factory()->create(['nama' => 'Pelanggan Tim Uji']);
     $order = timOrderTerjadwal($pic, $anggota);
     $order->update(['customer_id' => $customer->id]);
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
 
     // Anggota (bukan PIC) melihat order di Jadwal Hari Ini.
     $this->actingAs($anggota)->get('/teknisi')

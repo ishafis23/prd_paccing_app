@@ -1,13 +1,13 @@
 <?php
 
+use App\Enums\AttendanceStatus;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Models\Attendance;
 use App\Models\Order;
-use App\Models\StockItem;
 use App\Models\User;
-use App\Models\WorkReport;
 use App\Services\PaymentService;
 use App\Services\StockService;
 use App\Services\TeknisiService;
@@ -42,12 +42,15 @@ function resiOrderDikerjakan(User $teknisi): Order
         'teknisi_id' => $teknisi->id,
         'status' => OrderStatus::Dikerjakan,
     ]);
+    // dev-plan/17: kategori default Cuci AC sekarang wajib 6 foto — tes di
+    // file ini soal token resi, bukan foto laporan, jadi pindah kategori.
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
     Attendance::create([
         'user_id' => $teknisi->id,
         'order_id' => $order->id,
         'tanggal' => now()->toDateString(),
         'jam_masuk' => now(),
-        'status' => \App\Enums\AttendanceStatus::Hadir,
+        'status' => AttendanceStatus::Hadir,
     ]);
 
     return $order;

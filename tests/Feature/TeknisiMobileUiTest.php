@@ -2,6 +2,7 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Livewire\Teknisi\JadwalHariIni;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
@@ -74,6 +75,9 @@ it('check-in mengubah status jadi dikerjakan dan mencatat attendance', function 
 it('submit laporan lengkap dengan material dan foto -> order selesai, stok berkurang', function () {
     Storage::fake('public');
     $order = Order::factory()->create(['teknisi_id' => $this->teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    // dev-plan/17: kategori default Cuci AC sekarang wajib 6 foto per-kategori —
+    // tes ini pakai foto generik sebelum/sesudah, jadi pindah ke kategori belum wajib.
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
     $stockItem = StockItem::factory()->create(['stok_saat_ini' => 5]);
 
     Livewire::actingAs($this->teknisi)

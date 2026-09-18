@@ -36,8 +36,16 @@ beforeEach(function () {
 });
 
 it('FotoLaporanSlot punya template urut utk tiap kategori & fallback default', function () {
+    // dev-plan/17: Cuci AC sekarang dari photo_report_templates (data admin), bukan hardcode.
     expect(array_keys(FotoLaporanSlot::untuk(ServiceType::CuciAc)))
-        ->toBe(['outdoor_proses', 'indoor_proses', 'indoor_sebelum', 'indoor_sesudah_suhu']);
+        ->toBe([
+            'foto_tampak_depan_lokasi',
+            'foto_sesudah_cuci_indoor',
+            'foto_sesudah_cuci_outdoor',
+            'foto_area_unit_indoor',
+            'foto_area_unit_outdoor',
+            'foto_cek_suhu_indoor',
+        ]);
     expect(array_keys(FotoLaporanSlot::untuk(ServiceType::TambahFreon)))
         ->toBe(['tekanan_sebelum', 'tekanan_sesudah']);
     expect(array_keys(FotoLaporanSlot::untuk(ServiceType::ServiceAc)))
@@ -56,22 +64,25 @@ it('submitLaporan dengan foto_kategori membuat WorkReportPhoto sesuai order_item
     $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
     $item = $order->orderItems->first(); // kategori CuciAc dari factory default
 
+    // dev-plan/17: Cuci AC sekarang wajib ke-6 slotnya diisi.
+    $fotoKategori = collect(FotoLaporanSlot::untuk(ServiceType::CuciAc))
+        ->keys()
+        ->map(fn ($slot) => ['order_item_id' => $item->id, 'slot' => $slot, 'path' => "work-reports/{$slot}.jpg"])
+        ->all();
+
     $report = app(TeknisiService::class)->submitLaporan($order, $teknisi, [
         'catatan' => 'Selesai cuci AC.',
         'materials' => [],
-        'foto_kategori' => [
-            ['order_item_id' => $item->id, 'slot' => 'indoor_sebelum', 'path' => 'work-reports/indoor-sebelum.jpg'],
-            ['order_item_id' => $item->id, 'slot' => 'outdoor_proses', 'path' => 'work-reports/outdoor-proses.jpg'],
-        ],
+        'foto_kategori' => $fotoKategori,
     ]);
 
-    expect($report->photos)->toHaveCount(2);
+    expect($report->photos)->toHaveCount(6);
 
-    $outdoor = $report->photos->firstWhere('slot', 'outdoor_proses');
-    $indoor = $report->photos->firstWhere('slot', 'indoor_sebelum');
-    expect($outdoor->order_item_id)->toBe($item->id);
-    expect($outdoor->urutan)->toBe(0); // outdoor_proses = slot pertama di template CuciAc
-    expect($indoor->urutan)->toBe(2); // indoor_sebelum = slot ketiga
+    $pertama = $report->photos->firstWhere('slot', 'foto_tampak_depan_lokasi');
+    $terakhir = $report->photos->firstWhere('slot', 'foto_cek_suhu_indoor');
+    expect($pertama->order_item_id)->toBe($item->id);
+    expect($pertama->urutan)->toBe(0);
+    expect($terakhir->urutan)->toBe(5);
 });
 
 it('submitLaporan menolak order_item yang bukan milik order', function () {
@@ -107,6 +118,10 @@ it('admin menambah layanan dgn kategori TambahFreon, teknisi submit foto sesuai 
     $teknisi = ($this->mkTeknisi)();
     $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
 
+    // dev-plan/17: item stub bawaan order (kategori Cuci AC) sekarang wajib
+    // 6 foto — dihapus dulu supaya tes ini murni soal item Freon yg ditambah.
+    $order->orderItems()->delete();
+
     $itemFreon = app(OrderService::class)->tambahLayanan($order, [
         'nama_layanan' => 'Tambah Freon',
         'kategori' => ServiceType::TambahFreon->value,
@@ -130,17 +145,21 @@ it('form Livewire submitLaporan mengunggah foto per kategori & menyimpan ke disk
     $teknisi = ($this->mkTeknisi)();
     $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
     $item = $order->orderItems->first();
+    // dev-plan/17: Cuci AC sekarang wajib 6 foto — tes ini fokus ke mekanisme
+    // upload/simpan-ke-disk, jadi pindah ke kategori yg belum wajib (2 slot).
+    $item->update(['kategori' => ServiceType::TambahFreon]);
 
     Livewire::actingAs($teknisi)
         ->test(OrderDetail::class, ['order' => $order])
-        ->set('catatan', 'Selesai cuci AC.')
-        ->set("fotoKategori.{$item->id}.outdoor_proses", UploadedFile::fake()->image('outdoor.jpg'))
+        ->set('catatan', 'Freon ditambah.')
+        ->set("fotoKategori.{$item->id}.tekanan_sebelum", UploadedFile::fake()->image('tekanan-sebelum.jpg'))
+        ->set("fotoKategori.{$item->id}.tekanan_sesudah", UploadedFile::fake()->image('tekanan-sesudah.jpg'))
         ->call('submitLaporan')
         ->assertOk();
 
     $order->refresh();
     expect($order->status)->toBe(OrderStatus::Selesai);
-    $photo = WorkReportPhoto::where('order_item_id', $item->id)->where('slot', 'outdoor_proses')->first();
+    $photo = WorkReportPhoto::where('order_item_id', $item->id)->where('slot', 'tekanan_sebelum')->first();
     expect($photo)->not->toBeNull();
     Storage::disk('public')->assertExists($photo->path);
 });
@@ -151,8 +170,8 @@ it('form teknisi menampilkan slot foto sesuai kategori tiap order_item', functio
 
     Livewire::actingAs($teknisi)
         ->test(OrderDetail::class, ['order' => $order])
-        ->assertSee('Outdoor - Proses')
-        ->assertSee('Indoor - Sesudah (Cek Suhu)');
+        ->assertSee('Foto Tampak Depan Lokasi')
+        ->assertSee('Foto Cek Suhu (Indoor)');
 });
 
 it('halaman view order admin menampilkan foto per kategori', function () {
@@ -161,16 +180,20 @@ it('halaman view order admin menampilkan foto per kategori', function () {
     $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
     $item = $order->orderItems->first();
 
+    // dev-plan/17: Cuci AC sekarang wajib ke-6 slotnya diisi.
+    $fotoKategori = collect(FotoLaporanSlot::untuk(ServiceType::CuciAc))
+        ->keys()
+        ->map(fn ($slot) => ['order_item_id' => $item->id, 'slot' => $slot, 'path' => "work-reports/{$slot}.jpg"])
+        ->all();
+
     app(TeknisiService::class)->submitLaporan($order, $teknisi, [
         'catatan' => 'Selesai cuci AC.',
         'materials' => [],
-        'foto_kategori' => [
-            ['order_item_id' => $item->id, 'slot' => 'outdoor_proses', 'path' => 'work-reports/outdoor.jpg'],
-        ],
+        'foto_kategori' => $fotoKategori,
     ]);
 
     $this->actingAs($admin)->get("/admin/orders/{$order->id}")
         ->assertOk()
         ->assertSee('Foto per Kategori')
-        ->assertSee('Outdoor Proses');
+        ->assertSee('Foto Tampak Depan Lokasi');
 });

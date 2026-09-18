@@ -3,6 +3,7 @@
 use App\Enums\IncentiveKategori;
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Filament\Resources\OrderResource\Pages\CreateOrder;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Customer;
@@ -69,6 +70,9 @@ it('Admin membuat order klaim lewat form Filament (B50)', function () {
 
 it('Teknisi menandai klaim saat submit laporan (OrderDetail Livewire)', function () {
     $order = Order::factory()->create(['teknisi_id' => $this->teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    // dev-plan/17: kategori default Cuci AC sekarang wajib 6 foto — tes ini
+    // bukan soal foto laporan, jadi pindah ke kategori yg belum wajib.
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
 
     Livewire::actingAs($this->teknisi)
         ->test(OrderDetail::class, ['order' => $order])

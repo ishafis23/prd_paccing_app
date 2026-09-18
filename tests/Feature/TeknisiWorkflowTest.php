@@ -4,6 +4,7 @@ use App\Enums\AttendanceStatus;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Income;
@@ -118,6 +119,9 @@ it('check-in wajib lewat status menuju_lokasi (slider dulu)', function () {
 it('submit laporan -> work report, stok keluar, status selesai, check-out', function () {
     $teknisi = teknisiUser();
     $order = orderUntuk($teknisi, OrderStatus::Dikerjakan);
+    // dev-plan/17: kategori default Cuci AC sekarang wajib 6 foto — tes ini
+    // bukan soal foto laporan, jadi pindah ke kategori yg belum wajib.
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
 
     Attendance::factory()->create([
         'user_id' => $teknisi->id,
@@ -157,6 +161,7 @@ it('submit laporan -> work report, stok keluar, status selesai, check-out', func
 it('laporan dengan flag follow-up -> status butuh_followup', function () {
     $teknisi = teknisiUser();
     $order = orderUntuk($teknisi, OrderStatus::Dikerjakan);
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
 
     $this->teknisiService->submitLaporan($order, $teknisi, [
         'catatan' => 'Sparepart kurang, perlu order baru.',
@@ -180,6 +185,7 @@ it('laporan wajib punya catatan pengerjaan', function () {
 it('submit laporan memakai stok melebihi saldo -> stok minus (keputusan B4)', function () {
     $teknisi = teknisiUser();
     $order = orderUntuk($teknisi, OrderStatus::Dikerjakan);
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
     $item = StockItem::factory()->create(['stok_saat_ini' => 1]);
 
     $this->teknisiService->submitLaporan($order, $teknisi, [
@@ -197,6 +203,7 @@ it('end-to-end: order -> berangkat -> check-in -> laporan -> lunas -> income & r
 
     $order = orderUntuk($teknisi, OrderStatus::Terjadwal);
     $catalog = $order->serviceCatalog; // interval 3 bulan dari factory
+    $order->orderItems->first()->update(['kategori' => ServiceType::ServiceAc]);
 
     $this->teknisiService->berangkat($order, $teknisi);
     $this->teknisiService->checkIn($order, $teknisi);

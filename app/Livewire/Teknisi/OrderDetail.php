@@ -8,6 +8,7 @@ use App\Enums\PaymentStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\StockItem;
 use App\Services\AttendanceService;
 use App\Services\PaymentChannelService;
@@ -49,6 +50,9 @@ class OrderDetail extends Component
     /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] */
     public array $fotoKategori = [];
 
+    /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] — dev-plan/17, B63 (revisi): lengkapi foto wajib setelah laporan tersubmit. */
+    public array $fotoLengkapi = [];
+
     public $buktiPembayaran;
 
     public function mount(Order $order): void
@@ -75,6 +79,62 @@ class OrderDetail extends Component
         return $this->order->orderItems
             ->mapWithKeys(fn ($item) => [$item->id => FotoLaporanSlot::untuk($item->kategori)])
             ->all();
+    }
+
+    /**
+     * Kode slot yang wajib diisi per order_item (dev-plan/17, B63) —
+     * dipakai blade utk tampilkan badge "Wajib".
+     *
+     * @return array<int, array<int, string>>
+     */
+    public function getFotoSlotsWajibProperty(): array
+    {
+        return $this->order->orderItems
+            ->mapWithKeys(fn ($item) => [$item->id => array_keys(FotoLaporanSlot::wajibUntuk($item->kategori))])
+            ->all();
+    }
+
+    /**
+     * Foto wajib yang masih kurang utk order ini (dev-plan/17, B63 revisi)
+     * — dipakai tampilkan bagian "Lengkapi Foto Wajib" setelah laporan
+     * tersubmit (Selesai/ButuhFollowup) tapi dokumentasinya belum lengkap.
+     *
+     * @return array<int, array{order_item: OrderItem, kode_slot: string, label: string}>
+     */
+    public function getFotoWajibKurangProperty(): array
+    {
+        if (! in_array($this->order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
+            return [];
+        }
+
+        return app(TeknisiService::class)->fotoWajibKurang($this->order);
+    }
+
+    public function lengkapiFotoWajib(): void
+    {
+        $fotoKategori = [];
+        foreach ($this->fotoLengkapi as $orderItemId => $slots) {
+            foreach ($slots as $slot => $file) {
+                if ($file === null) {
+                    continue;
+                }
+
+                $fotoKategori[] = [
+                    'order_item_id' => (int) $orderItemId,
+                    'slot' => $slot,
+                    'path' => $file->store('work-reports', 'public'),
+                ];
+            }
+        }
+
+        try {
+            app(TeknisiService::class)->lengkapiFotoWajib($this->order, auth()->user(), $fotoKategori);
+            StorageQuotaService::lupakanCache();
+            session()->flash('status', 'Foto wajib berhasil dilengkapi.');
+            $this->reset('fotoLengkapi');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     public function tambahMaterial(): void
