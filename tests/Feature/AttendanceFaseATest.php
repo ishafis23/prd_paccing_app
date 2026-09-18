@@ -166,6 +166,21 @@ it('aksi "Buat Kode Baru" di tabel membuat AttendanceCode baru', function () {
         ->and(AttendanceCode::first()->status)->toBe(AttendanceCodeStatus::Aktif);
 });
 
+it('urlAbsen (isi QR) memakai APP_URL eksplisit, bukan root request ambient (regresi insiden subfolder 18 Sep)', function () {
+    config(['app.url' => 'https://mycompany.web.id/paccing/public']);
+
+    $admin = ($this->mkUser)(RoleName::Admin->value);
+    $kode = AttendanceCode::create([
+        'kode' => 'ABC123',
+        'status' => AttendanceCodeStatus::Aktif,
+        'berlaku_sampai' => now()->addDay(),
+        'dibuat_oleh' => $admin->id,
+    ]);
+
+    expect(AttendanceCodeResource::urlAbsen($kode))
+        ->toBe('https://mycompany.web.id/paccing/public/teknisi/absensi/ABC123');
+});
+
 it('aksi Aktifkan/Nonaktifkan di baris tabel bekerja lewat Livewire', function () {
     $admin = ($this->mkUser)(RoleName::Admin->value);
     $service = app(AttendanceCodeService::class);

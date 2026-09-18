@@ -4,6 +4,7 @@ namespace App\Livewire\Auth;
 
 use App\Enums\UserStatus;
 use App\Models\User as UserModel;
+use App\Support\Url;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -45,7 +46,7 @@ class Login extends Component
         }
 
         if ($user->hasRole('teknisi')) {
-            $this->redirect(route('teknisi.jadwal'), navigate: false);
+            $this->redirect(Url::absolute('teknisi.jadwal'), navigate: false);
 
             return;
         }

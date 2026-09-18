@@ -4,6 +4,7 @@ namespace App\Livewire\Portal;
 
 use App\Enums\CustomerStatus;
 use App\Models\Customer;
+use App\Support\Url;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -21,7 +22,7 @@ class Login extends Component
     public function mount(): void
     {
         if (Auth::guard('customer')->check()) {
-            $this->redirect(route('portal.dashboard'), navigate: false);
+            $this->redirect(Url::absolute('portal.dashboard'), navigate: false);
         }
     }
 
@@ -51,7 +52,7 @@ class Login extends Component
         Auth::guard('customer')->login($akun);
         session()->regenerate();
 
-        $this->redirect(route('portal.dashboard'), navigate: false);
+        $this->redirect(Url::absolute('portal.dashboard'), navigate: false);
     }
 
     public function render()

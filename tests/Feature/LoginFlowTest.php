@@ -5,10 +5,11 @@ use App\Enums\RoleName;
 use App\Livewire\Auth\Login;
 use App\Models\Order;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+    $this->seed(RolesAndPermissionsSeeder::class);
 });
 
 it('admin login lewat halaman login diarahkan ke /admin', function () {
@@ -31,6 +32,19 @@ it('teknisi login lewat halaman login diarahkan ke /teknisi', function () {
         ->set('password', 'password')
         ->call('login')
         ->assertRedirect('/teknisi');
+});
+
+it('login teknisi redirect memakai APP_URL eksplisit, bukan root request ambient (regresi insiden subfolder 18 Sep)', function () {
+    config(['app.url' => 'https://mycompany.web.id/paccing/public']);
+
+    $teknisi = User::factory()->create(['password' => 'password']);
+    $teknisi->assignRole(RoleName::Teknisi->value);
+
+    Livewire::test(Login::class)
+        ->set('email', $teknisi->email)
+        ->set('password', 'password')
+        ->call('login')
+        ->assertRedirect('https://mycompany.web.id/paccing/public/teknisi');
 });
 
 it('password salah menampilkan error, tidak login', function () {

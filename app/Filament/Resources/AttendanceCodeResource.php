@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Filament\Resources\AttendanceCodeResource\Pages;
 use App\Models\AttendanceCode;
 use App\Services\AttendanceCodeService;
+use App\Support\Url;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
 use Filament\Forms;
@@ -71,12 +72,17 @@ class AttendanceCodeResource extends Resource
     }
 
     /**
-     * URL absen (dituju QR) — dibangun manual (bukan route()) supaya tidak
-     * bergantung ke route scan teknisi yang baru ada di fase berikutnya.
+     * URL absen (dituju QR) — dibangun dari APP_URL eksplisit
+     * (App\Support\Url::absolute), BUKAN url()/route() polos. url() polos
+     * mengandalkan root request admin saat QR di-generate, yang di hosting
+     * subfolder (public_html/paccing/public) kadang tidak konsisten
+     * mendeteksi prefix /paccing/public — hasilnya QR berisi URL tanpa
+     * prefix, 404 saat discan HP teknisi (persis bug redirect login,
+     * lihat AppServiceProvider & 02-keputusan-eksekusi.md insiden 18 Sep).
      */
     public static function urlAbsen(AttendanceCode $record): string
     {
-        return url('/teknisi/absensi/'.$record->kode);
+        return Url::absolute('teknisi.absensi', ['kode' => $record->kode]);
     }
 
     public static function qrDataUri(AttendanceCode $record): string
