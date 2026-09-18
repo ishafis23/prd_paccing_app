@@ -31,7 +31,11 @@
             </template>
             <template x-if="scanning">
                 <div class="relative overflow-hidden rounded-2xl bg-black shadow-sm">
-                    <video x-ref="qrVideo" class="h-64 w-full object-cover" playsinline muted></video>
+                    <video x-ref="qrVideo" class="h-64 w-full object-cover" playsinline muted autoplay></video>
+                    <div x-show="!videoReady" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
+                        <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin" />
+                        <span class="text-xs">Membuka kamera…</span>
+                    </div>
                     <button type="button" x-on:click="stop()"
                         class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-bold text-white">
                         Batal

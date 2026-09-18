@@ -14,16 +14,36 @@ import QrScanner from 'qr-scanner';
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('qrScanner', (baseUrl) => ({
         scanning: false,
+        videoReady: false,
         error: null,
         instance: null,
+        readyTimeout: null,
 
         start() {
             this.error = null;
+            this.videoReady = false;
             this.scanning = true;
 
             this.$nextTick(() => {
+                const video = this.$refs.qrVideo;
+
+                video.addEventListener('playing', () => {
+                    this.videoReady = true;
+                    clearTimeout(this.readyTimeout);
+                });
+
+                // Kalau stream tidak pernah mulai (izin diam2 diblok browser,
+                // kamera dipakai app lain, dll) — jangan biarkan layar hitam
+                // tanpa penjelasan, kasih tau & kembalikan ke tombol.
+                this.readyTimeout = setTimeout(() => {
+                    if (!this.videoReady) {
+                        this.error = 'Kamera tidak merespons. Pastikan izin kamera diaktifkan utk browser ini, lalu coba lagi.';
+                        this.stop();
+                    }
+                }, 8000);
+
                 this.instance = new QrScanner(
-                    this.$refs.qrVideo,
+                    video,
                     (result) => this.onDecoded(result.data, baseUrl),
                     {
                         highlightScanRegion: true,
@@ -33,6 +53,7 @@ document.addEventListener('alpine:init', () => {
                 );
 
                 this.instance.start().catch((err) => {
+                    clearTimeout(this.readyTimeout);
                     this.error = 'Tidak bisa mengakses kamera: ' + (err?.message ?? err);
                     this.scanning = false;
                 });
@@ -40,12 +61,14 @@ document.addEventListener('alpine:init', () => {
         },
 
         stop() {
+            clearTimeout(this.readyTimeout);
             if (this.instance) {
                 this.instance.stop();
                 this.instance.destroy();
                 this.instance = null;
             }
             this.scanning = false;
+            this.videoReady = false;
         },
 
         onDecoded(text, baseUrl) {
