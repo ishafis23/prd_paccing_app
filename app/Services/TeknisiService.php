@@ -45,8 +45,9 @@ class TeknisiService
         // laporannya kurang foto wajib — dorong teknisi melengkapi dulu.
         $tertunda = $this->orderDenganFotoBelumLengkap($teknisi);
         if ($tertunda !== null) {
+            $daftar = collect($this->fotoWajibKurang($tertunda))->pluck('label')->implode(', ');
             throw new BusinessRuleException(
-                "Lengkapi dulu foto wajib pada laporan order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya."
+                "Lengkapi dulu foto wajib pada laporan order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya: {$daftar}."
             );
         }
 

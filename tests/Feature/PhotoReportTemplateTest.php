@@ -375,6 +375,53 @@ it('OrderDetail menampilkan & memproses form Lengkapi Foto Wajib', function () {
     expect(app(TeknisiService::class)->fotoWajibKurang($order->fresh('orderItems')))->toBe([]);
 });
 
+it('notifikasi sukses submitLaporan menyebutkan persis foto wajib yang masih kurang', function () {
+    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
+    $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
+    $item = $order->orderItems->first();
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->set('catatan', 'Sudah dicuci.')
+        ->set("fotoKategori.{$item->id}.foto_tampak_depan_lokasi", UploadedFile::fake()->image('a.jpg'))
+        ->call('submitLaporan')
+        ->assertSee('Foto Cek Suhu (Indoor)')
+        ->assertSee('berikutnya');
+});
+
+it('notifikasi sukses submitLaporan tidak sebut kekurangan kalau semua foto wajib sudah lengkap', function () {
+    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
+    $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
+    $item = $order->orderItems->first();
+
+    $component = Livewire::actingAs($teknisi)->test(OrderDetail::class, ['order' => $order]);
+    $component->set('catatan', 'Sudah dicuci lengkap.');
+    foreach (array_keys(FotoLaporanSlot::untuk(ServiceType::CuciAc)) as $slot) {
+        $component->set("fotoKategori.{$item->id}.{$slot}", UploadedFile::fake()->image("{$slot}.jpg"));
+    }
+    $component->call('submitLaporan')
+        ->assertSee('Laporan berhasil disubmit. Semua foto wajib sudah lengkap.');
+});
+
+it('pesan gagal berangkat menyebutkan persis foto wajib yang masih kurang', function () {
+    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
+    $ordersLama = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
+    $itemLama = $ordersLama->orderItems->first();
+
+    app(TeknisiService::class)->submitLaporan($ordersLama, $teknisi, [
+        'catatan' => 'Sudah dicuci.',
+        'materials' => [],
+        'foto_kategori' => [
+            ['order_item_id' => $itemLama->id, 'slot' => 'foto_tampak_depan_lokasi', 'path' => 'work-reports/a.jpg'],
+        ],
+    ]);
+
+    $orderBaru = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Terjadwal]);
+
+    expect(fn () => app(TeknisiService::class)->berangkat($orderBaru, $teknisi))
+        ->toThrow(BusinessRuleException::class, 'Foto Cek Suhu (Indoor)');
+});
+
 // --- Filament: PhotoReportTemplateResource -----------------------------------
 
 it('halaman Template Foto Laporan bisa diakses Owner/Admin/Finance, bukan Teknisi', function (string $role, bool $boleh) {

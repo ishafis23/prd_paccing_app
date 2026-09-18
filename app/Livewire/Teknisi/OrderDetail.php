@@ -128,9 +128,16 @@ class OrderDetail extends Component
         }
 
         try {
-            app(TeknisiService::class)->lengkapiFotoWajib($this->order, auth()->user(), $fotoKategori);
+            $teknisiService = app(TeknisiService::class);
+            $teknisiService->lengkapiFotoWajib($this->order, auth()->user(), $fotoKategori);
             StorageQuotaService::lupakanCache();
-            session()->flash('status', 'Foto wajib berhasil dilengkapi.');
+
+            $sisaKurang = $teknisiService->fotoWajibKurang($this->order->fresh('orderItems'));
+
+            session()->flash('status', $sisaKurang === []
+                ? 'Foto wajib sudah lengkap — Anda sekarang bisa berangkat ke order berikutnya.'
+                : 'Foto tersimpan. Masih ada '.collect($sisaKurang)->pluck('label')->implode(', ').' yang belum diisi.');
+
             $this->reset('fotoLengkapi');
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
@@ -326,9 +333,27 @@ class OrderDetail extends Component
         ];
 
         try {
-            app(TeknisiService::class)->submitLaporan($this->order, auth()->user(), $payload);
+            $teknisiService = app(TeknisiService::class);
+            $teknisiService->submitLaporan($this->order, auth()->user(), $payload);
             StorageQuotaService::lupakanCache();
-            session()->flash('status', 'Laporan berhasil disubmit.');
+
+            // dev-plan/17, B63 (revisi): kasih tahu langsung di notifikasi
+            // sukses foto wajib mana yang masih kurang, jangan cuma
+            // mengandalkan teknisi ngeh sendiri dari blok "Lengkapi Foto
+            // Wajib" di bawah — supaya mereka tidak kaget baru pas mau
+            // berangkat ke order berikutnya.
+            $kurang = $teknisiService->fotoWajibKurang(Order::with('orderItems')->findOrFail($this->orderId));
+
+            if ($kurang === []) {
+                session()->flash('status', 'Laporan berhasil disubmit. Semua foto wajib sudah lengkap.');
+            } else {
+                $daftar = collect($kurang)->pluck('label')->implode(', ');
+                session()->flash(
+                    'status',
+                    "Laporan berhasil disubmit. Masih ada {$daftar} yang belum diisi — lengkapi dulu di bawah sebelum bisa berangkat ke order berikutnya."
+                );
+            }
+
             $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
