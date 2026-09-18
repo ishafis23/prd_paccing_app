@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\CustomerArea;
 use App\Enums\CustomerJenis;
+use App\Enums\LeadSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
 use App\Enums\ServiceType;
+use App\Enums\UnitType;
 use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Customer;
@@ -16,6 +19,7 @@ use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\CustomerService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Support\EnumOptions;
@@ -51,11 +55,24 @@ class OrderResource extends Resource
     {
         return $form
             ->schema([
+                // dev-plan/16: pilihan pelanggan baru vs terdaftar.
+                Forms\Components\Radio::make('mode_pelanggan')
+                    ->label('Pelanggan')
+                    ->options([
+                        'terdaftar' => 'Pelanggan Terdaftar',
+                        'baru' => 'Pelanggan Baru',
+                    ])
+                    ->default('terdaftar')
+                    ->inline()
+                    ->live()
+                    ->columnSpanFull(),
+
                 Forms\Components\Select::make('customer_id')
                     ->label('Customer')
                     ->options(fn () => Customer::query()->pluck('nama', 'id'))
                     ->searchable()
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
+                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->live()
                     ->afterStateUpdated(function (Forms\Set $set, $state) {
                         $customer = Customer::find($state);
@@ -72,12 +89,72 @@ class OrderResource extends Resource
                             ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()])
                         : [])
                     ->searchable()
+                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->live()
                     ->afterStateUpdated(function (Forms\Set $set, $state) {
                         $alamat = CustomerAddress::find($state);
                         $set('alamat_pengerjaan', $alamat?->alamat);
                         $set('customer_ac_unit_id', null);
                     }),
+
+                // dev-plan/16, B57/B58: blok "Pelanggan Baru" — nama/no HP/
+                // jenis/area/sumber lead/email + unit AC pertama (opsional).
+                Forms\Components\Section::make('Data Pelanggan Baru')
+                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') === 'baru')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\TextInput::make('pelanggan_baru_nama')
+                            ->label('Nama')
+                            ->required(fn (Forms\Get $get): bool => $get('mode_pelanggan') === 'baru')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('pelanggan_baru_no_hp')
+                            ->label('No. HP/WA')
+                            ->required(fn (Forms\Get $get): bool => $get('mode_pelanggan') === 'baru')
+                            ->maxLength(20)
+                            ->live(onBlur: true)
+                            ->helperText(function (Forms\Get $get): ?string {
+                                $noHp = trim((string) $get('pelanggan_baru_no_hp'));
+                                if ($noHp === '') {
+                                    return null;
+                                }
+
+                                $ketemu = app(CustomerService::class)->cariByNoHp($noHp);
+
+                                return $ketemu
+                                    ? "⚠️ No. HP ini sudah terdaftar atas nama {$ketemu->nama} — pastikan ini memang pelanggan baru, atau pindah ke 'Pelanggan Terdaftar'."
+                                    : null;
+                            }),
+                        Forms\Components\Select::make('pelanggan_baru_jenis')
+                            ->label('Jenis Pelanggan')
+                            ->options(EnumOptions::for(CustomerJenis::class))
+                            ->default(CustomerJenis::Perorangan->value)
+                            ->live()
+                            ->afterStateUpdated(fn (Forms\Set $set, $state) => $set('jenis_pelanggan', $state)),
+                        Forms\Components\Select::make('pelanggan_baru_area')
+                            ->label('Area')
+                            ->options(EnumOptions::for(CustomerArea::class))
+                            ->required(fn (Forms\Get $get): bool => $get('mode_pelanggan') === 'baru'),
+                        Forms\Components\Select::make('pelanggan_baru_sumber_lead')
+                            ->label('Sumber Lead')
+                            ->options(EnumOptions::for(LeadSource::class))
+                            ->default(LeadSource::Lainnya->value),
+                        Forms\Components\TextInput::make('pelanggan_baru_email')
+                            ->label('Email (opsional)')
+                            ->email()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('pelanggan_baru_kode_ruangan')
+                            ->label('Ruangan Unit AC Pertama (opsional)')
+                            ->helperText('Kosongkan kalau belum mau dicatat sekarang — bisa dilengkapi belakangan lewat menu Customer.')
+                            ->maxLength(255),
+                        Forms\Components\Select::make('pelanggan_baru_jenis_unit')
+                            ->label('Jenis Unit AC (opsional)')
+                            ->options(EnumOptions::for(UnitType::class)),
+                        Forms\Components\TextInput::make('pelanggan_baru_pk')
+                            ->label('PK (opsional)')
+                            ->maxLength(20)
+                            ->placeholder('mis. 1 PK'),
+                    ]),
+
                 Forms\Components\Select::make('service_catalog_id')
                     ->label('Jenis Layanan')
                     ->options(fn () => ServiceCatalog::query()->where('aktif', true)->get()
@@ -100,7 +177,8 @@ class OrderResource extends Resource
                             ->get()
                             ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]);
                     })
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru'),
                 Forms\Components\Select::make('teknisi_id')
                     ->label('Assign Teknisi (opsional)')
                     ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))

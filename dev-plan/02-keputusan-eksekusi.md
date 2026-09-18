@@ -109,4 +109,15 @@ perubahan keputusan, catat di sini dengan tanggal revisi.
   sebelumnya redirect setelah login teknisi lompat ke root domain, hilang
   subfolder-nya. Perlu `APP_URL` di `.env` produksi diisi lengkap dengan
   subfolder + `php artisan config:clear` di server.
+- 18 September 2026: B56–B60 disetujui & DIEKSEKUSI (masukan client —
+  form "Tambah Order" sekarang punya pilihan **Pelanggan Terdaftar**
+  (proses sama seperti sebelumnya, tanpa perubahan) vs **Pelanggan Baru**
+  (isi data customer baru — nama, no HP, jenis, area, sumber lead, email —
+  langsung di form Order, tanpa buka menu Customer dulu; sekalian alamat
+  utama & 1 unit AC pertama kalau ruangannya diisi, `kode_unit` unit itu
+  di-generate otomatis). No. HP yang sudah terdaftar memunculkan warning
+  reaktif (bukan blokir). `OrderService::createOrder()` sendiri tidak
+  diubah — customer baru dibuat lewat `CustomerService` (baru) lalu id-nya
+  disuntik ke payload order. 13 test Pest baru. Lihat
+  `16-usulan-order-pelanggan-baru-atau-terdaftar.md`.
 - Perubahan setelah tanggal ini harus dicatat di sini.
