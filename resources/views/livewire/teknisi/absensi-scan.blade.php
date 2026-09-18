@@ -17,31 +17,31 @@
         </div>
     @elseif ($this->state === 'perlu_kode')
         <div x-data="qrScanner('{{ $this->urlAbsensiBase }}')" x-on:livewire:navigating.window="stop()">
-            <template x-if="!scanning">
-                <div class="rounded-2xl bg-amber-50 p-5 text-center shadow-sm ring-1 ring-amber-100">
-                    <x-heroicon-o-qr-code class="mx-auto h-8 w-8 text-amber-500" />
-                    <p class="mt-2 text-sm font-semibold text-amber-700">Belum absen datang</p>
-                    <p class="mt-1 text-xs text-amber-600">Scan kode QR yang ditempel di kantor untuk absen datang.</p>
-                    <button type="button" x-on:click="start()"
-                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3 text-sm font-bold text-white active:bg-amber-700">
-                        <x-heroicon-o-camera class="h-5 w-5" /> Scan Kode QR
-                    </button>
-                    <p x-show="error" x-text="error" class="mt-2 text-xs font-medium text-rose-600"></p>
+            <div x-show="!scanning" class="rounded-2xl bg-amber-50 p-5 text-center shadow-sm ring-1 ring-amber-100">
+                <x-heroicon-o-qr-code class="mx-auto h-8 w-8 text-amber-500" />
+                <p class="mt-2 text-sm font-semibold text-amber-700">Belum absen datang</p>
+                <p class="mt-1 text-xs text-amber-600">Scan kode QR yang ditempel di kantor untuk absen datang.</p>
+                <button type="button" x-on:click="start()"
+                    class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3 text-sm font-bold text-white active:bg-amber-700">
+                    <x-heroicon-o-camera class="h-5 w-5" /> Scan Kode QR
+                </button>
+                <p x-show="error" x-text="error" class="mt-2 text-xs font-medium text-rose-600"></p>
+            </div>
+            {{-- video SELALU ada di DOM (disembunyikan lewat x-show, bukan
+                 x-if) — x-ref harus tersedia sejak awal, x-if sempat bikin
+                 elemen video baru terbentuk setelah start() jalan (race,
+                 $refs.qrVideo masih undefined). --}}
+            <div x-show="scanning" class="relative overflow-hidden rounded-2xl bg-black shadow-sm">
+                <video x-ref="qrVideo" class="h-64 w-full object-cover" playsinline muted autoplay></video>
+                <div x-show="!videoReady" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
+                    <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin" />
+                    <span class="text-xs">Membuka kamera…</span>
                 </div>
-            </template>
-            <template x-if="scanning">
-                <div class="relative overflow-hidden rounded-2xl bg-black shadow-sm">
-                    <video x-ref="qrVideo" class="h-64 w-full object-cover" playsinline muted autoplay></video>
-                    <div x-show="!videoReady" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
-                        <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin" />
-                        <span class="text-xs">Membuka kamera…</span>
-                    </div>
-                    <button type="button" x-on:click="stop()"
-                        class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-bold text-white">
-                        Batal
-                    </button>
-                </div>
-            </template>
+                <button type="button" x-on:click="stop()"
+                    class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-bold text-white">
+                    Batal
+                </button>
+            </div>
         </div>
     @elseif ($this->state === 'siap_datang')
         <form wire:submit="catatDatang" class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
