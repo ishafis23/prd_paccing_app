@@ -22,41 +22,57 @@ document.addEventListener('alpine:init', () => {
         start() {
             this.error = null;
             this.videoReady = false;
+
+            // Fitur getUserMedia sendiri tidak ada di browser ini (WebView
+            // lama, dll) — jangan lanjut, browser tidak akan pernah nanya
+            // izin apa pun kalau API-nya memang tidak tersedia.
+            if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+                this.error = 'Browser ini tidak mendukung akses kamera dari halaman web. Coba pakai Chrome/Safari versi terbaru.';
+
+                return;
+            }
+
             this.scanning = true;
 
             this.$nextTick(() => {
-                const video = this.$refs.qrVideo;
+                try {
+                    const video = this.$refs.qrVideo;
 
-                video.addEventListener('playing', () => {
-                    this.videoReady = true;
+                    video.addEventListener('playing', () => {
+                        this.videoReady = true;
+                        clearTimeout(this.readyTimeout);
+                    });
+
+                    // Kalau stream tidak pernah mulai (izin diam2 diblok
+                    // browser, kamera dipakai app lain, dll) — jangan
+                    // biarkan layar hitam tanpa penjelasan selamanya.
+                    this.readyTimeout = setTimeout(() => {
+                        if (!this.videoReady) {
+                            this.error = 'Kamera tidak merespons. Pastikan izin kamera diaktifkan utk browser ini, lalu coba lagi.';
+                            this.stop();
+                        }
+                    }, 8000);
+
+                    this.instance = new QrScanner(
+                        video,
+                        (result) => this.onDecoded(result.data, baseUrl),
+                        {
+                            highlightScanRegion: true,
+                            highlightCodeOutline: true,
+                            preferredCamera: 'environment',
+                        }
+                    );
+
+                    this.instance.start().catch((err) => {
+                        clearTimeout(this.readyTimeout);
+                        this.error = 'Tidak bisa mengakses kamera: ' + (err?.message ?? err);
+                        this.scanning = false;
+                    });
+                } catch (err) {
                     clearTimeout(this.readyTimeout);
-                });
-
-                // Kalau stream tidak pernah mulai (izin diam2 diblok browser,
-                // kamera dipakai app lain, dll) — jangan biarkan layar hitam
-                // tanpa penjelasan, kasih tau & kembalikan ke tombol.
-                this.readyTimeout = setTimeout(() => {
-                    if (!this.videoReady) {
-                        this.error = 'Kamera tidak merespons. Pastikan izin kamera diaktifkan utk browser ini, lalu coba lagi.';
-                        this.stop();
-                    }
-                }, 8000);
-
-                this.instance = new QrScanner(
-                    video,
-                    (result) => this.onDecoded(result.data, baseUrl),
-                    {
-                        highlightScanRegion: true,
-                        highlightCodeOutline: true,
-                        preferredCamera: 'environment',
-                    }
-                );
-
-                this.instance.start().catch((err) => {
-                    clearTimeout(this.readyTimeout);
-                    this.error = 'Tidak bisa mengakses kamera: ' + (err?.message ?? err);
+                    this.error = 'Gagal membuka kamera: ' + (err?.message ?? err);
                     this.scanning = false;
-                });
+                }
             });
         },
 
