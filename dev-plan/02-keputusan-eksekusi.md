@@ -93,4 +93,20 @@ perubahan keputusan, catat di sini dengan tanggal revisi.
 - 8 September 2026: B38 dijalankan atas dasar asumsi (klarifikasi timeout) —
   landing profesional + menu Website (Hero Slider, Layanan Beranda,
   Pengaturan Beranda); lihat `11-usulan-landing-profesional-konten.md`.
+- 17–18 September 2026: B39–B55 disetujui & DIEKSEKUSI (absensi kantor
+  teknisi via QR + skema insentif "Games 1–4" dari Bendahara YDF): menu
+  Absensi & Insentif (Kode Absensi, Pengaturan Absensi, Rekap Absensi,
+  Rekap Insentif, Cuci Motor); Games 1 (hadir) + denda telat + toleransi
+  lembur, Games 2 (titik pertama via slider check-in), Games 3 (cuci
+  motor), Games 4 (kepulangan: titik & mode jalan); order klaim
+  dikecualikan dari hitungan titik/mode jalan (B50); verifikasi foto
+  Setujui/Tolak sebelum masuk total gaji (B55). Games 5 & 6 (omset & unit)
+  masih entri manual — menunggu definisi omset final dari Bendahara YDF
+  (§7 dokumen di bawah). 61 test Pest baru. Lihat
+  `15-usulan-absensi-barcode-teknisi.md`.
+- 18 September 2026: perbaikan `route()`/`url()` supaya ikut `APP_URL`
+  (aman untuk hosting subfolder, mis. `domain.com/paccing/public`) —
+  sebelumnya redirect setelah login teknisi lompat ke root domain, hilang
+  subfolder-nya. Perlu `APP_URL` di `.env` produksi diisi lengkap dengan
+  subfolder + `php artisan config:clear` di server.
 - Perubahan setelah tanggal ini harus dicatat di sini.
