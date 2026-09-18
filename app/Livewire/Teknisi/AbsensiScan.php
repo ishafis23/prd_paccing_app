@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AttendanceCodeService;
 use App\Services\AttendanceService;
 use App\Services\MotorCleaningService;
+use App\Support\Url;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -34,6 +35,17 @@ class AbsensiScan extends Component
     public function mount(?string $kode = null): void
     {
         $this->kode = $kode;
+    }
+
+    /**
+     * Base URL utk kamera scan QR (resources/js/app.js) — dibangun dari
+     * APP_URL eksplisit (App\Support\Url), BUKAN request ambien, supaya
+     * navigasi hasil scan tetap benar di hosting subfolder. Lihat juga
+     * AttendanceCodeResource::urlAbsen() (sumber isi QR-nya).
+     */
+    public function getUrlAbsensiBaseProperty(): string
+    {
+        return Url::absolute('teknisi.absensi');
     }
 
     public function getAbsenHariIniProperty(): ?DailyAttendance

@@ -16,10 +16,28 @@
             <p class="mt-1 text-xs text-rose-600">Kode sudah dinonaktifkan/kedaluwarsa atau salah. Hubungi admin.</p>
         </div>
     @elseif ($this->state === 'perlu_kode')
-        <div class="rounded-2xl bg-amber-50 p-5 text-center shadow-sm ring-1 ring-amber-100">
-            <x-heroicon-o-qr-code class="mx-auto h-8 w-8 text-amber-500" />
-            <p class="mt-2 text-sm font-semibold text-amber-700">Belum absen datang</p>
-            <p class="mt-1 text-xs text-amber-600">Scan kode QR yang ditempel di kantor untuk absen datang.</p>
+        <div x-data="qrScanner('{{ $this->urlAbsensiBase }}')" x-on:livewire:navigating.window="stop()">
+            <template x-if="!scanning">
+                <div class="rounded-2xl bg-amber-50 p-5 text-center shadow-sm ring-1 ring-amber-100">
+                    <x-heroicon-o-qr-code class="mx-auto h-8 w-8 text-amber-500" />
+                    <p class="mt-2 text-sm font-semibold text-amber-700">Belum absen datang</p>
+                    <p class="mt-1 text-xs text-amber-600">Scan kode QR yang ditempel di kantor untuk absen datang.</p>
+                    <button type="button" x-on:click="start()"
+                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3 text-sm font-bold text-white active:bg-amber-700">
+                        <x-heroicon-o-camera class="h-5 w-5" /> Scan Kode QR
+                    </button>
+                    <p x-show="error" x-text="error" class="mt-2 text-xs font-medium text-rose-600"></p>
+                </div>
+            </template>
+            <template x-if="scanning">
+                <div class="relative overflow-hidden rounded-2xl bg-black shadow-sm">
+                    <video x-ref="qrVideo" class="h-64 w-full object-cover" playsinline muted></video>
+                    <button type="button" x-on:click="stop()"
+                        class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-bold text-white">
+                        Batal
+                    </button>
+                </div>
+            </template>
         </div>
     @elseif ($this->state === 'siap_datang')
         <form wire:submit="catatDatang" class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
@@ -35,7 +53,7 @@
                         </div>
                     </template>
                     <img x-show="preview" :src="preview" alt="Pratinjau foto datang" class="absolute inset-0 h-full w-full object-cover">
-                    <input type="file" wire:model="foto" accept="image/*"
+                    <input type="file" wire:model="foto" accept="image/*" capture="user"
                         @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
                         class="absolute inset-0 cursor-pointer opacity-0">
                 </label>
@@ -68,7 +86,7 @@
                         </div>
                     </template>
                     <img x-show="preview" :src="preview" alt="Pratinjau foto pulang" class="absolute inset-0 h-full w-full object-cover">
-                    <input type="file" wire:model="foto" accept="image/*"
+                    <input type="file" wire:model="foto" accept="image/*" capture="user"
                         @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
                         class="absolute inset-0 cursor-pointer opacity-0">
                 </label>
@@ -127,7 +145,7 @@
                     </div>
                 </template>
                 <img x-show="preview" :src="preview" alt="Pratinjau foto cuci motor" class="absolute inset-0 h-full w-full object-cover">
-                <input type="file" wire:model="fotoMotor" accept="image/*"
+                <input type="file" wire:model="fotoMotor" accept="image/*" capture="environment"
                     @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
                     class="absolute inset-0 cursor-pointer opacity-0">
             </label>

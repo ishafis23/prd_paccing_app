@@ -296,6 +296,32 @@ it('AbsensiScan: tanpa kode & belum absen -> state perlu_kode', function () {
         ->assertSet('state', 'perlu_kode');
 });
 
+it('AbsensiScan: state perlu_kode menampilkan tombol Scan Kode QR (kamera in-app)', function () {
+    Livewire::actingAs($this->teknisi)
+        ->test(AbsensiScan::class)
+        ->assertSee('Scan Kode QR')
+        ->assertSeeHtml('x-data="qrScanner(');
+});
+
+it('AbsensiScan: input foto datang/pulang/cuci motor dipaksa buka kamera, bukan galeri', function () {
+    // perlu_kode: cuma form Cuci Motor yg tampil (foto motor -> kamera belakang).
+    Livewire::actingAs($this->teknisi)
+        ->test(AbsensiScan::class)
+        ->assertSeeHtml('capture="environment"');
+
+    // siap_datang: foto bukti kehadiran -> kamera depan (selfie).
+    Livewire::actingAs($this->teknisi)
+        ->test(AbsensiScan::class, ['kode' => $this->kode])
+        ->assertSeeHtml('capture="user"');
+
+    app(AttendanceService::class)->catatDatang($this->teknisi, $this->kode, UploadedFile::fake()->image('a.jpg'));
+
+    // siap_pulang: sama, foto pulang -> kamera depan.
+    Livewire::actingAs($this->teknisi)
+        ->test(AbsensiScan::class)
+        ->assertSeeHtml('capture="user"');
+});
+
 it('AbsensiScan: kode valid & belum absen -> catatDatang lewat form berhasil', function () {
     Livewire::actingAs($this->teknisi)
         ->test(AbsensiScan::class, ['kode' => $this->kode])
