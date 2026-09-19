@@ -179,7 +179,7 @@
                     <x-heroicon-o-camera class="h-5 w-5" /> Titik Pertama Hari Ini (Games 2)
                 </p>
                 <p class="mb-3 text-xs text-gray-500">Ini check-in pertama Anda hari ini — upload foto bukti (mis. buka cover AC indoor) sebelum geser check-in.</p>
-                <div x-data="{ preview: null }" class="relative h-32 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+                <div x-data="cameraUpload('fotoTitikPertama')" class="relative h-32 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
                     <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                         <template x-if="!preview">
                             <div class="flex flex-col items-center">
@@ -188,13 +188,15 @@
                             </div>
                         </template>
                         <img x-show="preview" :src="preview" alt="Pratinjau foto titik pertama" class="absolute inset-0 h-full w-full object-cover">
-                        <input type="file" wire:model="fotoTitikPertama" accept="image/*"
-                            @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
+                        <input type="file" accept="image/*"
+                            x-on:change="onFile($event)"
                             class="absolute inset-0 cursor-pointer opacity-0">
                     </label>
-                    <div wire:loading wire:target="fotoTitikPertama" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                    <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
                         <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                        <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
                     </div>
+                    <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
                 </div>
                 @error('fotoTitikPertama') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
@@ -339,20 +341,32 @@
                                 </p>
                                 <div class="grid grid-cols-2 gap-2">
                                     @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
-                                        <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
-                                            <x-heroicon-o-camera class="h-5 w-5" />
-                                            <span class="mt-0.5 px-1 text-[11px]">
-                                                {{ $slotLabel }}
-                                                @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
-                                                    <span class="text-rose-500">*Wajib</span>
-                                                @endif
-                                            </span>
-                                            @if (! empty($fotoKategori[$item->id][$slotKey] ?? null))
-                                                <span class="mt-0.5 text-[10px] font-bold text-emerald-600">Terpilih</span>
-                                            @endif
-                                            <input type="file" wire:model="fotoKategori.{{ $item->id }}.{{ $slotKey }}" accept="image/*"
-                                                class="absolute inset-0 cursor-pointer opacity-0">
-                                        </label>
+                                        <div x-data="cameraUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}')">
+                                            <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
+                                                <template x-if="!uploading">
+                                                    <div class="flex flex-col items-center">
+                                                        <x-heroicon-o-camera class="h-5 w-5" />
+                                                        <span class="mt-0.5 px-1 text-[11px]">
+                                                            {{ $slotLabel }}
+                                                            @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
+                                                                <span class="text-rose-500">*Wajib</span>
+                                                            @endif
+                                                        </span>
+                                                        @if (! empty($fotoKategori[$item->id][$slotKey] ?? null))
+                                                            <span class="mt-0.5 text-[10px] font-bold text-emerald-600">Terpilih</span>
+                                                        @endif
+                                                    </div>
+                                                </template>
+                                                <div x-show="uploading" class="flex flex-col items-center">
+                                                    <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
+                                                    <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
+                                                </div>
+                                                <input type="file" accept="image/*"
+                                                    x-on:change="onFile($event)"
+                                                    class="absolute inset-0 cursor-pointer opacity-0">
+                                            </label>
+                                            <p x-show="error" x-text="error" class="text-[10px] font-medium text-rose-600"></p>
+                                        </div>
                                         @error('fotoKategori.'.$item->id.'.'.$slotKey)
                                             <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
                                         @enderror
@@ -367,7 +381,7 @@
             <div>
                 <label class="mb-2 block text-sm font-semibold text-gray-700">Sertakan Foto <span class="font-normal text-gray-400">(opsional, JPG/PNG maks 5 MB)</span></label>
                 <div class="grid grid-cols-2 gap-3">
-                    <div x-data="{ preview: null, nama: '' }" class="relative h-28 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+                    <div x-data="cameraUpload('fotoSebelum')" class="relative h-28 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
                         <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                             <template x-if="!preview">
                                 <div class="flex flex-col items-center">
@@ -380,16 +394,17 @@
                                 class="absolute inset-0 h-full w-full object-cover">
                             <span x-show="preview" x-cloak
                                 class="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white" x-text="nama"></span>
-                            <input type="file" wire:model="fotoSebelum" accept="image/*"
-                                @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null; nama = f ? f.name : ''"
+                            <input type="file" accept="image/*"
+                                x-on:change="onFile($event)"
                                 class="absolute inset-0 cursor-pointer opacity-0">
                         </label>
-                        <div wire:loading wire:target="fotoSebelum"
-                            class="absolute inset-0 flex items-center justify-center bg-white/70">
+                        <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
                             <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                            <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
                         </div>
+                        <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
                     </div>
-                    <div x-data="{ preview: null, nama: '' }" class="relative h-28 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+                    <div x-data="cameraUpload('fotoSesudah')" class="relative h-28 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
                         <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                             <template x-if="!preview">
                                 <div class="flex flex-col items-center">
@@ -402,14 +417,15 @@
                                 class="absolute inset-0 h-full w-full object-cover">
                             <span x-show="preview" x-cloak
                                 class="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white" x-text="nama"></span>
-                            <input type="file" wire:model="fotoSesudah" accept="image/*"
-                                @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null; nama = f ? f.name : ''"
+                            <input type="file" accept="image/*"
+                                x-on:change="onFile($event)"
                                 class="absolute inset-0 cursor-pointer opacity-0">
                         </label>
-                        <div wire:loading wire:target="fotoSesudah"
-                            class="absolute inset-0 flex items-center justify-center bg-white/70">
+                        <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
                             <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                            <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
                         </div>
+                        <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
                     </div>
                 </div>
                 @error('fotoSebelum') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -463,12 +479,24 @@
             </p>
             <div class="mt-3 grid grid-cols-2 gap-2">
                 @foreach ($this->fotoWajibKurang as $kurang)
-                    <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
-                        <x-heroicon-o-camera class="h-5 w-5" />
-                        <span class="mt-0.5 px-1 text-[11px]">{{ $kurang['label'] }}</span>
-                        <input type="file" wire:model="fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}" accept="image/*"
-                            class="absolute inset-0 cursor-pointer opacity-0">
-                    </label>
+                    <div x-data="cameraUpload('fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}')">
+                        <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
+                            <template x-if="!uploading">
+                                <div class="flex flex-col items-center">
+                                    <x-heroicon-o-camera class="h-5 w-5" />
+                                    <span class="mt-0.5 px-1 text-[11px]">{{ $kurang['label'] }}</span>
+                                </div>
+                            </template>
+                            <div x-show="uploading" class="flex flex-col items-center">
+                                <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-amber-600" />
+                                <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-amber-600"></span>
+                            </div>
+                            <input type="file" accept="image/*"
+                                x-on:change="onFile($event)"
+                                class="absolute inset-0 cursor-pointer opacity-0">
+                        </label>
+                        <p x-show="error" x-text="error" class="text-[10px] font-medium text-rose-600"></p>
+                    </div>
                     @error('fotoLengkapi.'.$kurang['order_item']->id.'.'.$kurang['kode_slot'])
                         <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -602,15 +630,22 @@
                                     class="mt-2 h-40 w-full rounded-xl object-cover ring-1 ring-gray-100">
                                 <p class="mt-1 text-xs text-gray-400">Pilih file baru di bawah untuk mengganti.</p>
                             @endif
-                            <div class="mt-2 flex items-center gap-2">
-                                <input type="file" wire:model="buktiPembayaran" accept="image/*"
-                                    class="flex-1 text-xs text-gray-500">
-                                <button type="button" wire:click="uploadBuktiPembayaran" wire:loading.attr="disabled" wire:target="buktiPembayaran,uploadBuktiPembayaran"
-                                    class="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white active:bg-blue-700">
-                                    Simpan
-                                </button>
+                            <div x-data="cameraUpload('buktiPembayaran')">
+                                <div class="mt-2 flex items-center gap-2">
+                                    <input type="file" accept="image/*"
+                                        x-on:change="onFile($event)"
+                                        class="flex-1 text-xs text-gray-500">
+                                    <button type="button" wire:click="uploadBuktiPembayaran" wire:loading.attr="disabled" wire:target="uploadBuktiPembayaran"
+                                        x-bind:disabled="uploading"
+                                        class="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white active:bg-blue-700 disabled:opacity-60">
+                                        Simpan
+                                    </button>
+                                </div>
+                                <div x-show="uploading" class="mt-1 text-xs text-gray-400">
+                                    Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>...
+                                </div>
+                                <p x-show="error" x-text="error" class="mt-1 text-xs text-rose-600"></p>
                             </div>
-                            <div wire:loading wire:target="buktiPembayaran,uploadBuktiPembayaran" class="mt-1 text-xs text-gray-400">Mengunggah...</div>
                             @error('buktiPembayaran') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         @endif
                     </div>

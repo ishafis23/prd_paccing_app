@@ -55,7 +55,7 @@
             <h2 class="text-sm font-semibold text-gray-900">Catat Datang</h2>
             <p class="mt-1 text-xs text-gray-500">Ambil foto bukti kehadiran di kantor.</p>
 
-            <div x-data="{ preview: null }" class="relative mt-4 h-40 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+            <div x-data="cameraUpload('foto')" class="relative mt-4 h-40 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
                 <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                     <template x-if="!preview">
                         <div class="flex flex-col items-center">
@@ -64,13 +64,15 @@
                         </div>
                     </template>
                     <img x-show="preview" :src="preview" alt="Pratinjau foto datang" class="absolute inset-0 h-full w-full object-cover">
-                    <input type="file" wire:model="foto" accept="image/*" capture="user"
-                        @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
+                    <input type="file" accept="image/*" capture="user"
+                        x-on:change="onFile($event)"
                         class="absolute inset-0 cursor-pointer opacity-0">
                 </label>
-                <div wire:loading wire:target="foto" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
                     <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                    <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
                 </div>
+                <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
             </div>
             @error('foto') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
 
@@ -88,7 +90,7 @@
             <h2 class="text-sm font-semibold text-gray-900">Catat Pulang</h2>
             <p class="mt-1 text-xs text-gray-500">Ambil foto bukti kepulangan.</p>
 
-            <div x-data="{ preview: null }" class="relative mt-4 h-40 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+            <div x-data="cameraUpload('foto')" class="relative mt-4 h-40 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
                 <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                     <template x-if="!preview">
                         <div class="flex flex-col items-center">
@@ -97,13 +99,15 @@
                         </div>
                     </template>
                     <img x-show="preview" :src="preview" alt="Pratinjau foto pulang" class="absolute inset-0 h-full w-full object-cover">
-                    <input type="file" wire:model="foto" accept="image/*" capture="user"
-                        @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
+                    <input type="file" accept="image/*" capture="user"
+                        x-on:change="onFile($event)"
                         class="absolute inset-0 cursor-pointer opacity-0">
                 </label>
-                <div wire:loading wire:target="foto" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
                     <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                    <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
                 </div>
+                <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
             </div>
             @error('foto') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
 
@@ -164,7 +168,7 @@
             </select>
         </div>
 
-        <div x-data="{ preview: null }" class="relative mt-3 h-32 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+        <div x-data="cameraUpload('fotoMotor')" class="relative mt-3 h-32 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
             <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                 <template x-if="!preview">
                     <div class="flex flex-col items-center">
@@ -173,13 +177,15 @@
                     </div>
                 </template>
                 <img x-show="preview" :src="preview" alt="Pratinjau foto cuci motor" class="absolute inset-0 h-full w-full object-cover">
-                <input type="file" wire:model="fotoMotor" accept="image/*" capture="environment"
-                    @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null"
+                <input type="file" accept="image/*" capture="environment"
+                    x-on:change="onFile($event)"
                     class="absolute inset-0 cursor-pointer opacity-0">
             </label>
-            <div wire:loading wire:target="fotoMotor" class="absolute inset-0 flex items-center justify-center bg-white/70">
+            <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
                 <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
+                <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
             </div>
+            <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
         </div>
         @error('fotoMotor') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
 

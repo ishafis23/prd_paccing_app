@@ -11,7 +11,114 @@ import QrScanner from 'qr-scanner';
  * tak dikenal, kita tetap navigasi ke domain sendiri, bukan ikut URL apa
  * pun yang ada di dalam QR.
  */
+/**
+ * Kompres foto kamera di browser SEBELUM upload (keluhan user 19 Sep:
+ * upload lama krn foto kamera penuh 3-8 MB, tidak ada kompresi sama
+ * sekali sebelumnya). Skala ke maks 1200px sisi terpanjang, re-encode
+ * JPEG kualitas 70% — biasanya jadi ~100-250 KB, upload jauh lebih
+ * cepat, kualitas masih cukup jelas dibaca sbg bukti.
+ */
+function compressImage(file, maxDimension = 1200, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+
+            let { width, height } = img;
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    reject(new Error('Gagal memproses gambar.'));
+
+                    return;
+                }
+
+                resolve(new File(
+                    [blob],
+                    (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg',
+                    { type: 'image/jpeg' }
+                ));
+            }, 'image/jpeg', quality);
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Gagal membaca gambar.'));
+        };
+
+        img.src = url;
+    });
+}
+
 document.addEventListener('alpine:init', () => {
+    /**
+     * Dipasang di <input type="file"> (TANPA wire:model — upload dikirim
+     * manual lewat $wire.upload setelah dikompres, bukan otomatis oleh
+     * Livewire dgn file asli). `property` boleh path bertitik utk array
+     * bersarang (mis. "fotoKategori.5.sebelum"), sama seperti wire:model.
+     */
+    window.Alpine.data('cameraUpload', (property) => ({
+        preview: null,
+        nama: '',
+        uploading: false,
+        progress: 0,
+        error: null,
+
+        async onFile(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            this.error = null;
+            this.preview = URL.createObjectURL(file);
+            this.nama = file.name || '';
+            this.uploading = true;
+            this.progress = 0;
+
+            let compressed;
+            try {
+                compressed = await compressImage(file);
+            } catch (err) {
+                this.uploading = false;
+                this.error = 'Gagal memproses foto: ' + (err?.message ?? err);
+
+                return;
+            }
+
+            this.$wire.upload(
+                property,
+                compressed,
+                () => {
+                    this.uploading = false;
+                },
+                (message) => {
+                    this.uploading = false;
+                    this.error = 'Gagal upload foto: ' + message;
+                },
+                (uploadEvent) => {
+                    this.progress = uploadEvent.detail.progress;
+                }
+            );
+        },
+    }));
+
     window.Alpine.data('qrScanner', (baseUrl) => ({
         scanning: false,
         videoReady: false,
