@@ -131,10 +131,27 @@
         </div>
     @endif
 
-    {{-- Games 3: Catat Cuci Motor — berdiri sendiri, tidak tergantung status absen datang/pulang. --}}
-    <form wire:submit="catatCuciMotor" class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-        <h2 class="text-sm font-semibold text-gray-900">Catat Cuci/Perawatan Motor (Games 3)</h2>
-        <p class="mt-1 text-xs text-gray-500">Bisa dicatat pagi maupun sore. Maksimal 2 orang per motor.</p>
+    {{-- Games 3: Catat Cuci Motor — berdiri sendiri, tidak tergantung status absen datang/pulang.
+         Banner ilustrasi (icon + gradient) dulu sblm form, biar lebih menarik —
+         bukan foto editorial hasil hotlink (risiko hak cipta/link mati). --}}
+    <form wire:submit="catatCuciMotor" class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <div class="relative overflow-hidden bg-gradient-to-br from-sky-500 via-cyan-500 to-blue-600 px-5 py-6">
+            <div class="absolute -right-4 -top-6 h-24 w-24 rounded-full bg-white/10"></div>
+            <div class="absolute -bottom-8 right-12 h-16 w-16 rounded-full bg-white/10"></div>
+            <div class="absolute bottom-3 left-10 h-7 w-7 rounded-full bg-white/10"></div>
+            <div class="relative flex items-center gap-3">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30">
+                    <x-heroicon-o-sparkles class="h-6 w-6 text-white" />
+                </span>
+                <div>
+                    <h2 class="text-base font-extrabold text-white">Cuci &amp; Rawat Motor</h2>
+                    <p class="text-xs text-sky-50">Games 3 — bonus insentif kebersihan motor</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-5">
+        <p class="text-xs text-gray-500">Bisa dicatat pagi maupun sore. Maksimal 2 orang per motor.</p>
 
         <div class="mt-3">
             <label class="mb-1 block text-xs font-medium text-gray-700">Rekan (opsional, maks. 1 orang)</label>
@@ -170,5 +187,6 @@
             class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white active:bg-blue-700 disabled:opacity-60">
             Catat Cuci Motor
         </button>
+        </div>
     </form>
 </div>
