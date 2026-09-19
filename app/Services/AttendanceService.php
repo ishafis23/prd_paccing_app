@@ -216,7 +216,12 @@ class AttendanceService
         return $absen->fresh();
     }
 
-    private function tentukanStatusDatang(User $teknisi, Carbon $tanggal, Carbon $now, AttendanceSetting $settings): DailyAttendanceStatus
+    /**
+     * Publik (bukan cuma dipakai internal catatDatang()) — dipakai ulang
+     * oleh `absensi:koreksi-zona-waktu` utk hitung ulang status_datang yg
+     * benar setelah insiden timezone UTC (lihat 02-keputusan-eksekusi.md).
+     */
+    public function tentukanStatusDatang(User $teknisi, Carbon $tanggal, Carbon $now, AttendanceSetting $settings): DailyAttendanceStatus
     {
         $jamNow = $now->format('H:i:s');
 
