@@ -4,9 +4,15 @@
         <div class="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('status') }}</div>
     @endif
 
-    <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-        <h1 class="text-base font-bold text-gray-900">Absensi Kantor</h1>
-        <p class="mt-1 text-sm text-gray-500">{{ now()->translatedFormat('l, d F Y') }}</p>
+    <div class="flex items-center justify-between gap-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+        <div>
+            <h1 class="text-base font-bold text-gray-900">Absensi Kantor</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ now()->translatedFormat('l, d F Y') }}</p>
+        </div>
+        <a href="{{ route('teknisi.riwayat-absensi') }}" wire:navigate
+            class="flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 active:bg-blue-100">
+            <x-heroicon-o-clock class="h-4 w-4" /> Riwayat
+        </a>
     </div>
 
     @if ($this->state === 'kode_invalid')
