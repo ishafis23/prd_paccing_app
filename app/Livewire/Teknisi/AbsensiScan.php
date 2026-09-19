@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Teknisi;
 
+use App\Enums\AttendanceMode;
 use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\DailyAttendance;
 use App\Models\User;
 use App\Services\AttendanceCodeService;
+use App\Services\AttendanceLocationService;
 use App\Services\AttendanceService;
+use App\Services\AttendanceSettingService;
 use App\Services\MotorCleaningService;
 use App\Support\Url;
 use Illuminate\Support\Carbon;
@@ -26,6 +29,12 @@ class AbsensiScan extends Component
 
     public ?string $kode = null;
 
+    public ?float $lat = null;
+
+    public ?float $lng = null;
+
+    public ?string $lokasiError = null;
+
     public $foto;
 
     public $fotoMotor;
@@ -35,6 +44,40 @@ class AbsensiScan extends Component
     public function mount(?string $kode = null): void
     {
         $this->kode = $kode;
+    }
+
+    public function getModeAbsensiProperty(): AttendanceMode
+    {
+        return app(AttendanceSettingService::class)->data()->mode_absensi;
+    }
+
+    /**
+     * dev-plan/19: dipanggil dari JS (navigator.geolocation) begitu teknisi
+     * tap "Absen dari Sini". Dicek lebih awal di sini (bukan nunggu submit
+     * foto) supaya error "kejauhan dari kantor" langsung kelihatan sebelum
+     * teknisi sempat ambil foto — evaluasi ulang tetap terjadi di
+     * AttendanceService::catatDatang() saat submit (otoritatif).
+     */
+    public function setLokasi(float $lat, float $lng): void
+    {
+        $evaluasi = app(AttendanceLocationService::class)->evaluasiLokasi($lat, $lng);
+
+        if ($evaluasi['lokasi'] === null) {
+            $this->lokasiError = 'Belum ada lokasi kantor terdaftar. Hubungi admin.';
+
+            return;
+        }
+
+        if (! $evaluasi['masuk']) {
+            $jarak = round($evaluasi['jarak_meter']);
+            $this->lokasiError = "Anda {$jarak}m dari {$evaluasi['lokasi']->nama} (radius {$evaluasi['lokasi']->radius_meter}m). Mendekat ke kantor lalu coba lagi.";
+
+            return;
+        }
+
+        $this->lokasiError = null;
+        $this->lat = $lat;
+        $this->lng = $lng;
     }
 
     /**
@@ -66,7 +109,7 @@ class AbsensiScan extends Component
     }
 
     /**
-     * @return string 'perlu_kode'|'kode_invalid'|'siap_datang'|'siap_pulang'|'selesai'
+     * @return string 'perlu_kode'|'kode_invalid'|'perlu_lokasi'|'siap_datang'|'siap_pulang'|'selesai'
      */
     public function getStateProperty(): string
     {
@@ -78,6 +121,10 @@ class AbsensiScan extends Component
 
         if ($absen && $absen->jam_datang !== null) {
             return 'siap_pulang';
+        }
+
+        if ($this->modeAbsensi === AttendanceMode::Lokasi) {
+            return $this->lat !== null && $this->lng !== null ? 'siap_datang' : 'perlu_lokasi';
         }
 
         if ($this->kode === null) {
@@ -92,7 +139,7 @@ class AbsensiScan extends Component
         $this->validate(['foto' => ['required', 'image', 'max:5120']]);
 
         try {
-            app(AttendanceService::class)->catatDatang(auth()->user(), (string) $this->kode, $this->foto);
+            app(AttendanceService::class)->catatDatang(auth()->user(), $this->kode, $this->foto, $this->lat, $this->lng);
 
             $this->reset('foto');
             session()->flash('status', 'Absen datang berhasil dicatat.');

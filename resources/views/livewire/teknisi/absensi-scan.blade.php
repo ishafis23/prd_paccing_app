@@ -15,6 +15,29 @@
             <p class="mt-2 text-sm font-semibold text-rose-700">Kode absensi tidak berlaku</p>
             <p class="mt-1 text-xs text-rose-600">Kode sudah dinonaktifkan/kedaluwarsa atau salah. Hubungi admin.</p>
         </div>
+    @elseif ($this->state === 'perlu_lokasi')
+        <div x-data="{ mengecek: false }" class="rounded-2xl bg-amber-50 p-5 text-center shadow-sm ring-1 ring-amber-100">
+            <x-heroicon-o-map-pin class="mx-auto h-8 w-8 text-amber-500" />
+            <p class="mt-2 text-sm font-semibold text-amber-700">Belum absen datang</p>
+            <p class="mt-1 text-xs text-amber-600">Pastikan Anda sudah berada di kantor, lalu tekan tombol di bawah.</p>
+            <button type="button"
+                x-on:click="
+                    mengecek = true;
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => { mengecek = false; $wire.setLokasi(pos.coords.latitude, pos.coords.longitude); },
+                        (err) => { mengecek = false; $wire.set('lokasiError', 'Gagal mengambil lokasi: ' + err.message); },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                "
+                x-bind:disabled="mengecek"
+                class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3 text-sm font-bold text-white active:bg-amber-700 disabled:opacity-60">
+                <x-heroicon-o-map-pin class="h-5 w-5" />
+                <span x-text="mengecek ? 'Mengecek lokasi…' : 'Absen dari Sini'"></span>
+            </button>
+            @if ($lokasiError)
+                <p class="mt-2 text-xs font-medium text-rose-600">{{ $lokasiError }}</p>
+            @endif
+        </div>
     @elseif ($this->state === 'perlu_kode')
         <div x-data="qrScanner('{{ $this->urlAbsensiBase }}')" x-on:livewire:navigating.window="stop()">
             <div x-show="!scanning" class="rounded-2xl bg-amber-50 p-5 text-center shadow-sm ring-1 ring-amber-100">

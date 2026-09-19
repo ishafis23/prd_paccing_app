@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AttendanceMode;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 class AttendanceSetting extends Model
 {
     protected $fillable = [
+        'mode_absensi',
         'jam_games1_batas',
         'nominal_games1',
         'jam_normal_selesai',
@@ -36,6 +38,7 @@ class AttendanceSetting extends Model
     protected function casts(): array
     {
         return [
+            'mode_absensi' => AttendanceMode::class,
             'nominal_games1' => 'decimal:2',
             'nominal_denda_telat' => 'decimal:2',
             'nominal_games2' => 'decimal:2',

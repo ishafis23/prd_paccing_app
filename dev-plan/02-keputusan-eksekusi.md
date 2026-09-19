@@ -135,4 +135,46 @@ perubahan keputusan, catat di sini dengan tanggal revisi.
   foto yang kurang dilengkapi lewat bagian baru "Lengkapi Foto Wajib".
   33 test Pest baru + ~10 test lama disesuaikan. Lihat
   `17-usulan-template-foto-laporan-dinamis.md`.
+- 18-19 September 2026: perbaikan `route()`/`url()` tanggal 18 Sep (ikut
+  `APP_URL`) ternyata **belum cukup** — redirect login & isi QR absensi
+  masih kadang salah karena `route()`/`url()` polos tetap mengandalkan
+  root request AMBIEN, bukan `APP_URL` murni. Diganti helper baru
+  `App\Support\Url::absolute()` (dipakai di `Login.php`, `Portal\Login.php`,
+  `AttendanceCodeResource::urlAbsen()`) yang bangun URL eksplisit dari
+  `APP_URL`, TANPA `URL::forceRootUrl()` (itu yang sebelumnya merusak
+  upload Livewire, sudah dicabut 18 Sep). Sekalian ketahuan & diperbaiki
+  bug lama tak terkait: `AttendanceCodeResource::qrDataUri()` masih pakai
+  API `endroid/qr-code` v4 (named constructor args), padahal versi
+  ter-lock 5.1.0 pakai fluent API — 500 di aksi "Lihat QR", baru ketahuan
+  krn halaman itu belum pernah dipakai di production sebelumnya.
+- 19 September 2026: scan QR absensi sekarang **langsung dari kamera HP
+  di dalam app** (sebelumnya cuma pesan statis, teknisi harus pakai app
+  kamera bawaan HP di luar aplikasi — keluhan user "kenapa belum bisa
+  scan barcode"). Pakai library `qr-scanner` (npm), hasil scan diambil
+  segmen terakhir path-nya sbg kode lalu dinavigasikan ke URL sendiri
+  (`App\Support\Url::absolute`), bukan ikut URL apa pun isi QR-nya
+  (jaga-jaga kalau QR fisik pernah ditukar). Sekalian: foto bukti absen
+  datang/pulang & cuci motor dipaksa buka kamera langsung (atribut HTML
+  `capture`, bukan galeri/upload), dan **semua 9 input foto di app
+  teknisi** dikompres di browser sebelum upload (resize maks 1200px +
+  JPEG kualitas 70%, ~100-250 KB dari yg tadinya bisa 3-8 MB) — keluhan
+  user upload lama. Sekalian ketahuan `public/build` (aset Vite) sudah
+  lama tidak dibuild ulang sejak 1x commit manual lama, ketinggalan
+  banyak perubahan markup (footer nav teknisi tampil bertumpuk vertikal
+  krn `grid-cols-5` tidak ada di CSS yg di-deploy) — dibuild ulang &
+  dikomit.
+- 19 September 2026: B70–B74 disetujui & DIEKSEKUSI (mode absensi kedua:
+  **Titik Lokasi/GPS**, selain Scan QR yang sudah ada — admin pilih salah
+  satu di Pengaturan Absensi, berlaku semua teknisi). Lokasi kantor
+  dikelola di menu baru "Lokasi Absensi" (bisa lebih dari 1 aktif
+  sekaligus, absen sah kalau teknisi dalam radius SALAH SATU), koordinat
+  diisi lewat Link Google Maps (pakai ulang `GoogleMapsLinkService` +
+  peta Leaflet yang sudah ada utk alamat Customer) — bukan ketik manual.
+  Radius per-lokasi, default **50 meter** (klarifikasi user: "mereka
+  harus benar-benar berada di kantor"). Jarak dihitung rumus Haversine
+  (`AttendanceLocationService`). Foto selfie tetap wajib di kedua mode —
+  GPS berfungsi sbg kemudahan, bukan pengganti verifikasi manusia (GPS
+  bisa dipalsukan via fake-GPS app). Mode QR tidak dihapus, admin bisa
+  pindah kapan saja. 22 test Pest baru. Lihat
+  `19-usulan-mode-absensi-qr-atau-lokasi.md`.
 - Perubahan setelah tanggal ini harus dicatat di sini.

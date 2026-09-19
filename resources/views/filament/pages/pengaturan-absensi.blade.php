@@ -14,6 +14,23 @@
                 };
             @endphp
 
+            {{-- Mode Absensi (dev-plan/19, B71) --}}
+            <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5">
+                <h2 class="text-sm font-semibold text-gray-950">Mode Absensi</h2>
+                <p class="mt-1 text-xs text-gray-500">Berlaku untuk semua teknisi sekaligus.</p>
+                <div class="mt-4 max-w-sm">
+                    <select wire:model="modeAbsensi"
+                        class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-blue-500">
+                        <option value="qr">Scan Kode QR</option>
+                        <option value="lokasi">Titik Lokasi (GPS)</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-400">
+                        "Titik Lokasi" perlu minimal 1 lokasi aktif di menu "Lokasi Absensi" (koordinat + radius).
+                    </p>
+                    @error('modeAbsensi') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
             {{-- Games 1 + denda + toleransi --}}
             <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5">
                 <h2 class="text-sm font-semibold text-gray-950">Games 1 — Kehadiran, Denda Telat &amp; Toleransi Lembur</h2>

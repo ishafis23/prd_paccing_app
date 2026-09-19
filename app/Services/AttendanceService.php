@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AttendanceMode;
 use App\Enums\DailyAttendanceStatus;
 use App\Enums\IncentiveKategori;
 use App\Enums\IncentiveStatusVerifikasi;
@@ -31,16 +32,47 @@ class AttendanceService
 
     public function __construct(
         private readonly AttendanceCodeService $kodeService,
+        private readonly AttendanceLocationService $lokasiService,
         private readonly AttendanceSettingService $settingService,
         private readonly TechnicianIncentiveService $incentiveService,
         private readonly StorageQuotaService $quotaService,
     ) {}
 
-    public function catatDatang(User $teknisi, string $kode, UploadedFile $foto): DailyAttendance
+    /**
+     * dev-plan/19: bukti kehadiran sesuai mode absensi aktif —
+     * `$kode` dipakai kalau mode QR, `$lat`/`$lng` kalau mode lokasi.
+     * Parameter yang tidak relevan dgn mode aktif boleh null, diabaikan.
+     */
+    public function catatDatang(User $teknisi, ?string $kode, UploadedFile $foto, ?float $lat = null, ?float $lng = null): DailyAttendance
     {
         $this->assertRole($teknisi, [RoleName::Teknisi]);
 
-        $attendanceCode = $this->kodeService->validasiAtauGagal($kode);
+        $settings = $this->settingService->data();
+        $attendanceCodeId = null;
+        $attendanceLocationId = null;
+
+        if ($settings->mode_absensi === AttendanceMode::Lokasi) {
+            if ($lat === null || $lng === null) {
+                throw new BusinessRuleException('Lokasi tidak terdeteksi. Aktifkan izin lokasi di browser lalu coba lagi.');
+            }
+
+            $evaluasi = $this->lokasiService->evaluasiLokasi($lat, $lng);
+
+            if ($evaluasi['lokasi'] === null) {
+                throw new BusinessRuleException('Belum ada lokasi kantor terdaftar. Hubungi admin.');
+            }
+
+            if (! $evaluasi['masuk']) {
+                $jarak = round($evaluasi['jarak_meter']);
+                throw new BusinessRuleException(
+                    "Anda {$jarak}m dari {$evaluasi['lokasi']->nama} (radius {$evaluasi['lokasi']->radius_meter}m). Mendekat ke kantor lalu coba lagi."
+                );
+            }
+
+            $attendanceLocationId = $evaluasi['lokasi']->id;
+        } else {
+            $attendanceCodeId = $this->kodeService->validasiAtauGagal((string) $kode)->id;
+        }
 
         $tanggal = Carbon::today();
 
@@ -59,13 +91,13 @@ class AttendanceService
         StorageQuotaService::lupakanCache();
 
         $now = Carbon::now();
-        $settings = $this->settingService->data();
         $status = $this->tentukanStatusDatang($teknisi, $tanggal, $now, $settings);
 
         $absen = DailyAttendance::updateOrCreate(
             ['user_id' => $teknisi->id, 'tanggal' => $tanggal->toDateString()],
             [
-                'attendance_code_id' => $attendanceCode->id,
+                'attendance_code_id' => $attendanceCodeId,
+                'attendance_location_id' => $attendanceLocationId,
                 'jam_datang' => $now,
                 'foto_datang' => $path,
                 'status_datang' => $status->value,

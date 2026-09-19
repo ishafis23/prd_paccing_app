@@ -18,6 +18,7 @@ class DailyAttendance extends Model
     protected $fillable = [
         'user_id',
         'attendance_code_id',
+        'attendance_location_id',
         'tanggal',
         'jam_datang',
         'foto_datang',
@@ -47,5 +48,10 @@ class DailyAttendance extends Model
     public function attendanceCode(): BelongsTo
     {
         return $this->belongsTo(AttendanceCode::class);
+    }
+
+    public function attendanceLocation(): BelongsTo
+    {
+        return $this->belongsTo(AttendanceLocation::class);
     }
 }

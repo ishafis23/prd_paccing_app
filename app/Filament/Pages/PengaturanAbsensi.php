@@ -2,10 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\AttendanceMode;
 use App\Enums\RoleName;
 use App\Services\AttendanceSettingService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Validation\Rule;
 
 /**
  * Menu Absensi & Insentif → "Pengaturan Absensi" (dev-plan/15, B42): seluruh
@@ -25,6 +27,8 @@ class PengaturanAbsensi extends Page
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
     protected static ?string $slug = 'pengaturan-absensi';
+
+    public string $modeAbsensi = '';
 
     public string $jamGames1Batas = '';
 
@@ -80,6 +84,7 @@ class PengaturanAbsensi extends Page
 
         $setting = app(AttendanceSettingService::class)->data();
 
+        $this->modeAbsensi = $setting->mode_absensi->value;
         $this->jamGames1Batas = substr((string) $setting->jam_games1_batas, 0, 5);
         $this->nominalGames1 = (string) $setting->nominal_games1;
         $this->jamNormalSelesai = substr((string) $setting->jam_normal_selesai, 0, 5);
@@ -105,6 +110,7 @@ class PengaturanAbsensi extends Page
     public function simpan(): void
     {
         $this->validate([
+            'modeAbsensi' => ['required', Rule::enum(AttendanceMode::class)],
             'jamGames1Batas' => ['required', 'date_format:H:i'],
             'nominalGames1' => ['required', 'numeric', 'min:0'],
             'jamNormalSelesai' => ['required', 'date_format:H:i'],
@@ -128,6 +134,7 @@ class PengaturanAbsensi extends Page
         ]);
 
         app(AttendanceSettingService::class)->perbarui([
+            'mode_absensi' => $this->modeAbsensi,
             'jam_games1_batas' => $this->jamGames1Batas,
             'nominal_games1' => $this->nominalGames1,
             'jam_normal_selesai' => $this->jamNormalSelesai,
