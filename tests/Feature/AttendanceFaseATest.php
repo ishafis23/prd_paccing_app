@@ -181,6 +181,29 @@ it('urlAbsen (isi QR) memakai APP_URL eksplisit, bukan root request ambient (reg
         ->toBe('https://mycompany.web.id/paccing/public/teknisi/absensi/ABC123');
 });
 
+it('qrDataUri menghasilkan gambar QR PNG data-uri yang valid (regresi 500 Unknown named parameter $writer)', function () {
+    $admin = ($this->mkUser)(RoleName::Admin->value);
+    $kode = AttendanceCode::create([
+        'kode' => 'QR-TEST-1',
+        'status' => AttendanceCodeStatus::Aktif,
+        'berlaku_sampai' => now()->addDay(),
+        'dibuat_oleh' => $admin->id,
+    ]);
+
+    expect(AttendanceCodeResource::qrDataUri($kode))->toStartWith('data:image/png;base64,');
+});
+
+it('aksi "Lihat QR" di tabel bekerja lewat Livewire (regresi 500 modal QR)', function () {
+    $admin = ($this->mkUser)(RoleName::Admin->value);
+    $service = app(AttendanceCodeService::class);
+    $kode = $service->buatBaru($admin);
+
+    Livewire::actingAs($admin)
+        ->test(ListAttendanceCodes::class)
+        ->callTableAction('lihatQr', $kode)
+        ->assertHasNoTableActionErrors();
+});
+
 it('aksi Aktifkan/Nonaktifkan di baris tabel bekerja lewat Livewire', function () {
     $admin = ($this->mkUser)(RoleName::Admin->value);
     $service = app(AttendanceCodeService::class);

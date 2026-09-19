@@ -87,12 +87,15 @@ class AttendanceCodeResource extends Resource
 
     public static function qrDataUri(AttendanceCode $record): string
     {
-        $result = (new Builder(
-            writer: new PngWriter,
-            data: static::urlAbsen($record),
-            size: 320,
-            margin: 12,
-        ))->build();
+        // endroid/qr-code 5.x: Builder::__construct() tanpa parameter,
+        // API-nya fluent (bukan named constructor args spt v4) — lihat
+        // vendor/endroid/qr-code/src/Builder/Builder.php.
+        $result = Builder::create()
+            ->writer(new PngWriter)
+            ->data(static::urlAbsen($record))
+            ->size(320)
+            ->margin(12)
+            ->build();
 
         return $result->getDataUri();
     }
