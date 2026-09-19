@@ -15,6 +15,7 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('qrScanner', (baseUrl) => ({
         scanning: false,
         videoReady: false,
+        decoded: false,
         error: null,
         instance: null,
         readyTimeout: null,
@@ -22,6 +23,7 @@ document.addEventListener('alpine:init', () => {
         start() {
             this.error = null;
             this.videoReady = false;
+            this.decoded = false;
 
             // Fitur getUserMedia sendiri tidak ada di browser ini (WebView
             // lama, dll) — jangan lanjut, browser tidak akan pernah nanya
@@ -85,10 +87,22 @@ document.addEventListener('alpine:init', () => {
             }
             this.scanning = false;
             this.videoReady = false;
+            this.decoded = false;
         },
 
         onDecoded(text, baseUrl) {
-            this.stop();
+            // Jangan panggil stop() penuh di sini — itu juga menyembunyikan
+            // kotak (scanning=false). Matikan kamera saja, tapi kotaknya
+            // tetap tampil dgn overlay "terdeteksi" supaya user lihat
+            // konfirmasi SEBELUM halaman pindah (sebelumnya langsung
+            // redirect diam2, user kira macet — keluhan user 19 Sep).
+            clearTimeout(this.readyTimeout);
+            if (this.instance) {
+                this.instance.stop();
+                this.instance.destroy();
+                this.instance = null;
+            }
+            this.decoded = true;
 
             let kode = text;
             try {
@@ -101,7 +115,9 @@ document.addEventListener('alpine:init', () => {
                 // teks hasil scan bukan URL — pakai apa adanya sbg kode.
             }
 
-            window.location.href = baseUrl.replace(/\/$/, '') + '/' + encodeURIComponent(kode);
+            setTimeout(() => {
+                window.location.href = baseUrl.replace(/\/$/, '') + '/' + encodeURIComponent(kode);
+            }, 500);
         },
     }));
 });

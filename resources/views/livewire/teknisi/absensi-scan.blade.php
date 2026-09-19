@@ -33,11 +33,18 @@
                  $refs.qrVideo masih undefined). --}}
             <div x-show="scanning" class="relative overflow-hidden rounded-2xl bg-black shadow-sm">
                 <video x-ref="qrVideo" class="h-64 w-full object-cover" playsinline muted autoplay></video>
-                <div x-show="!videoReady" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
+                <div x-show="!videoReady && !decoded" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
                     <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin" />
                     <span class="text-xs">Membuka kamera…</span>
                 </div>
-                <button type="button" x-on:click="stop()"
+                {{-- Konfirmasi visual begitu QR terbaca, sebelum redirect
+                     (dulu langsung pindah halaman diam2 — user kira macet,
+                     keluhan 19 Sep). --}}
+                <div x-show="decoded" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-600 text-white">
+                    <x-heroicon-o-check-circle class="h-10 w-10" />
+                    <span class="text-sm font-semibold">Kode terdeteksi — memproses…</span>
+                </div>
+                <button type="button" x-on:click="stop()" x-show="!decoded"
                     class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-bold text-white">
                     Batal
                 </button>
