@@ -188,7 +188,7 @@
                             </div>
                         </template>
                         <img x-show="preview" :src="preview" alt="Pratinjau foto titik pertama" class="absolute inset-0 h-full w-full object-cover">
-                        <input type="file" accept="image/*"
+                        <input type="file" accept="image/*" capture="environment"
                             x-on:change="onFile($event)"
                             class="absolute inset-0 cursor-pointer opacity-0">
                     </label>
@@ -361,7 +361,7 @@
                                                     <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
                                                     <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
                                                 </div>
-                                                <input type="file" accept="image/*"
+                                                <input type="file" accept="image/*" capture="environment"
                                                     x-on:change="onFile($event)"
                                                     class="absolute inset-0 cursor-pointer opacity-0">
                                             </label>
@@ -394,7 +394,7 @@
                                 class="absolute inset-0 h-full w-full object-cover">
                             <span x-show="preview" x-cloak
                                 class="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white" x-text="nama"></span>
-                            <input type="file" accept="image/*"
+                            <input type="file" accept="image/*" capture="environment"
                                 x-on:change="onFile($event)"
                                 class="absolute inset-0 cursor-pointer opacity-0">
                         </label>
@@ -417,7 +417,7 @@
                                 class="absolute inset-0 h-full w-full object-cover">
                             <span x-show="preview" x-cloak
                                 class="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white" x-text="nama"></span>
-                            <input type="file" accept="image/*"
+                            <input type="file" accept="image/*" capture="environment"
                                 x-on:change="onFile($event)"
                                 class="absolute inset-0 cursor-pointer opacity-0">
                         </label>
@@ -491,7 +491,7 @@
                                 <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-amber-600" />
                                 <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-amber-600"></span>
                             </div>
-                            <input type="file" accept="image/*"
+                            <input type="file" accept="image/*" capture="environment"
                                 x-on:change="onFile($event)"
                                 class="absolute inset-0 cursor-pointer opacity-0">
                         </label>
@@ -632,7 +632,7 @@
                             @endif
                             <div x-data="cameraUpload('buktiPembayaran')">
                                 <div class="mt-2 flex items-center gap-2">
-                                    <input type="file" accept="image/*"
+                                    <input type="file" accept="image/*" capture="environment"
                                         x-on:change="onFile($event)"
                                         class="flex-1 text-xs text-gray-500">
                                     <button type="button" wire:click="uploadBuktiPembayaran" wire:loading.attr="disabled" wire:target="uploadBuktiPembayaran"
