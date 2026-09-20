@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use Filament\Http\Responses\Auth\Contracts\LoginResponse as LoginResponseContract;
+use Filament\Http\Responses\Auth\Contracts\LogoutResponse as LogoutResponseContract;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -38,5 +40,15 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
+
+        // Redirect login/logout panel admin memakai APP_URL eksplisit
+        // (App\Support\Url::panel), bukan Filament::getUrl()/getLoginUrl()
+        // yang dibangun dari root request ambient — di hosting subfolder
+        // route() kadang kehilangan prefix /public sehingga setelah login
+        // admin nyasar ke /admin tanpa /public (kasus sama dgn insiden
+        // 18 Sep untuk teknisi). Daftar ulang kontrak di sini (boot, bukan
+        // register) supaya menimpa binding bawaan FilamentServiceProvider.
+        $this->app->bind(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
+        $this->app->bind(LogoutResponseContract::class, \App\Http\Responses\LogoutResponse::class);
     }
 }

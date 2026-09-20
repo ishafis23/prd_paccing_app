@@ -17,4 +17,23 @@ class Url
     {
         return rtrim((string) config('app.url'), '/').route($routeName, $parameters, false);
     }
+
+    /**
+     * URL panel Filament (mis. 'admin') yang deterministik dari APP_URL —
+     * pakai $panel->getPath() (bukan route()), supaya setelah login admin
+     * tidak nyasar ke /admin tanpa prefix /public di hosting subfolder
+     * (route() absen di sana kadang kehilangan prefix, sama seperti kasus
+     * absolute() di atas). $path opsional utk halaman anak, mis.
+     * panel('admin', 'login') → <APP_URL>/admin/login.
+     */
+    public static function panel(string $panelId, string $path = ''): string
+    {
+        $segmen = filament()->getPanel($panelId)->getPath();
+
+        if ($path !== '') {
+            $segmen .= '/'.ltrim($path, '/');
+        }
+
+        return rtrim((string) config('app.url'), '/').'/'.ltrim($segmen, '/');
+    }
 }

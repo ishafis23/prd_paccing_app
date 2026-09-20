@@ -40,7 +40,7 @@ class Login extends Component
         $user = Auth::user();
 
         if ($user->canAccessPanel(filament()->getPanel('admin'))) {
-            $this->redirect(filament()->getPanel('admin')->getUrl(), navigate: false);
+            $this->redirect(Url::panel('admin'), navigate: false);
 
             return;
         }

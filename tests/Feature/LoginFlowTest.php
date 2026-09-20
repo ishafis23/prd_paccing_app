@@ -6,6 +6,8 @@ use App\Livewire\Auth\Login;
 use App\Models\Order;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
+use Filament\Http\Responses\Auth\Contracts\LoginResponse as LoginResponseContract;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -45,6 +47,31 @@ it('login teknisi redirect memakai APP_URL eksplisit, bukan root request ambient
         ->set('password', 'password')
         ->call('login')
         ->assertRedirect('https://mycompany.web.id/paccing/public/teknisi');
+});
+
+it('login admin lewat halaman login memakai APP_URL eksplisit, bukan root request ambient (regresi subfolder)', function () {
+    config(['app.url' => 'https://mycompany.web.id/paccing/public']);
+
+    $admin = User::factory()->create(['password' => 'password']);
+    $admin->assignRole(RoleName::Admin->value);
+
+    Livewire::test(Login::class)
+        ->set('email', $admin->email)
+        ->set('password', 'password')
+        ->call('login')
+        ->assertRedirect('https://mycompany.web.id/paccing/public/admin');
+});
+
+it('respon login Filament (halaman /admin/login) memakai URL panel eksplisit dari APP_URL (regresi subfolder)', function () {
+    config(['app.url' => 'https://mycompany.web.id/paccing/public']);
+
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+    $response = app(LoginResponseContract::class)->toResponse(
+        Illuminate\Http\Request::create('/admin/login', 'POST')
+    );
+
+    expect($response->getTargetUrl())->toBe('https://mycompany.web.id/paccing/public/admin');
 });
 
 it('password salah menampilkan error, tidak login', function () {
