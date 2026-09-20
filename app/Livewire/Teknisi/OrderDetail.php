@@ -10,6 +10,7 @@ use App\Models\Attendance;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\StockItem;
+use App\Models\WorkReport;
 use App\Services\AttendanceService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
@@ -46,6 +47,11 @@ class OrderDetail extends Component
     public $fotoSebelum;
 
     public $fotoSesudah;
+
+    /** Foto pengganti utk "Perbarui Foto Laporan" (setelah laporan tersubmit). */
+    public $fotoSebelumBaru;
+
+    public $fotoSesudahBaru;
 
     /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] */
     public array $fotoKategori = [];
@@ -108,6 +114,67 @@ class OrderDetail extends Component
         }
 
         return app(TeknisiService::class)->fotoWajibKurang($this->order);
+    }
+
+    /**
+     * Laporan TERAKHIR order ini — target timpa foto sebelum/sesudah utk
+     * blok "Perbarui Foto Laporan" setelah laporan disubmit.
+     */
+    public function getLaporanTerakhirProperty(): ?WorkReport
+    {
+        return $this->order->workReports->sortByDesc('id')->first();
+    }
+
+    /**
+     * Ganti foto sebelum/sesudah laporan yang SUDAH tersubmit (mis. hasilnya
+     * ternyata blur setelah dicek admin). Kuota dicek dulu sebelum file
+     * disimpan ke disk, sama seperti submit laporan biasa.
+     */
+    public function simpanPerbaikanFoto(): void
+    {
+        $this->validate([
+            'fotoSebelumBaru' => ['nullable', 'image', 'max:5120'],
+            'fotoSesudahBaru' => ['nullable', 'image', 'max:5120'],
+        ]);
+
+        if ($this->fotoSebelumBaru === null && $this->fotoSesudahBaru === null) {
+            $this->addError('fotoSebelumBaru', 'Pilih minimal satu foto untuk diperbarui.');
+
+            return;
+        }
+
+        $tambahBytes = (int) ($this->fotoSebelumBaru?->getSize() ?? 0)
+            + (int) ($this->fotoSesudahBaru?->getSize() ?? 0);
+
+        try {
+            if ($tambahBytes > 0) {
+                app(StorageQuotaService::class)->pastikanCukup($tambahBytes);
+            }
+        } catch (BusinessRuleException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        try {
+            app(TeknisiService::class)->perbaruiFotoLaporan(
+                $this->order,
+                auth()->user(),
+                $this->fotoSebelumBaru?->store('work-reports', 'public'),
+                $this->fotoSesudahBaru?->store('work-reports', 'public'),
+            );
+            StorageQuotaService::lupakanCache();
+
+            // Relasi workReports di memori masih menyimpan laporan lama —
+            // lepas dulu supaya galeri/ressor di bawah ikut re-query (Livewire
+            // meng-cache computed property getOrder() selama satu request).
+            $this->order->unsetRelation('workReports');
+
+            session()->flash('status', 'Foto laporan diperbarui.');
+            $this->reset(['fotoSebelumBaru', 'fotoSesudahBaru']);
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     public function lengkapiFotoWajib(): void

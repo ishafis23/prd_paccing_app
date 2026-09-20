@@ -20,6 +20,7 @@ use App\Models\WorkReportPhoto;
 use App\Support\FotoLaporanSlot;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class TeknisiService
 {
@@ -371,6 +372,56 @@ class TeknisiService
         $this->catatFotoKategori($report, $baris);
 
         return $report->fresh('photos');
+    }
+
+    /**
+     * Ganti foto sebelum/sesudah pada laporan TERAKHIR yang laporannya
+     * SUDAH tersubmit (mis. hasilnya ternyata blur setelah dicek admin).
+     * Order harus selesai/butuh_followup; foto lama di disk dihapus saat
+     * diganti. Foto kategori tetap lewat lengkapiFotoWajib().
+     */
+    public function perbaruiFotoLaporan(Order $order, User $teknisi, ?string $fotoSebelum, ?string $fotoSesudah): WorkReport
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (! in_array($order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
+            throw new BusinessRuleException('Foto laporan hanya bisa diperbarui setelah laporan disubmit.');
+        }
+
+        if ($fotoSebelum === null && $fotoSesudah === null) {
+            throw new BusinessRuleException('Pilih minimal satu foto untuk diperbarui.');
+        }
+
+        $report = $order->workReports()->latest('id')->first();
+        if ($report === null) {
+            throw new BusinessRuleException('Belum ada laporan tersimpan utk order ini.');
+        }
+
+        if (filled($fotoSebelum) || filled($fotoSesudah)) {
+            $quota = app(StorageQuotaService::class);
+            if ($quota->pakaiBytes(segar: true) >= $quota->kuotaBytes()) {
+                throw new BusinessRuleException('Penyimpanan foto penuh — foto tidak bisa dilampirkan. Hubungi admin untuk menaikkan kuota.');
+            }
+        }
+
+        if (filled($fotoSebelum) && $fotoSebelum !== $report->foto_sebelum) {
+            if (filled($report->foto_sebelum)) {
+                Storage::disk('public')->delete($report->foto_sebelum);
+            }
+            $report->foto_sebelum = $fotoSebelum;
+        }
+
+        if (filled($fotoSesudah) && $fotoSesudah !== $report->foto_sesudah) {
+            if (filled($report->foto_sesudah)) {
+                Storage::disk('public')->delete($report->foto_sesudah);
+            }
+            $report->foto_sesudah = $fotoSesudah;
+        }
+
+        $report->save();
+
+        return $report->fresh();
     }
 
     /**

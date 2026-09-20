@@ -2,11 +2,16 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Exceptions\BusinessRuleException;
+use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\WorkReport;
+use App\Services\TeknisiService;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -78,4 +83,75 @@ it('resi publik menampilkan foto pengerjaan', function () {
         ->assertSuccessful()
         ->assertSee('storage/work-reports/sebelum.jpg')
         ->assertSee('storage/work-reports/sesudah.jpg');
+});
+
+it('teknisi melihat blok "Perbarui Foto Laporan" setelah laporan disubmit', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+
+    $this->actingAs($teknisi)
+        ->get("/teknisi/order/{$order->id}")
+        ->assertSuccessful()
+        ->assertSee('Perbarui Foto Laporan')
+        ->assertSee('Ganti Foto Sebelum')
+        ->assertSee('Ganti Foto Sesudah');
+});
+
+it('area foto teknisi memakai height yang lebih besar (h-44 preview, h-56 galeri)', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+
+    $this->actingAs($teknisi)
+        ->get("/teknisi/order/{$order->id}")
+        ->assertSuccessful()
+        ->assertSee('h-44')
+        ->assertSee('h-56');
+});
+
+it('perbaruiFotoLaporan mengganti foto sebelum laporan terakhir & menghapus file lama', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+    Storage::disk('public')->put('work-reports/sebelum-baru.jpg', 'foto-baru');
+
+    app(TeknisiService::class)->perbaruiFotoLaporan(
+        $order->fresh(),
+        $teknisi,
+        'work-reports/sebelum-baru.jpg',
+        null,
+    );
+
+    $laporan = $order->workReports()->latest('id')->first();
+    expect($laporan->foto_sebelum)->toBe('work-reports/sebelum-baru.jpg');
+    expect($laporan->foto_sesudah)->toBe('work-reports/sesudah.jpg');
+    Storage::disk('public')->assertMissing('work-reports/sebelum.jpg');
+});
+
+it('perbaruiFotoLaporan ditolak kalau laporan belum pernah disubmit', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+
+    app(TeknisiService::class)->perbaruiFotoLaporan($order, $teknisi, 'work-reports/x.jpg', null);
+})->throws(BusinessRuleException::class, 'setelah laporan disubmit');
+
+it('perbaruiFotoLaporan ditolak kalau tidak ada satu pun foto pengganti', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+
+    app(TeknisiService::class)->perbaruiFotoLaporan($order->fresh(), $teknisi, null, null);
+})->throws(BusinessRuleException::class, 'minimal satu foto');
+
+it('form teknisi bisa mengunggah foto pengganti sebelum setelah laporan disubmit', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->set('fotoSebelumBaru', UploadedFile::fake()->image('sebelum-baru.jpg'))
+        ->call('simpanPerbaikanFoto')
+        ->assertOk();
+
+    $laporan = $order->workReports()->latest('id')->first();
+    expect($laporan->foto_sebelum)->not->toBe('work-reports/sebelum.jpg');
+    Storage::disk('public')->assertExists($laporan->foto_sebelum);
+    Storage::disk('public')->assertMissing('work-reports/sebelum.jpg');
 });

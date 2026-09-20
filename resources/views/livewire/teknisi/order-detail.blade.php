@@ -179,7 +179,7 @@
                     <x-heroicon-o-camera class="h-5 w-5" /> Titik Pertama Hari Ini (Games 2)
                 </p>
                 <p class="mb-3 text-xs text-gray-500">Ini check-in pertama Anda hari ini — upload foto bukti (mis. buka cover AC indoor) sebelum geser check-in.</p>
-                <div x-data="cameraUpload('fotoTitikPertama')" class="relative h-32 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+                <div x-data="cameraUpload('fotoTitikPertama')" class="relative h-44 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
                     <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                         <template x-if="!preview">
                             <div class="flex flex-col items-center">
@@ -342,7 +342,7 @@
                                 <div class="grid grid-cols-2 gap-2">
                                     @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
                                         <div x-data="cameraUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}')">
-                                            <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
+                                            <label class="relative flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
                                                 <template x-if="!uploading">
                                                     <div class="flex flex-col items-center">
                                                         <x-heroicon-o-camera class="h-5 w-5" />
@@ -381,7 +381,7 @@
             <div>
                 <label class="mb-2 block text-sm font-semibold text-gray-700">Sertakan Foto <span class="font-normal text-gray-400">(opsional, JPG/PNG maks 5 MB)</span></label>
                 <div class="grid grid-cols-2 gap-3">
-                    <div x-data="cameraUpload('fotoSebelum')" class="relative h-28 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+                    <div x-data="cameraUpload('fotoSebelum')" class="relative h-44 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
                         <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                             <template x-if="!preview">
                                 <div class="flex flex-col items-center">
@@ -404,7 +404,7 @@
                         </div>
                         <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
                     </div>
-                    <div x-data="cameraUpload('fotoSesudah')" class="relative h-28 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+                    <div x-data="cameraUpload('fotoSesudah')" class="relative h-44 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
                         <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
                             <template x-if="!preview">
                                 <div class="flex flex-col items-center">
@@ -452,6 +452,83 @@
         </form>
     @endif
 
+    {{-- Ganti foto sebelum/sesudah laporan yang SUDAH tersubmit (mis. hasilnya
+         ternyata blur setelah dicek admin). Bekerja pada laporan terakhir. --}}
+    @if (in_array($order->status, [$orderStatus::Selesai, $orderStatus::ButuhFollowup])
+        && $this->laporanTerakhir
+        && (filled($this->laporanTerakhir->foto_sebelum) || filled($this->laporanTerakhir->foto_sesudah)))
+        <div class="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <h2 class="flex items-center gap-2 font-bold text-gray-900">
+                <x-heroicon-o-photo class="h-5 w-5 text-blue-600" /> Perbarui Foto Laporan
+            </h2>
+            <p class="text-xs text-gray-400">Foto baru langsung menimpa foto pada laporan terakhir &amp; tampil di resi customer.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    @if (filled($this->laporanTerakhir->foto_sebelum))
+                        <img src="{{ asset('storage/'.ltrim($this->laporanTerakhir->foto_sebelum, '/')) }}"
+                            alt="Foto sebelum pengerjaan {{ $order->customer->nama }}"
+                            class="h-44 w-full rounded-xl object-cover ring-1 ring-gray-100">
+                    @else
+                        <div class="flex h-44 w-full items-center justify-center rounded-xl bg-gray-50 text-xs text-gray-400 ring-1 ring-gray-100">Belum ada foto sebelum</div>
+                    @endif
+                    <div x-data="cameraUpload('fotoSebelumBaru')" class="mt-2">
+                        <label class="relative flex h-32 flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 text-center text-gray-400">
+                            <template x-if="!preview">
+                                <div class="flex flex-col items-center">
+                                    <x-heroicon-o-camera class="h-6 w-6" />
+                                    <span class="mt-1 text-xs">Ganti Foto Sebelum</span>
+                                </div>
+                            </template>
+                            <img x-show="preview" :src="preview" alt="Pratinjau foto sebelum baru"
+                                class="absolute inset-0 h-full w-full object-cover">
+                            <input type="file" accept="image/*" capture="environment"
+                                x-on:change="onFile($event)"
+                                class="absolute inset-0 cursor-pointer opacity-0">
+                        </label>
+                        <div x-show="uploading" class="mt-1 text-center text-xs text-gray-400">
+                            Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>...
+                        </div>
+                        <p x-show="error" x-text="error" class="mt-1 text-xs text-rose-600"></p>
+                    </div>
+                    @error('fotoSebelumBaru') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    @if (filled($this->laporanTerakhir->foto_sesudah))
+                        <img src="{{ asset('storage/'.ltrim($this->laporanTerakhir->foto_sesudah, '/')) }}"
+                            alt="Foto sesudah pengerjaan {{ $order->customer->nama }}"
+                            class="h-44 w-full rounded-xl object-cover ring-1 ring-gray-100">
+                    @else
+                        <div class="flex h-44 w-full items-center justify-center rounded-xl bg-gray-50 text-xs text-gray-400 ring-1 ring-gray-100">Belum ada foto sesudah</div>
+                    @endif
+                    <div x-data="cameraUpload('fotoSesudahBaru')" class="mt-2">
+                        <label class="relative flex h-32 flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 text-center text-gray-400">
+                            <template x-if="!preview">
+                                <div class="flex flex-col items-center">
+                                    <x-heroicon-o-camera class="h-6 w-6" />
+                                    <span class="mt-1 text-xs">Ganti Foto Sesudah</span>
+                                </div>
+                            </template>
+                            <img x-show="preview" :src="preview" alt="Pratinjau foto sesudah baru"
+                                class="absolute inset-0 h-full w-full object-cover">
+                            <input type="file" accept="image/*" capture="environment"
+                                x-on:change="onFile($event)"
+                                class="absolute inset-0 cursor-pointer opacity-0">
+                        </label>
+                        <div x-show="uploading" class="mt-1 text-center text-xs text-gray-400">
+                            Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>...
+                        </div>
+                        <p x-show="error" x-text="error" class="mt-1 text-xs text-rose-600"></p>
+                    </div>
+                    @error('fotoSesudahBaru') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            <button type="button" wire:click="simpanPerbaikanFoto" wire:loading.attr="disabled"
+                class="w-full rounded-full bg-blue-600 py-3 font-bold text-white shadow-md shadow-blue-200 active:bg-blue-700">
+                Simpan Foto
+            </button>
+        </div>
+    @endif
+
     @if ($order->status === $orderStatus::Selesai)
         <div class="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
             <p class="flex items-center gap-2 font-bold text-emerald-700">
@@ -480,7 +557,7 @@
             <div class="mt-3 grid grid-cols-2 gap-2">
                 @foreach ($this->fotoWajibKurang as $kurang)
                     <div x-data="cameraUpload('fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}')">
-                        <label class="relative flex h-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
+                        <label class="relative flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
                             <template x-if="!uploading">
                                 <div class="flex flex-col items-center">
                                     <x-heroicon-o-camera class="h-5 w-5" />
@@ -776,14 +853,14 @@
                             @if ($lp['sebelum'])
                                 <figure>
                                     <img src="{{ $lp['sebelum'] }}" alt="Foto sebelum pengerjaan {{ $order->customer->nama }}"
-                                        class="h-36 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
+                                        class="h-56 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
                                     <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">Sebelum</figcaption>
                                 </figure>
                             @endif
                             @if ($lp['sesudah'])
                                 <figure>
                                     <img src="{{ $lp['sesudah'] }}" alt="Foto sesudah pengerjaan {{ $order->customer->nama }}"
-                                        class="h-36 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
+                                        class="h-56 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
                                     <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">Sesudah</figcaption>
                                 </figure>
                             @endif
