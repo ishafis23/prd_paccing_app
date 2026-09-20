@@ -780,7 +780,8 @@ class OrderResource extends BaseResource
                     Tables\Actions\DeleteBulkAction::make(),
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('id', 'desc');
     }
 
     public static function getRelations(): array
