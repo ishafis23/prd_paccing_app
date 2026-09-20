@@ -57,10 +57,18 @@ it('Admin membuat order klaim lewat form Filament (B50)', function () {
     Livewire::actingAs($this->admin)
         ->test(CreateOrder::class)
         ->fillForm([
+            'mode_pelanggan' => 'terdaftar',
             'customer_id' => $customer->id,
-            'service_catalog_id' => $catalog->id,
-            'jumlah_unit' => 1,
-            'is_klaim' => true,
+            'jenis_pelanggan' => 'perorangan',
+            'alamat' => [
+                [
+                    'mode' => 'existing',
+                    'is_klaim' => true,
+                    'items' => [
+                        ['unit_mode' => 'tidak_ada', 'service_catalog_id' => $catalog->id, 'jumlah' => 1],
+                    ],
+                ],
+            ],
         ])
         ->call('create')
         ->assertHasNoFormErrors();

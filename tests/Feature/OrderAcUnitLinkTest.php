@@ -133,11 +133,17 @@ it('form Create Order admin bisa memilih unit AC customer', function () {
     Livewire::actingAs($admin)
         ->test(CreateOrder::class)
         ->fillForm([
+            'mode_pelanggan' => 'terdaftar',
             'customer_id' => $customer->id,
-            'service_catalog_id' => $catalog->id,
-            'jumlah_unit' => 1,
-            'customer_ac_unit_id' => $unit->id,
             'jenis_pelanggan' => CustomerJenis::Perorangan->value,
+            'alamat' => [
+                [
+                    'mode' => 'existing',
+                    'items' => [
+                        ['unit_mode' => 'existing', 'customer_ac_unit_id' => $unit->id, 'service_catalog_id' => $catalog->id, 'jumlah' => 1],
+                    ],
+                ],
+            ],
         ])
         ->call('create')
         ->assertHasNoFormErrors();

@@ -10,10 +10,11 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+    $this->seed(RolesAndPermissionsSeeder::class);
     $this->admin = User::factory()->create();
     $this->admin->assignRole(RoleName::Admin->value);
     $this->finance = User::factory()->create();
@@ -29,9 +30,17 @@ it('admin membuat order baru lewat form filament -> lewat OrderService (status b
     Livewire::actingAs($this->admin)
         ->test(CreateOrder::class)
         ->fillForm([
+            'mode_pelanggan' => 'terdaftar',
             'customer_id' => $customer->id,
-            'service_catalog_id' => $catalog->id,
-            'jumlah_unit' => 1,
+            'jenis_pelanggan' => 'perorangan',
+            'alamat' => [
+                [
+                    'mode' => 'existing',
+                    'items' => [
+                        ['unit_mode' => 'tidak_ada', 'service_catalog_id' => $catalog->id, 'jumlah' => 1],
+                    ],
+                ],
+            ],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -49,9 +58,17 @@ it('katalog nonaktif ditolak lewat notifikasi, bukan exception mentah', function
     Livewire::actingAs($this->admin)
         ->test(CreateOrder::class)
         ->fillForm([
+            'mode_pelanggan' => 'terdaftar',
             'customer_id' => $customer->id,
-            'service_catalog_id' => $catalog->id,
-            'jumlah_unit' => 1,
+            'jenis_pelanggan' => 'perorangan',
+            'alamat' => [
+                [
+                    'mode' => 'existing',
+                    'items' => [
+                        ['unit_mode' => 'tidak_ada', 'service_catalog_id' => $catalog->id, 'jumlah' => 1],
+                    ],
+                ],
+            ],
         ])
         ->call('create');
 
