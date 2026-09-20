@@ -2,14 +2,33 @@
 
     @forelse ($orders as $order)
         @php
-            $fotoSesudah = $order->workReports()->orderByDesc('id')->first()?->foto_sesudah;
+            $laporan = $order->workReports->sortByDesc('id')->first();
             $total = number_format((float) $order->total(), 0, ',', '.');
+
+            // Seluruh foto laporan terakhir: sebelum, sesudah, lalu per-kategori.
+            $daftarFoto = collect();
+            if ($laporan) {
+                $daftarFoto = collect()
+                    ->concat($laporan->foto_sebelum ? [['path' => $laporan->foto_sebelum, 'label' => 'Sebelum']] : [])
+                    ->concat($laporan->foto_sesudah ? [['path' => $laporan->foto_sesudah, 'label' => 'Sesudah']] : [])
+                    ->concat(
+                        $laporan->photos
+                            ->sortBy('urutan')
+                            ->map(function ($p) {
+                                $label = \App\Support\FotoLaporanSlot::untuk($p->orderItem?->kategori)[$p->slot] ?? $p->slot;
+
+                                return ['path' => $p->path, 'label' => $label];
+                            })
+                    )
+                    ->values();
+            }
+            $fotoUtama = $daftarFoto->first()['path'] ?? null;
         @endphp
         <a href="{{ url('/teknisi/order/'.$order->id) }}" wire:navigate
             class="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 transition active:scale-[0.99] active:bg-gray-50">
             <div class="flex items-start gap-3">
-                @if ($fotoSesudah)
-                    <img src="{{ asset('storage/'.ltrim($fotoSesudah, '/')) }}" alt="Foto hasil pengerjaan {{ $order->customer->nama }}"
+                @if ($fotoUtama)
+                    <img src="{{ asset('storage/'.ltrim($fotoUtama, '/')) }}" alt="Foto hasil pengerjaan {{ $order->customer->nama }}"
                         class="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-gray-100">
                 @else
                     <x-initials-avatar :name="$order->customer->nama" size="h-16 w-16 text-sm" />
@@ -29,6 +48,24 @@
                     </p>
                 </div>
             </div>
+            @if ($daftarFoto->count() > 1)
+                <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    @foreach ($daftarFoto->take(4) as $foto)
+                        <figure class="w-24 shrink-0">
+                            <img src="{{ asset('storage/'.ltrim($foto['path'], '/')) }}"
+                                alt="{{ $foto['label'] }} {{ $order->customer->nama }}"
+                                class="h-24 w-24 rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
+                            <figcaption class="mt-1 truncate text-center text-[9px] font-medium text-gray-400">{{ $foto['label'] }}</figcaption>
+                        </figure>
+                    @endforeach
+                    @if ($daftarFoto->count() > 4)
+                        <div class="flex h-24 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-gray-50 text-xs font-bold text-gray-400 ring-1 ring-gray-100">
+                            <x-heroicon-o-photo class="h-5 w-5" />
+                            +{{ $daftarFoto->count() - 4 }}
+                        </div>
+                    @endif
+                </div>
+            @endif
             <div class="mt-3 flex items-center justify-between border-t border-dashed border-gray-100 pt-3">
                 <span class="text-xs font-medium text-gray-400">Total Tagihan</span>
                 <span class="text-sm font-extrabold text-gray-900">Rp {{ $total }}</span>
