@@ -7,7 +7,6 @@ use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\WorkReport;
-use App\Models\WorkReportPhoto;
 use App\Services\TeknisiService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
@@ -54,14 +53,16 @@ it('teknisi melihat foto sebelum & sesudah di preview detail order', function ()
         ->assertSee('Foto Pengerjaan');
 });
 
-it('halaman riwayat teknisi menampilkan thumbnail foto sesudah', function () {
+it('halaman riwayat teknisi tidak merender foto laporan di list (ringan, foto cukup dilihat di detail)', function () {
     $teknisi = ($this->mkTeknisi)();
-    fotoOrderSelesai($teknisi);
+    $order = fotoOrderSelesai($teknisi);
 
     $this->actingAs($teknisi)
         ->get('/teknisi/riwayat')
         ->assertSuccessful()
-        ->assertSee('storage/work-reports/sesudah.jpg');
+        ->assertSee($order->customer->nama)
+        ->assertDontSee('storage/work-reports/sebelum.jpg')
+        ->assertDontSee('storage/work-reports/sesudah.jpg');
 });
 
 it('admin melihat foto sebelum & sesudah di detail order', function () {
@@ -166,26 +167,4 @@ it('slot foto per layanan menampilkan elemen preview gambar, bukan cuma teks Ter
         ->assertSuccessful()
         ->assertSee('alt="Pratinjau Foto Tampak Depan Lokasi"', false)
         ->assertSee('alt="Pratinjau Foto Cek Suhu (Indoor)"', false);
-});
-
-it('riwayat teknisi menampilkan galeri foto laporan (sebelum, sesudah, kategori)', function () {
-    $teknisi = ($this->mkTeknisi)();
-    $order = fotoOrderSelesai($teknisi);
-    $item = $order->orderItems->first();
-
-    WorkReportPhoto::create([
-        'work_report_id' => $order->workReports->first()->id,
-        'order_item_id' => $item->id,
-        'slot' => 'foto_tampak_depan_lokasi',
-        'path' => 'work-reports/depan.jpg',
-        'urutan' => 0,
-    ]);
-
-    $this->actingAs($teknisi)
-        ->get('/teknisi/riwayat')
-        ->assertSuccessful()
-        ->assertSee('storage/work-reports/sebelum.jpg')
-        ->assertSee('storage/work-reports/sesudah.jpg')
-        ->assertSee('storage/work-reports/depan.jpg')
-        ->assertSee('Foto Tampak Depan Lokasi');
 });

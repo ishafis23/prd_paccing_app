@@ -16,7 +16,7 @@ class RiwayatPengerjaan extends Component
         $orders = Order::query()
             ->untukTeknisi(auth()->id())
             ->whereIn('status', [OrderStatus::Selesai->value, OrderStatus::ButuhFollowup->value])
-            ->with(['customer', 'serviceCatalog', 'latestPayment', 'workReports.photos.orderItem.acUnit'])
+            ->with(['customer', 'serviceCatalog', 'latestPayment'])
             ->orderByDesc('updated_at')
             ->paginate(10);
 
