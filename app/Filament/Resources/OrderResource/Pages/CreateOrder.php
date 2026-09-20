@@ -164,20 +164,39 @@ class CreateOrder extends CreateRecord
                         Forms\Components\Radio::make('mode')
                             ->label('Alamat')
                             ->options(['existing' => 'Alamat Tersimpan', 'baru' => 'Alamat Baru'])
-                            ->default(fn (Get $get): string => $get('../mode_pelanggan') === 'baru' ? 'baru' : 'existing')
-                            ->visible(fn (Get $get): bool => $get('../mode_pelanggan') !== 'baru')
+                            // ../mode_pelanggan cuma naik 1 hop (lewat index item
+                            // repeater), belum sampai root — sama seperti bug
+                            // customer_address_id di bawah, butuh 2 hop.
+                            ->default(fn (Get $get): string => $get('../../mode_pelanggan') === 'baru' ? 'baru' : 'existing')
+                            ->visible(fn (Get $get): bool => $get('../../mode_pelanggan') !== 'baru')
                             ->inline()
                             ->live(),
 
                         Forms\Components\Select::make('customer_address_id')
                             ->label('Pilih Alamat')
                             ->helperText('Kosongkan utk pakai alamat utama customer.')
-                            ->options(fn (Get $get) => filled($get('../customer_id'))
-                                ? Customer::find($get('../customer_id'))?->addresses()->orderBy('id')->get()
+                            ->options(fn (Get $get) => filled($get('../../customer_id'))
+                                ? Customer::find($get('../../customer_id'))?->addresses()->orderBy('id')->get()
                                     ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()])
                                 : [])
-                            ->searchable()
-                            ->visible(fn (Get $get): bool => $get('../mode_pelanggan') !== 'baru' && $get('mode') !== 'baru')
+                            // Path relatif BUKAN ../customer_id (itu cuma naik 1
+                            // level, lewat index item repeater "alamat" doang,
+                            // masih nyangkut di dalam repeater itu sendiri) —
+                            // tiap "../" cuma buang 1 segmen path (lihat
+                            // HasState::generateRelativeStatePath, beforeLast('.')),
+                            // dan index item repeater ITU SENDIRI adalah 1
+                            // segmen terpisah dari nama repeater-nya. Perlu
+                            // ../../customer_id (2 hop: lewat index item, lalu
+                            // lewat nama repeater "alamat") baru sampai ke root.
+                            // Sebelumnya SELALU null → dropdown ini SELALU kosong
+                            // regardless drop searchable — bug user: alamat
+                            // "kadang tidak otomatis mengisi" (dibuktikan empiris
+                            // via helperText debug, bukan tebakan). Sekalian
+                            // ->searchable() DIHAPUS: opsinya cuma sedikit per
+                            // customer, dan versi remote-search closure begini
+                            // riskan gagal resolve path yg sama saat request AJAX
+                            // pencarian terpisah dari render biasa.
+                            ->visible(fn (Get $get): bool => $get('../../mode_pelanggan') !== 'baru' && $get('mode') !== 'baru')
                             ->live(),
 
                         Forms\Components\Group::make([
@@ -194,7 +213,7 @@ class CreateOrder extends CreateRecord
                                 ->columnSpanFull(),
                         ])
                             ->columns(2)
-                            ->visible(fn (Get $get): bool => $get('../mode_pelanggan') === 'baru' || $get('mode') === 'baru'),
+                            ->visible(fn (Get $get): bool => $get('../../mode_pelanggan') === 'baru' || $get('mode') === 'baru'),
 
                         Forms\Components\Select::make('teknisi_id')
                             ->label('Assign Teknisi (opsional)')
@@ -239,9 +258,31 @@ class CreateOrder extends CreateRecord
                                 Forms\Components\Select::make('customer_ac_unit_id')
                                     ->label('Pilih Unit AC')
                                     ->options(function (Get $get) {
-                                        $customerId = $get('../../customer_id');
-                                        $alamatId = $get('../customer_address_id');
-                                        if (blank($customerId) || blank($alamatId)) {
+                                        // 4 hop ke root customer_id: lewat index
+                                        // item "items", nama repeater "items",
+                                        // index item "alamat", nama repeater
+                                        // "alamat" — dibuktikan empiris lewat
+                                        // helperText debug (bukan tebakan), sama
+                                        // kasus dgn customer_address_id di atas.
+                                        $customerId = $get('../../../../customer_id');
+                                        if (blank($customerId)) {
+                                            return [];
+                                        }
+
+                                        // customer_address_id boleh kosong (admin
+                                        // memilih "pakai alamat utama customer") —
+                                        // fallback ke alamat utama di sini juga,
+                                        // supaya daftar Unit AC tidak ikut kosong
+                                        // gara-gara alamat tidak dipilih eksplisit.
+                                        // 2 hop: lewat index item "items", nama
+                                        // repeater "items" -> sampai level alamat.{i}
+                                        // tempat customer_address_id berada.
+                                        $alamatId = $get('../../customer_address_id');
+                                        if (blank($alamatId)) {
+                                            $alamatId = Customer::find($customerId)?->alamatUtama()?->id;
+                                        }
+
+                                        if (blank($alamatId)) {
                                             return [];
                                         }
 
@@ -251,7 +292,12 @@ class CreateOrder extends CreateRecord
                                             ->get()
                                             ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]);
                                     })
-                                    ->searchable()
+                                    // TANPA ->searchable() — sama seperti
+                                    // customer_address_id di atas: path relatif
+                                    // (../../../../customer_id, ../../customer_address_id)
+                                    // tidak konsisten ke-resolve saat request AJAX
+                                    // pencarian terpisah, daftar unit per alamat
+                                    // selalu pendek.
                                     ->live()
                                     ->visible(fn (Get $get): bool => $get('unit_mode') === 'existing')
                                     ->columnSpanFull(),

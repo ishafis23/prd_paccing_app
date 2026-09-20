@@ -175,3 +175,45 @@ it('mode Pelanggan Terdaftar (default) tetap seperti sebelumnya — tidak ada re
     $order = Order::where('customer_id', $customer->id)->first();
     expect($order)->not->toBeNull();
 });
+
+it('regresi path relatif: field "Pilih Alamat" (Step 2) menampilkan alamat tersimpan customer setelah customer_id dipilih', function () {
+    // Bug 21 Sep 2026: closure options() customer_address_id pakai
+    // "../customer_id" (cuma naik 1 level lewat index item repeater
+    // "alamat") — belum sampai root, jadi SELALU null & dropdown
+    // SELALU kosong walau customer punya alamat tersimpan. Perbaikan:
+    // "../../customer_id" (2 hop: index item + nama repeater).
+    $customer = Customer::factory()->create();
+    CustomerAddress::factory()->create(['customer_id' => $customer->id, 'alamat' => 'Jl. Regresi Path Relatif No. 7']);
+
+    $component = Livewire::actingAs($this->admin)
+        ->test(CreateOrder::class)
+        ->fillForm(['mode_pelanggan' => 'terdaftar', 'customer_id' => $customer->id]);
+
+    $component->assertSee('Jl. Regresi Path Relatif No. 7');
+});
+
+it('regresi path relatif: field "Pilih Unit AC" menampilkan unit tersimpan di alamat customer', function () {
+    $customer = Customer::factory()->create();
+    $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
+    CustomerAcUnit::factory()->create([
+        'customer_id' => $customer->id,
+        'customer_address_id' => $alamat->id,
+        'kode_unit' => 'AC-REGRESI-1',
+    ]);
+
+    $component = Livewire::actingAs($this->admin)
+        ->test(CreateOrder::class)
+        ->fillForm([
+            'mode_pelanggan' => 'terdaftar',
+            'customer_id' => $customer->id,
+            'alamat' => [
+                [
+                    'mode' => 'existing',
+                    'customer_address_id' => $alamat->id,
+                    'items' => [['unit_mode' => 'existing']],
+                ],
+            ],
+        ]);
+
+    $component->assertSee('AC-REGRESI-1');
+});
