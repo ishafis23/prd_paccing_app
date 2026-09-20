@@ -342,8 +342,8 @@
                                 <div class="grid grid-cols-2 gap-2">
                                     @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
                                         <div x-data="cameraUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}')">
-                                            <label class="relative flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
-                                                <template x-if="!uploading">
+                                            <label class="relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
+                                                <template x-if="!preview">
                                                     <div class="flex flex-col items-center">
                                                         <x-heroicon-o-camera class="h-5 w-5" />
                                                         <span class="mt-0.5 px-1 text-[11px]">
@@ -352,14 +352,22 @@
                                                                 <span class="text-rose-500">*Wajib</span>
                                                             @endif
                                                         </span>
-                                                        @if (! empty($fotoKategori[$item->id][$slotKey] ?? null))
-                                                            <span class="mt-0.5 text-[10px] font-bold text-emerald-600">Terpilih</span>
-                                                        @endif
                                                     </div>
                                                 </template>
-                                                <div x-show="uploading" class="flex flex-col items-center">
-                                                    <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
-                                                    <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
+                                                <img x-show="preview" :src="preview" alt="Pratinjau {{ $slotLabel }}"
+                                                    class="absolute inset-0 h-full w-full object-cover">
+                                                <span x-show="preview" x-cloak
+                                                    class="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[9px] leading-tight text-white">
+                                                    {{ $slotLabel }}
+                                                    @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
+                                                        <span class="text-rose-300">* Wajib</span>
+                                                    @endif
+                                                </span>
+                                                <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                                                    <div class="flex flex-col items-center">
+                                                        <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
+                                                        <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
+                                                    </div>
                                                 </div>
                                                 <input type="file" accept="image/*" capture="environment"
                                                     x-on:change="onFile($event)"
@@ -557,16 +565,22 @@
             <div class="mt-3 grid grid-cols-2 gap-2">
                 @foreach ($this->fotoWajibKurang as $kurang)
                     <div x-data="cameraUpload('fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}')">
-                        <label class="relative flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
-                            <template x-if="!uploading">
+                        <label class="relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
+                            <template x-if="!preview">
                                 <div class="flex flex-col items-center">
                                     <x-heroicon-o-camera class="h-5 w-5" />
                                     <span class="mt-0.5 px-1 text-[11px]">{{ $kurang['label'] }}</span>
                                 </div>
                             </template>
-                            <div x-show="uploading" class="flex flex-col items-center">
-                                <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-amber-600" />
-                                <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-amber-600"></span>
+                            <img x-show="preview" :src="preview" alt="Pratinjau {{ $kurang['label'] }}"
+                                class="absolute inset-0 h-full w-full object-cover">
+                            <span x-show="preview" x-cloak
+                                class="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[9px] leading-tight text-white">{{ $kurang['label'] }}</span>
+                            <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                                <div class="flex flex-col items-center">
+                                    <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-amber-600" />
+                                    <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-amber-600"></span>
+                                </div>
                             </div>
                             <input type="file" accept="image/*" capture="environment"
                                 x-on:change="onFile($event)"

@@ -155,3 +155,14 @@ it('form teknisi bisa mengunggah foto pengganti sebelum setelah laporan disubmit
     Storage::disk('public')->assertExists($laporan->foto_sebelum);
     Storage::disk('public')->assertMissing('work-reports/sebelum.jpg');
 });
+
+it('slot foto per layanan menampilkan elemen preview gambar, bukan cuma teks Terpilih', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+
+    $this->actingAs($teknisi)
+        ->get("/teknisi/order/{$order->id}")
+        ->assertSuccessful()
+        ->assertSee('alt="Pratinjau Foto Tampak Depan Lokasi"', false)
+        ->assertSee('alt="Pratinjau Foto Cek Suhu (Indoor)"', false);
+});
