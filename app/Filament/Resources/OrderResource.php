@@ -37,6 +37,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class OrderResource extends BaseResource
 {
@@ -397,7 +398,19 @@ class OrderResource extends BaseResource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(EnumOptions::for(OrderStatus::class)),
                 Tables\Filters\SelectFilter::make('teknisi_id')->label('Teknisi')->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id')),
+                Tables\Filters\SelectFilter::make('team_id')->label('Tim')->options(fn () => Team::where('aktif', true)->pluck('nama', 'id')),
                 Tables\Filters\SelectFilter::make('titik_id')->label('Titik')->options(fn () => Titik::orderBy('urutan')->pluck('nama', 'id')),
+                Tables\Filters\Filter::make('tanggal_jadwal')
+                    ->form([
+                        Forms\Components\DatePicker::make('tanggal_jadwal')->label('Tanggal Jadwal'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        filled($data['tanggal_jadwal'] ?? null),
+                        fn (Builder $q) => $q->whereDate('tanggal_jadwal', $data['tanggal_jadwal']),
+                    ))
+                    ->indicateUsing(fn (array $data): ?string => filled($data['tanggal_jadwal'] ?? null)
+                        ? 'Tanggal: '.Carbon::parse($data['tanggal_jadwal'])->format('d M Y')
+                        : null),
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([

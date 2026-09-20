@@ -3,14 +3,17 @@
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
+use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
+use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Models\Titik;
 use App\Models\User;
 use App\Services\OrderService;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -168,4 +171,20 @@ it('team_id & teknisi_id keduanya kosong -> order tetap baru tanpa PIC (regresi)
 
     expect($orders[0]->status)->toBe(OrderStatus::Baru)
         ->and($orders[0]->teknisi_id)->toBeNull();
+});
+
+it('daftar order bisa difilter berdasarkan Tim & Tanggal Jadwal', function () {
+    $admin = ttUser(RoleName::Admin);
+    $team = Team::factory()->create(['aktif' => true]);
+
+    $ordHariIniTimA = Order::factory()->create(['team_id' => $team->id, 'tanggal_jadwal' => '2026-10-01']);
+    $ordHariIniTimLain = Order::factory()->create(['team_id' => null, 'tanggal_jadwal' => '2026-10-01']);
+    $ordTimAHariLain = Order::factory()->create(['team_id' => $team->id, 'tanggal_jadwal' => '2026-10-02']);
+
+    Livewire::actingAs($admin)
+        ->test(ListOrders::class)
+        ->filterTable('team_id', $team->id)
+        ->filterTable('tanggal_jadwal', ['tanggal_jadwal' => '2026-10-01'])
+        ->assertCanSeeTableRecords([$ordHariIniTimA])
+        ->assertCanNotSeeTableRecords([$ordHariIniTimLain, $ordTimAHariLain]);
 });
