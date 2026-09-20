@@ -7,6 +7,7 @@ use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\WorkReport;
+use App\Models\WorkReportPhoto;
 use App\Services\TeknisiService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
@@ -167,4 +168,45 @@ it('slot foto per layanan menampilkan elemen preview gambar, bukan cuma teks Ter
         ->assertSuccessful()
         ->assertSee('alt="Pratinjau Foto Tampak Depan Lokasi"', false)
         ->assertSee('alt="Pratinjau Foto Cek Suhu (Indoor)"', false);
+});
+
+it('galeri "Foto Pengerjaan" teknisi menampilkan juga foto per kategori', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+    $item = $order->orderItems->first();
+    $laporan = $order->workReports->first();
+
+    WorkReportPhoto::create([
+        'work_report_id' => $laporan->id,
+        'order_item_id' => $item->id,
+        'slot' => 'foto_cek_suhu_indoor',
+        'path' => 'work-reports/cek-suhu.jpg',
+        'urutan' => 5,
+    ]);
+
+    $this->actingAs($teknisi)
+        ->get("/teknisi/order/{$order->id}")
+        ->assertSuccessful()
+        ->assertSee('storage/work-reports/cek-suhu.jpg')
+        ->assertSee('Foto Cek Suhu (Indoor)');
+});
+
+it('resi publik menampilkan juga foto per kategori laporan', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = fotoOrderSelesai($teknisi);
+    $item = $order->orderItems->first();
+    $laporan = $order->workReports->first();
+
+    WorkReportPhoto::create([
+        'work_report_id' => $laporan->id,
+        'order_item_id' => $item->id,
+        'slot' => 'foto_cek_suhu_indoor',
+        'path' => 'work-reports/cek-suhu.jpg',
+        'urutan' => 5,
+    ]);
+
+    $this->get("/resi/{$order->id}/{$order->pastikanResiToken()}")
+        ->assertSuccessful()
+        ->assertSee('storage/work-reports/cek-suhu.jpg')
+        ->assertSee('Foto Cek Suhu (Indoor)');
 });

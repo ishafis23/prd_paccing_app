@@ -26,7 +26,7 @@
     $katalog = $order->serviceCatalog;
     $teknisi = $order->teknisi;
     $pembayaran = $order->latestPayment;
-    $laporan = $order->workReports()->orderByDesc('waktu_selesai')->first();
+    $laporan = $order->workReports()->orderByDesc('waktu_selesai')->with('photos.orderItem')->first();
     $lunas = optional($pembayaran)->status === \App\Enums\PaymentStatus::Lunas;
     $channelAktif = app(\App\Services\PaymentChannelService::class)->daftarAktif();
     $metodeDipilih = $order->metode_dipilih?->value;
@@ -162,25 +162,36 @@
         </div>
     @endunless
 
-    {{-- Dokumentasi pengerjaan (foto dari laporan teknisi) --}}
-    @if ($laporan && (filled($laporan->foto_sebelum) || filled($laporan->foto_sesudah)))
+    {{-- Dokumentasi pengerjaan (semua foto bukti dari laporan teknisi) --}}
+    @php
+        $fotoDokumentasi = collect();
+        if ($laporan) {
+            $fotoDokumentasi = collect()
+                ->concat(filled($laporan->foto_sebelum) ? [['path' => $laporan->foto_sebelum, 'label' => 'Sebelum']] : [])
+                ->concat(filled($laporan->foto_sesudah) ? [['path' => $laporan->foto_sesudah, 'label' => 'Sesudah']] : [])
+                ->concat(
+                    $laporan->photos
+                        ->sortBy('urutan')
+                        ->map(function ($p) {
+                            $label = \App\Support\FotoLaporanSlot::untuk($p->orderItem?->kategori)[$p->slot] ?? $p->slot;
+
+                            return ['path' => $p->path, 'label' => $label];
+                        })
+                )
+                ->values();
+        }
+    @endphp
+    @if ($fotoDokumentasi->isNotEmpty())
         <div class="mt-5">
             <h3 class="text-sm font-bold text-gray-700">Dokumentasi Pengerjaan</h3>
             <div class="mt-2 grid grid-cols-2 gap-3">
-                @if (filled($laporan->foto_sebelum))
+                @foreach ($fotoDokumentasi as $foto)
                     <figure>
-                        <img src="{{ asset('storage/'.ltrim($laporan->foto_sebelum, '/')) }}"
-                             alt="Foto sebelum pengerjaan" class="w-full rounded-lg border border-gray-200 object-cover">
-                        <figcaption class="mt-1 text-center text-xs text-gray-500">Sebelum</figcaption>
+                        <img src="{{ asset('storage/'.ltrim($foto['path'], '/')) }}"
+                             alt="{{ $foto['label'] }} pengerjaan {{ $customer?->nama ?? '' }}" class="w-full rounded-lg border border-gray-200 object-cover">
+                        <figcaption class="mt-1 text-center text-xs text-gray-500">{{ $foto['label'] }}</figcaption>
                     </figure>
-                @endif
-                @if (filled($laporan->foto_sesudah))
-                    <figure>
-                        <img src="{{ asset('storage/'.ltrim($laporan->foto_sesudah, '/')) }}"
-                             alt="Foto sesudah pengerjaan" class="w-full rounded-lg border border-gray-200 object-cover">
-                        <figcaption class="mt-1 text-center text-xs text-gray-500">Sesudah</figcaption>
-                    </figure>
-                @endif
+                @endforeach
             </div>
         </div>
     @endif

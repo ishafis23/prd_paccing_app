@@ -30,16 +30,28 @@
 
         $laporanFoto = $order->workReports
             ->sortByDesc('id')
-            ->filter(fn ($r) => filled($r->foto_sebelum) || filled($r->foto_sesudah))
             ->map(fn ($r) => [
                 'id' => $r->id,
                 'waktu' => $r->waktu_selesai
                     ? \Illuminate\Support\Carbon::parse($r->waktu_selesai)->format('d M Y H:i')
                     : '-',
                 'catatan' => $r->catatan_pengerjaan,
-                'sebelum' => $r->foto_sebelum ? asset('storage/'.ltrim($r->foto_sebelum, '/')) : null,
-                'sesudah' => $r->foto_sesudah ? asset('storage/'.ltrim($r->foto_sesudah, '/')) : null,
+                // Semua bukti pengerjaan: sebelum, sesudah, lalu per-kategori.
+                'fotos' => collect()
+                    ->concat(filled($r->foto_sebelum) ? [['path' => $r->foto_sebelum, 'label' => 'Sebelum']] : [])
+                    ->concat(filled($r->foto_sesudah) ? [['path' => $r->foto_sesudah, 'label' => 'Sesudah']] : [])
+                    ->concat(
+                        $r->photos
+                            ->sortBy('urutan')
+                            ->map(function ($p) {
+                                $label = \App\Support\FotoLaporanSlot::untuk($p->orderItem?->kategori)[$p->slot] ?? $p->slot;
+
+                                return ['path' => $p->path, 'label' => $label];
+                            })
+                    )
+                    ->values(),
             ])
+            ->filter(fn ($lp) => $lp['fotos']->isNotEmpty())
             ->values();
 
         $metodeDipilih = $order->metode_dipilih?->value;
@@ -864,20 +876,13 @@
                             <p class="mt-0.5 text-xs text-gray-500">{{ $lp['catatan'] }}</p>
                         @endif
                         <div class="mt-2 grid grid-cols-2 gap-3">
-                            @if ($lp['sebelum'])
+                            @foreach ($lp['fotos'] as $foto)
                                 <figure>
-                                    <img src="{{ $lp['sebelum'] }}" alt="Foto sebelum pengerjaan {{ $order->customer->nama }}"
+                                    <img src="{{ asset('storage/'.ltrim($foto['path'], '/')) }}" alt="{{ $foto['label'] }} {{ $order->customer->nama }}"
                                         class="h-56 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
-                                    <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">Sebelum</figcaption>
+                                    <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">{{ $foto['label'] }}</figcaption>
                                 </figure>
-                            @endif
-                            @if ($lp['sesudah'])
-                                <figure>
-                                    <img src="{{ $lp['sesudah'] }}" alt="Foto sesudah pengerjaan {{ $order->customer->nama }}"
-                                        class="h-56 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
-                                    <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">Sesudah</figcaption>
-                                </figure>
-                            @endif
+                            @endforeach
                         </div>
                     </div>
                 @endforeach
