@@ -20,7 +20,7 @@ use Illuminate\Http\UploadedFile;
  * Harga & interval tetap dari katalog; admin menambah gambar/deskripsi,
  * toggle tampil, dan urutan. Owner/Admin.
  */
-class LayananBerandaResource extends Resource
+class LayananBerandaResource extends BaseResource
 {
     protected static ?string $model = ServiceCatalog::class;
 

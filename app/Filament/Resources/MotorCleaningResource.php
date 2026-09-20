@@ -17,7 +17,7 @@ use Filament\Tables\Table;
  * read + tambah manual (Admin/HR); pencatatan utama tetap lewat teknisi
  * di menu Absensi.
  */
-class MotorCleaningResource extends Resource
+class MotorCleaningResource extends BaseResource
 {
     protected static ?string $model = MotorCleaning::class;
 

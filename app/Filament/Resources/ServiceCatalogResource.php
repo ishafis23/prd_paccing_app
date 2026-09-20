@@ -13,7 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class ServiceCatalogResource extends Resource
+class ServiceCatalogResource extends BaseResource
 {
     protected static ?string $model = ServiceCatalog::class;
 

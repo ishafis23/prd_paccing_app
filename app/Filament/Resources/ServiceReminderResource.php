@@ -20,7 +20,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class ServiceReminderResource extends Resource
+class ServiceReminderResource extends BaseResource
 {
     protected static ?string $model = ServiceReminder::class;
 

@@ -20,7 +20,7 @@ use Filament\Tables\Table;
  * utk absensi mode GPS — bisa lebih dari 1 aktif sekaligus (B70), absen
  * sah kalau teknisi dalam radius SALAH SATU lokasi aktif.
  */
-class AttendanceLocationResource extends Resource
+class AttendanceLocationResource extends BaseResource
 {
     protected static ?string $model = AttendanceLocation::class;
 

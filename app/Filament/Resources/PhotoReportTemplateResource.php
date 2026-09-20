@@ -21,7 +21,7 @@ use Filament\Tables\Table;
  * tandai wajib per item langsung di tabel, serta tambah item baru tanpa
  * deploy. Menggantikan hardcode `App\Support\FotoLaporanSlot`.
  */
-class PhotoReportTemplateResource extends Resource
+class PhotoReportTemplateResource extends BaseResource
 {
     protected static ?string $model = PhotoReportTemplate::class;
 

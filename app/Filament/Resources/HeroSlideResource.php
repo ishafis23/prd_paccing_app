@@ -17,7 +17,7 @@ use Illuminate\Http\UploadedFile;
 /**
  * Kelola slide hero landing (B38c) — grup Website. Owner/Admin.
  */
-class HeroSlideResource extends Resource
+class HeroSlideResource extends BaseResource
 {
     protected static ?string $model = HeroSlide::class;
 

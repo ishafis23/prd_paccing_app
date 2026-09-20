@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Builder;
  * karena validasi spesifik jenis & otorisasi dijaga di service. Finance hanya
  * melihat; Admin/Owner mengelola.
  */
-class PaymentChannelResource extends Resource
+class PaymentChannelResource extends BaseResource
 {
     protected static ?string $model = PaymentChannel::class;
 

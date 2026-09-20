@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * `technician_incentives` — entri otomatis (Games 1/4, denda telat) + entri
  * manual Admin/HR (Games 5/6 sementara, B53) + verifikasi foto (B55).
  */
-class TechnicianIncentiveResource extends Resource
+class TechnicianIncentiveResource extends BaseResource
 {
     protected static ?string $model = TechnicianIncentive::class;
 

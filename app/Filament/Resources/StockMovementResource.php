@@ -11,7 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class StockMovementResource extends Resource
+class StockMovementResource extends BaseResource
 {
     protected static ?string $model = StockMovement::class;
 

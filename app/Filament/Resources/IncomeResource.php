@@ -12,7 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 
 /** Dibuat otomatis oleh PaymentService saat order lunas — read-only. */
-class IncomeResource extends Resource
+class IncomeResource extends BaseResource
 {
     protected static ?string $model = Income::class;
 

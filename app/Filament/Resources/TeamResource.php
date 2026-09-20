@@ -17,7 +17,7 @@ use Filament\Tables\Table;
  * dipilih sekali lalu dipakai berulang lewat aksi "Assign Tim" di Order
  * (beda dari assign satu-satu per order yg sudah ada).
  */
-class TeamResource extends Resource
+class TeamResource extends BaseResource
 {
     protected static ?string $model = Team::class;
 

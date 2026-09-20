@@ -37,7 +37,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 
-class OrderResource extends Resource
+class OrderResource extends BaseResource
 {
     protected static ?string $model = Order::class;
 

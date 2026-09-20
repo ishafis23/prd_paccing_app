@@ -16,7 +16,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 
-class StockItemResource extends Resource
+class StockItemResource extends BaseResource
 {
     protected static ?string $model = StockItem::class;
 

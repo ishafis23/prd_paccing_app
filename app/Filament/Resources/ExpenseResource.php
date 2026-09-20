@@ -14,7 +14,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class ExpenseResource extends Resource
+class ExpenseResource extends BaseResource
 {
     protected static ?string $model = Expense::class;
 

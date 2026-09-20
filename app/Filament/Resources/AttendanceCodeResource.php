@@ -25,7 +25,7 @@ use Illuminate\Support\Str;
  * riwayat kode/QR absensi kantor. Hanya 1 kode `aktif` berlaku sekaligus —
  * "Buat Kode Baru" otomatis menonaktifkan yang lama.
  */
-class AttendanceCodeResource extends Resource
+class AttendanceCodeResource extends BaseResource
 {
     protected static ?string $model = AttendanceCode::class;
 

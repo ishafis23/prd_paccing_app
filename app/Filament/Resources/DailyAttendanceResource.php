@@ -20,7 +20,7 @@ use Filament\Tables\Table;
  * Menu Absensi & Insentif → "Rekap Absensi" (dev-plan/15, §4/§5): daftar
  * absen kantor harian teknisi + override pengecualian denda (B45).
  */
-class DailyAttendanceResource extends Resource
+class DailyAttendanceResource extends BaseResource
 {
     protected static ?string $model = DailyAttendance::class;
 

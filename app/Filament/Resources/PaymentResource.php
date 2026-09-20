@@ -12,7 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 
 /** Read-only — pencatatan pembayaran wajib lewat aksi "Catat Pembayaran" di OrderResource. */
-class PaymentResource extends Resource
+class PaymentResource extends BaseResource
 {
     protected static ?string $model = Payment::class;
 
