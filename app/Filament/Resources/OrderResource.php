@@ -31,8 +31,8 @@ use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -398,383 +398,389 @@ class OrderResource extends BaseResource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make(),
 
-                Tables\Actions\Action::make('suratJalan')
-                    ->label('Surat Jalan')
-                    ->icon('heroicon-o-clipboard-document-list')
-                    ->color('gray')
-                    ->visible(fn (Order $record) => $record->jenis_pelanggan === CustomerJenis::Company
-                        && $record->status !== OrderStatus::Batal)
-                    ->url(fn (Order $record) => route('surat-jalan.show', [$record->id, $record->pastikanSuratJalanToken()]))
-                    ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('suratJalan')
+                        ->label('Surat Jalan')
+                        ->icon('heroicon-o-clipboard-document-list')
+                        ->color('gray')
+                        ->visible(fn (Order $record) => $record->jenis_pelanggan === CustomerJenis::Company
+                            && $record->status !== OrderStatus::Batal)
+                        ->url(fn (Order $record) => route('surat-jalan.show', [$record->id, $record->pastikanSuratJalanToken()]))
+                        ->openUrlInNewTab(),
 
-                Tables\Actions\Action::make('tambahLayanan')
-                    ->label('Tambah Layanan')
-                    ->icon('heroicon-o-plus-circle')
-                    ->color('gray')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal]))
-                    ->modalHeading('Tambah Layanan ke Order')
-                    ->modalDescription('Mis. sparepart pengganti yg sudah disepakati dgn customer (alur "Ada Perbaikan"). Harga diisi manual sesuai hasil nego.')
-                    ->form([
-                        Forms\Components\TextInput::make('nama_layanan')
-                            ->label('Nama Layanan/Sparepart')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\Select::make('kategori')
-                            ->options(EnumOptions::for(ServiceType::class)),
-                        Forms\Components\Select::make('customer_ac_unit_id')
-                            ->label('Unit AC (opsional)')
-                            ->options(fn (Order $record) => CustomerAcUnit::query()
-                                ->where('customer_id', $record->customer_id)
-                                ->get()
-                                ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
-                            ->searchable(),
-                        Forms\Components\TextInput::make('harga')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required()
-                            ->minValue(0),
-                        Forms\Components\TextInput::make('jumlah')
-                            ->numeric()
-                            ->default(1)
-                            ->minValue(1)
-                            ->required(),
-                        Forms\Components\Textarea::make('catatan')
-                            ->columnSpanFull(),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->tambahLayanan($record, $data, auth()->user());
-                            Notification::make()->success()->title('Layanan ditambahkan')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal menambah layanan')->body($e->getMessage())->send();
-                        }
-                    }),
-
-                Tables\Actions\Action::make('setujuiPerbaikan')
-                    ->label('Setujui Perbaikan')
-                    ->icon('heroicon-o-wrench')
-                    ->color('success')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && $record->perbaikan_menunggu_konfirmasi)
-                    ->modalHeading('Setujui Perbaikan')
-                    ->modalDescription(fn (Order $record) => 'Customer setuju atas: '.$record->perbaikan_catatan
-                        .($record->perbaikan_estimasi_harga !== null ? ' (estimasi teknisi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')' : ''))
-                    ->form([
-                        Forms\Components\TextInput::make('nama_layanan')
-                            ->label('Nama Layanan/Sparepart')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\Select::make('kategori')
-                            ->options(EnumOptions::for(ServiceType::class)),
-                        Forms\Components\Select::make('customer_ac_unit_id')
-                            ->label('Unit AC (opsional)')
-                            ->options(fn (Order $record) => CustomerAcUnit::query()
-                                ->where('customer_id', $record->customer_id)
-                                ->get()
-                                ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
-                            ->searchable(),
-                        Forms\Components\TextInput::make('harga')
-                            ->label('Harga hasil deal')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required()
-                            ->minValue(0),
-                        Forms\Components\TextInput::make('jumlah')
-                            ->numeric()
-                            ->default(1)
-                            ->minValue(1)
-                            ->required(),
-                        Forms\Components\Textarea::make('catatan')
-                            ->columnSpanFull(),
-                    ])
-                    ->fillForm(fn (Order $record): array => [
-                        'nama_layanan' => $record->perbaikan_catatan,
-                        'harga' => $record->perbaikan_estimasi_harga,
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->setujuiPerbaikan($record, $data, auth()->user());
-                            Notification::make()->success()->title('Perbaikan disetujui, layanan ditambahkan')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal menyetujui perbaikan')->body($e->getMessage())->send();
-                        }
-                    }),
-
-                Tables\Actions\Action::make('tolakPerbaikan')
-                    ->label('Tolak Perbaikan')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && $record->perbaikan_menunggu_konfirmasi)
-                    ->modalHeading('Tolak Perbaikan')
-                    ->modalDescription(fn (Order $record) => 'Customer tidak setuju atas: '.$record->perbaikan_catatan)
-                    ->form([
-                        Forms\Components\Textarea::make('catatan')->label('Catatan (opsional)')->columnSpanFull(),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->tolakPerbaikan($record, auth()->user(), $data['catatan'] ?? null);
-                            Notification::make()->success()->title('Perbaikan ditolak')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal menolak perbaikan')->body($e->getMessage())->send();
-                        }
-                    }),
-
-                Tables\Actions\Action::make('assignTeknisi')
-                    ->label('Assign Teknisi')
-                    ->icon('heroicon-o-user-plus')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
-                        && $record->teknisi_id === null)
-                    ->modalHeading('Assign Teknisi')
-                    ->modalDescription('Boleh pilih beberapa teknisi. Urutan pilihan menentukan PIC: teknisi PERTAMA menjadi penanggung jawab (PIC), sisanya anggota tim.')
-                    ->form([
-                        Forms\Components\Select::make('teknisi_ids')
-                            ->label('Teknisi')
-                            ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
-                            ->multiple()
-                            ->searchable()
-                            ->required()
-                            ->helperText('Pilih sesuai urutan prioritas: pertama = PIC.'),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        $ids = array_values($data['teknisi_ids']);
-                        $pic = User::findOrFail($ids[0]);
-                        $berhasil = [$pic->name];
-                        $dilewati = [];
-
-                        try {
-                            app(OrderService::class)->assignTechnician($record, $pic, auth()->user());
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal assign PIC')->body($e->getMessage())->send();
-
-                            return;
-                        }
-
-                        foreach (array_slice($ids, 1) as $teknisiId) {
+                    Tables\Actions\Action::make('tambahLayanan')
+                        ->label('Tambah Layanan')
+                        ->icon('heroicon-o-plus-circle')
+                        ->color('gray')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal]))
+                        ->modalHeading('Tambah Layanan ke Order')
+                        ->modalDescription('Mis. sparepart pengganti yg sudah disepakati dgn customer (alur "Ada Perbaikan"). Harga diisi manual sesuai hasil nego.')
+                        ->form([
+                            Forms\Components\TextInput::make('nama_layanan')
+                                ->label('Nama Layanan/Sparepart')
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\Select::make('kategori')
+                                ->options(EnumOptions::for(ServiceType::class)),
+                            Forms\Components\Select::make('customer_ac_unit_id')
+                                ->label('Unit AC (opsional)')
+                                ->options(fn (Order $record) => CustomerAcUnit::query()
+                                    ->where('customer_id', $record->customer_id)
+                                    ->get()
+                                    ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
+                                ->searchable(),
+                            Forms\Components\TextInput::make('harga')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->required()
+                                ->minValue(0),
+                            Forms\Components\TextInput::make('jumlah')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required(),
+                            Forms\Components\Textarea::make('catatan')
+                                ->columnSpanFull(),
+                        ])
+                        ->action(function (Order $record, array $data) {
                             try {
-                                app(OrderService::class)->tambahTeknisi($record, User::findOrFail($teknisiId), auth()->user());
-                                $berhasil[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
-                            } catch (BusinessRuleException|AuthorizationException) {
-                                $dilewati[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                app(OrderService::class)->tambahLayanan($record, $data, auth()->user());
+                                Notification::make()->success()->title('Layanan ditambahkan')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal menambah layanan')->body($e->getMessage())->send();
                             }
-                        }
+                        }),
 
-                        Notification::make()->success()
-                            ->title('Teknisi di-assign')
-                            ->body(implode(', ', $berhasil).($dilewati !== [] ? ' — sudah anggota: '.implode(', ', $dilewati) : ''))
-                            ->send();
-                    }),
-
-                Tables\Actions\Action::make('assignTim')
-                    ->label('Assign Tim')
-                    ->icon('heroicon-o-user-group')
-                    ->color('gray')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
-                        && $record->teknisi_id === null)
-                    ->modalHeading('Assign Tim Teknisi')
-                    ->modalDescription('Pilih tim tetap (dev-plan/12 §3.13) — seluruh anggotanya (termasuk PIC) otomatis ditugaskan ke order ini.')
-                    ->form([
-                        Forms\Components\Select::make('team_id')
-                            ->label('Tim')
-                            ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
-                            ->searchable()
-                            ->required(),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->assignTeam($record, Team::findOrFail($data['team_id']), auth()->user());
-                            Notification::make()->success()->title('Tim di-assign')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal assign tim')->body($e->getMessage())->send();
-                        }
-                    }),
-
-                Tables\Actions\Action::make('gantiPic')
-                    ->label('Ganti PIC')
-                    ->icon('heroicon-o-arrows-right-left')
-                    ->color('warning')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
-                        && $record->teknisi_id !== null)
-                    ->modalHeading('Ganti PIC')
-                    ->modalDescription('Utk teknisi berhalangan di hari-H. Status order TIDAK berubah — attendance terbuka PIC lama (kalau sempat check-in) otomatis ditutup.')
-                    ->form([
-                        Forms\Components\Select::make('teknisi_id')
-                            ->label('PIC Baru')
-                            ->options(fn (Order $record) => User::role(RoleName::Teknisi->value)
-                                ->where('id', '!=', $record->teknisi_id)
-                                ->pluck('name', 'id'))
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Textarea::make('alasan')->label('Alasan (opsional)')->columnSpanFull(),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->gantiPic(
-                                $record,
-                                User::findOrFail($data['teknisi_id']),
-                                auth()->user(),
-                                $data['alasan'] ?? null,
-                            );
-                            Notification::make()->success()->title('PIC diganti')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal ganti PIC')->body($e->getMessage())->send();
-                        }
-                    }),
-
-                Tables\Actions\Action::make('tambahTeknisiTim')
-                    ->label('Tambah Anggota Tim')
-                    ->icon('heroicon-o-user-group')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
-                        && $record->teknisi_id !== null)
-                    ->modalHeading('Tambah Anggota Tim')
-                    ->modalDescription('Order harus punya PIC dulu (Assign Teknisi). Boleh pilih beberapa teknisi sekaligus.')
-                    ->form([
-                        Forms\Components\Select::make('teknisi_ids')
-                            ->label('Teknisi')
-                            ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
-                            ->multiple()
-                            ->searchable()
-                            ->required()
-                            ->helperText('Teknisi yang sudah menjadi anggota tim otomatis dilewati.'),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        $ditambah = [];
-                        $dilewati = [];
-
-                        foreach ($data['teknisi_ids'] as $teknisiId) {
+                    Tables\Actions\Action::make('setujuiPerbaikan')
+                        ->label('Setujui Perbaikan')
+                        ->icon('heroicon-o-wrench')
+                        ->color('success')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && $record->perbaikan_menunggu_konfirmasi)
+                        ->modalHeading('Setujui Perbaikan')
+                        ->modalDescription(fn (Order $record) => 'Customer setuju atas: '.$record->perbaikan_catatan
+                            .($record->perbaikan_estimasi_harga !== null ? ' (estimasi teknisi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')' : ''))
+                        ->form([
+                            Forms\Components\TextInput::make('nama_layanan')
+                                ->label('Nama Layanan/Sparepart')
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\Select::make('kategori')
+                                ->options(EnumOptions::for(ServiceType::class)),
+                            Forms\Components\Select::make('customer_ac_unit_id')
+                                ->label('Unit AC (opsional)')
+                                ->options(fn (Order $record) => CustomerAcUnit::query()
+                                    ->where('customer_id', $record->customer_id)
+                                    ->get()
+                                    ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]))
+                                ->searchable(),
+                            Forms\Components\TextInput::make('harga')
+                                ->label('Harga hasil deal')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->required()
+                                ->minValue(0),
+                            Forms\Components\TextInput::make('jumlah')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required(),
+                            Forms\Components\Textarea::make('catatan')
+                                ->columnSpanFull(),
+                        ])
+                        ->fillForm(fn (Order $record): array => [
+                            'nama_layanan' => $record->perbaikan_catatan,
+                            'harga' => $record->perbaikan_estimasi_harga,
+                        ])
+                        ->action(function (Order $record, array $data) {
                             try {
-                                app(OrderService::class)->tambahTeknisi($record, User::findOrFail($teknisiId), auth()->user());
-                                $ditambah[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
-                            } catch (BusinessRuleException $e) {
-                                $dilewati[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
-                            } catch (AuthorizationException $e) {
-                                $dilewati[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                app(OrderService::class)->setujuiPerbaikan($record, $data, auth()->user());
+                                Notification::make()->success()->title('Perbaikan disetujui, layanan ditambahkan')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal menyetujui perbaikan')->body($e->getMessage())->send();
                             }
-                        }
+                        }),
 
-                        if ($ditambah !== []) {
+                    Tables\Actions\Action::make('tolakPerbaikan')
+                        ->label('Tolak Perbaikan')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && $record->perbaikan_menunggu_konfirmasi)
+                        ->modalHeading('Tolak Perbaikan')
+                        ->modalDescription(fn (Order $record) => 'Customer tidak setuju atas: '.$record->perbaikan_catatan)
+                        ->form([
+                            Forms\Components\Textarea::make('catatan')->label('Catatan (opsional)')->columnSpanFull(),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                app(OrderService::class)->tolakPerbaikan($record, auth()->user(), $data['catatan'] ?? null);
+                                Notification::make()->success()->title('Perbaikan ditolak')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal menolak perbaikan')->body($e->getMessage())->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('assignTeknisi')
+                        ->label('Assign Teknisi')
+                        ->icon('heroicon-o-user-plus')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                            && $record->teknisi_id === null)
+                        ->modalHeading('Assign Teknisi')
+                        ->modalDescription('Boleh pilih beberapa teknisi. Urutan pilihan menentukan PIC: teknisi PERTAMA menjadi penanggung jawab (PIC), sisanya anggota tim.')
+                        ->form([
+                            Forms\Components\Select::make('teknisi_ids')
+                                ->label('Teknisi')
+                                ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
+                                ->multiple()
+                                ->searchable()
+                                ->required()
+                                ->helperText('Pilih sesuai urutan prioritas: pertama = PIC.'),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            $ids = array_values($data['teknisi_ids']);
+                            $pic = User::findOrFail($ids[0]);
+                            $berhasil = [$pic->name];
+                            $dilewati = [];
+
+                            try {
+                                app(OrderService::class)->assignTechnician($record, $pic, auth()->user());
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal assign PIC')->body($e->getMessage())->send();
+
+                                return;
+                            }
+
+                            foreach (array_slice($ids, 1) as $teknisiId) {
+                                try {
+                                    app(OrderService::class)->tambahTeknisi($record, User::findOrFail($teknisiId), auth()->user());
+                                    $berhasil[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                } catch (BusinessRuleException|AuthorizationException) {
+                                    $dilewati[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                }
+                            }
+
                             Notification::make()->success()
-                                ->title('Anggota tim ditambahkan')
-                                ->body('Anggota baru: '.implode(', ', $ditambah))
+                                ->title('Teknisi di-assign')
+                                ->body(implode(', ', $berhasil).($dilewati !== [] ? ' — sudah anggota: '.implode(', ', $dilewati) : ''))
                                 ->send();
-                        }
+                        }),
 
-                        if ($dilewati !== []) {
-                            Notification::make()->warning()
-                                ->title('Sebagian dilewati')
-                                ->body('Sudah menjadi anggota: '.implode(', ', $dilewati))
-                                ->send();
-                        }
-                    }),
+                    Tables\Actions\Action::make('assignTim')
+                        ->label('Assign Tim')
+                        ->icon('heroicon-o-user-group')
+                        ->color('gray')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                            && $record->teknisi_id === null)
+                        ->modalHeading('Assign Tim Teknisi')
+                        ->modalDescription('Pilih tim tetap (dev-plan/12 §3.13) — seluruh anggotanya (termasuk PIC) otomatis ditugaskan ke order ini.')
+                        ->form([
+                            Forms\Components\Select::make('team_id')
+                                ->label('Tim')
+                                ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
+                                ->searchable()
+                                ->required(),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                app(OrderService::class)->assignTeam($record, Team::findOrFail($data['team_id']), auth()->user());
+                                Notification::make()->success()->title('Tim di-assign')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal assign tim')->body($e->getMessage())->send();
+                            }
+                        }),
 
-                Tables\Actions\Action::make('verifikasiLaporan')
-                    ->label('Verifikasi Laporan')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('success')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && $record->workReports->sortByDesc('id')->first()?->sudahDiverifikasi() === false)
-                    ->requiresConfirmation()
-                    ->modalDescription(fn (Order $record) => $record->workReports->sortByDesc('id')->first()?->catatan_pengerjaan)
-                    ->modalHeading('Verifikasi Laporan Pengerjaan')
-                    ->modalSubmitActionLabel('Ya, Verifikasi')
-                    ->action(function (Order $record) {
-                        $laporan = $record->workReports->sortByDesc('id')->first();
+                    Tables\Actions\Action::make('gantiPic')
+                        ->label('Ganti PIC')
+                        ->icon('heroicon-o-arrows-right-left')
+                        ->color('warning')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                            && $record->teknisi_id !== null)
+                        ->modalHeading('Ganti PIC')
+                        ->modalDescription('Utk teknisi berhalangan di hari-H. Status order TIDAK berubah — attendance terbuka PIC lama (kalau sempat check-in) otomatis ditutup.')
+                        ->form([
+                            Forms\Components\Select::make('teknisi_id')
+                                ->label('PIC Baru')
+                                ->options(fn (Order $record) => User::role(RoleName::Teknisi->value)
+                                    ->where('id', '!=', $record->teknisi_id)
+                                    ->pluck('name', 'id'))
+                                ->searchable()
+                                ->required(),
+                            Forms\Components\Textarea::make('alasan')->label('Alasan (opsional)')->columnSpanFull(),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                app(OrderService::class)->gantiPic(
+                                    $record,
+                                    User::findOrFail($data['teknisi_id']),
+                                    auth()->user(),
+                                    $data['alasan'] ?? null,
+                                );
+                                Notification::make()->success()->title('PIC diganti')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal ganti PIC')->body($e->getMessage())->send();
+                            }
+                        }),
 
-                        try {
-                            app(OrderService::class)->verifikasiLaporan($laporan, auth()->user());
-                            Notification::make()->success()->title('Laporan diverifikasi')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal verifikasi')->body($e->getMessage())->send();
-                        }
-                    }),
+                    Tables\Actions\Action::make('tambahTeknisiTim')
+                        ->label('Tambah Anggota Tim')
+                        ->icon('heroicon-o-user-group')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal])
+                            && $record->teknisi_id !== null)
+                        ->modalHeading('Tambah Anggota Tim')
+                        ->modalDescription('Order harus punya PIC dulu (Assign Teknisi). Boleh pilih beberapa teknisi sekaligus.')
+                        ->form([
+                            Forms\Components\Select::make('teknisi_ids')
+                                ->label('Teknisi')
+                                ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
+                                ->multiple()
+                                ->searchable()
+                                ->required()
+                                ->helperText('Teknisi yang sudah menjadi anggota tim otomatis dilewati.'),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            $ditambah = [];
+                            $dilewati = [];
 
-                Tables\Actions\Action::make('catatPembayaran')
-                    ->label('Catat Pembayaran')
-                    ->icon('heroicon-o-banknotes')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Finance->value, RoleName::Owner->value])
-                        && ! in_array($record->status, [OrderStatus::Batal])
-                        && $record->latestPayment?->status?->value !== 'lunas')
-                    ->form([
-                        Forms\Components\Select::make('metode')
-                            ->options(EnumOptions::for(PaymentMethod::class))
-                            ->default(PaymentMethod::Cash->value)
-                            ->required(),
-                        Forms\Components\TextInput::make('jumlah_dibayar')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required()
-                            ->minValue(1),
-                        Forms\Components\DatePicker::make('tanggal_bayar')
-                            ->default(now()),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            $payment = app(PaymentService::class)->recordPayment(
-                                $record,
-                                PaymentMethod::from($data['metode']),
-                                (float) $data['jumlah_dibayar'],
-                                auth()->user(),
-                                $data['tanggal_bayar'] ?? null,
-                            );
-                            Notification::make()->success()->title('Pembayaran tercatat')->body("Status: {$payment->status->value}")->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal mencatat pembayaran')->body($e->getMessage())->send();
-                        }
-                    }),
+                            foreach ($data['teknisi_ids'] as $teknisiId) {
+                                try {
+                                    app(OrderService::class)->tambahTeknisi($record, User::findOrFail($teknisiId), auth()->user());
+                                    $ditambah[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                } catch (BusinessRuleException $e) {
+                                    $dilewati[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                } catch (AuthorizationException $e) {
+                                    $dilewati[] = User::find($teknisiId)?->name ?? "#{$teknisiId}";
+                                }
+                            }
 
-                Tables\Actions\Action::make('jadwalkanUlang')
-                    ->label('Jadwalkan Ulang')
-                    ->icon('heroicon-o-calendar-days')
-                    ->color('warning')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && $record->status === OrderStatus::Terkendala)
-                    ->modalHeading('Jadwalkan Ulang Order')
-                    ->modalDescription(fn (Order $record) => 'Alasan kendala sebelumnya: '.$record->alasan_kendala)
-                    ->form([
-                        Forms\Components\DatePicker::make('tanggal_jadwal')
-                            ->required()
-                            ->default(now()->addDay()),
-                        Forms\Components\TimePicker::make('jam_jadwal'),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->reschedule(
-                                $record,
-                                auth()->user(),
-                                $data['tanggal_jadwal'],
-                                $data['jam_jadwal'] ?? null,
-                            );
-                            Notification::make()->success()->title('Order dijadwalkan ulang')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal menjadwalkan ulang')->body($e->getMessage())->send();
-                        }
-                    }),
+                            if ($ditambah !== []) {
+                                Notification::make()->success()
+                                    ->title('Anggota tim ditambahkan')
+                                    ->body('Anggota baru: '.implode(', ', $ditambah))
+                                    ->send();
+                            }
 
-                Tables\Actions\Action::make('batalkan')
-                    ->label('Batalkan')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                        && in_array($record->status, [OrderStatus::Baru, OrderStatus::Terjadwal, OrderStatus::Terkendala]))
-                    ->form([
-                        Forms\Components\Textarea::make('alasan')->label('Alasan pembatalan'),
-                    ])
-                    ->action(function (Order $record, array $data) {
-                        try {
-                            app(OrderService::class)->cancel($record, auth()->user(), $data['alasan'] ?? null);
-                            Notification::make()->success()->title('Order dibatalkan')->send();
-                        } catch (BusinessRuleException|AuthorizationException $e) {
-                            Notification::make()->danger()->title('Gagal membatalkan order')->body($e->getMessage())->send();
-                        }
-                    }),
-            ])
+                            if ($dilewati !== []) {
+                                Notification::make()->warning()
+                                    ->title('Sebagian dilewati')
+                                    ->body('Sudah menjadi anggota: '.implode(', ', $dilewati))
+                                    ->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('verifikasiLaporan')
+                        ->label('Verifikasi Laporan')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && $record->workReports->sortByDesc('id')->first()?->sudahDiverifikasi() === false)
+                        ->requiresConfirmation()
+                        ->modalDescription(fn (Order $record) => $record->workReports->sortByDesc('id')->first()?->catatan_pengerjaan)
+                        ->modalHeading('Verifikasi Laporan Pengerjaan')
+                        ->modalSubmitActionLabel('Ya, Verifikasi')
+                        ->action(function (Order $record) {
+                            $laporan = $record->workReports->sortByDesc('id')->first();
+
+                            try {
+                                app(OrderService::class)->verifikasiLaporan($laporan, auth()->user());
+                                Notification::make()->success()->title('Laporan diverifikasi')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal verifikasi')->body($e->getMessage())->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('catatPembayaran')
+                        ->label('Catat Pembayaran')
+                        ->icon('heroicon-o-banknotes')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Finance->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Batal])
+                            && $record->latestPayment?->status?->value !== 'lunas')
+                        ->form([
+                            Forms\Components\Select::make('metode')
+                                ->options(EnumOptions::for(PaymentMethod::class))
+                                ->default(PaymentMethod::Cash->value)
+                                ->required(),
+                            Forms\Components\TextInput::make('jumlah_dibayar')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->required()
+                                ->minValue(1),
+                            Forms\Components\DatePicker::make('tanggal_bayar')
+                                ->default(now()),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                $payment = app(PaymentService::class)->recordPayment(
+                                    $record,
+                                    PaymentMethod::from($data['metode']),
+                                    (float) $data['jumlah_dibayar'],
+                                    auth()->user(),
+                                    $data['tanggal_bayar'] ?? null,
+                                );
+                                Notification::make()->success()->title('Pembayaran tercatat')->body("Status: {$payment->status->value}")->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal mencatat pembayaran')->body($e->getMessage())->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('jadwalkanUlang')
+                        ->label('Jadwalkan Ulang')
+                        ->icon('heroicon-o-calendar-days')
+                        ->color('warning')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && $record->status === OrderStatus::Terkendala)
+                        ->modalHeading('Jadwalkan Ulang Order')
+                        ->modalDescription(fn (Order $record) => 'Alasan kendala sebelumnya: '.$record->alasan_kendala)
+                        ->form([
+                            Forms\Components\DatePicker::make('tanggal_jadwal')
+                                ->required()
+                                ->default(now()->addDay()),
+                            Forms\Components\TimePicker::make('jam_jadwal'),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                app(OrderService::class)->reschedule(
+                                    $record,
+                                    auth()->user(),
+                                    $data['tanggal_jadwal'],
+                                    $data['jam_jadwal'] ?? null,
+                                );
+                                Notification::make()->success()->title('Order dijadwalkan ulang')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal menjadwalkan ulang')->body($e->getMessage())->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('batalkan')
+                        ->label('Batalkan')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && in_array($record->status, [OrderStatus::Baru, OrderStatus::Terjadwal, OrderStatus::Terkendala]))
+                        ->form([
+                            Forms\Components\Textarea::make('alasan')->label('Alasan pembatalan'),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                app(OrderService::class)->cancel($record, auth()->user(), $data['alasan'] ?? null);
+                                Notification::make()->success()->title('Order dibatalkan')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal membatalkan order')->body($e->getMessage())->send();
+                            }
+                        }),
+                ])
+                    ->label('Aksi')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->color('gray')
+                    ->button(),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
