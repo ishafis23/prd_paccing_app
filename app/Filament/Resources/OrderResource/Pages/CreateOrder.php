@@ -13,6 +13,8 @@ use App\Models\CustomerAcUnit;
 use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
+use App\Models\Team;
+use App\Models\Titik;
 use App\Models\User;
 use App\Services\CustomerService;
 use App\Services\OrderService;
@@ -25,6 +27,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 
@@ -195,10 +198,19 @@ class CreateOrder extends CreateRecord
 
                         Forms\Components\Select::make('teknisi_id')
                             ->label('Assign Teknisi (opsional)')
+                            ->helperText('Isi salah satu: Assign Teknisi ATAU Assign Tim, bukan keduanya.')
                             ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
                             ->searchable(),
+                        Forms\Components\Select::make('team_id')
+                            ->label('Atau Assign Tim (opsional)')
+                            ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
+                            ->searchable(),
                         Forms\Components\DatePicker::make('tanggal_jadwal'),
-                        Forms\Components\TimePicker::make('jam_jadwal'),
+                        Forms\Components\Select::make('titik_id')
+                            ->label('Titik/Jam Kunjungan')
+                            ->options(fn () => Titik::where('aktif', true)->orderBy('urutan')->get()
+                                ->mapWithKeys(fn (Titik $t) => [$t->id => $t->nama.' ('.Carbon::parse($t->jam)->format('H:i').')']))
+                            ->searchable(),
                         Forms\Components\Toggle::make('is_klaim')
                             ->label('Pekerjaan klaim/garansi (tidak ditagih)'),
                         Forms\Components\Textarea::make('catatan_admin')
@@ -332,9 +344,16 @@ class CreateOrder extends CreateRecord
                                     ? (CustomerAddress::find($blok['customer_address_id'])?->labelTampil() ?? '—')
                                     : '— alamat utama customer —');
 
-                            $teknisi = filled($blok['teknisi_id'] ?? null)
-                                ? User::find($blok['teknisi_id'])?->name
-                                : '— belum di-assign —';
+                            $penanggungJawab = filled($blok['team_id'] ?? null)
+                                ? 'Tim '.(Team::find($blok['team_id'])?->nama ?? '—')
+                                : (filled($blok['teknisi_id'] ?? null)
+                                    ? User::find($blok['teknisi_id'])?->name
+                                    : '— belum di-assign —');
+
+                            $titik = filled($blok['titik_id'] ?? null) ? Titik::find($blok['titik_id']) : null;
+                            $titikLabel = $titik !== null
+                                ? $titik->nama.' ('.Carbon::parse($titik->jam)->format('H:i').')'
+                                : '— belum dipilih —';
 
                             $subtotal = 0.0;
                             $itemsHtml = '';
@@ -355,7 +374,8 @@ class CreateOrder extends CreateRecord
 
                             $html .= '<div class="rounded-lg border p-4 mb-3">'
                                 .'<p class="font-semibold">Alamat '.($i + 1).': '.e($alamatLabel).'</p>'
-                                .'<p class="text-sm opacity-70">Teknisi: '.e($teknisi ?? '—').'</p>'
+                                .'<p class="text-sm opacity-70">Titik: '.e($titikLabel).'</p>'
+                                .'<p class="text-sm opacity-70">Ditugaskan ke: '.e($penanggungJawab ?? '—').'</p>'
                                 .'<ul class="list-disc ml-5 text-sm">'.$itemsHtml.'</ul>'
                                 .'<p class="text-sm font-medium">Subtotal: Rp'.number_format($subtotal, 0, ',', '.').'</p>'
                                 .'</div>';

@@ -31,6 +31,7 @@ class Order extends Model
         'jenis_pelanggan',
         'tanggal_jadwal',
         'jam_jadwal',
+        'titik_id',
         'status',
         'metode_dipilih',
         'bukti_pembayaran',
@@ -102,6 +103,14 @@ class Order extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * Slot jam kunjungan baku (dev-plan/18) — sumber `jam_jadwal` order ini.
+     */
+    public function titik(): BelongsTo
+    {
+        return $this->belongsTo(Titik::class);
     }
 
     public function teknisi(): BelongsTo

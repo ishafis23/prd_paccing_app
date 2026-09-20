@@ -18,6 +18,7 @@ use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
+use App\Models\Titik;
 use App\Models\User;
 use App\Services\CustomerService;
 use App\Services\OrderService;
@@ -376,6 +377,7 @@ class OrderResource extends BaseResource
                     default => 'info',
                 }),
                 Tables\Columns\TextColumn::make('tanggal_jadwal')->date('d M Y')->sortable(),
+                Tables\Columns\TextColumn::make('titik.nama')->label('Titik')->placeholder('—')->sortable(),
                 Tables\Columns\TextColumn::make('total')->label('Total')->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.')),
                 Tables\Columns\TextColumn::make('laporan_status')
                     ->label('Laporan')
@@ -395,6 +397,7 @@ class OrderResource extends BaseResource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(EnumOptions::for(OrderStatus::class)),
                 Tables\Filters\SelectFilter::make('teknisi_id')->label('Teknisi')->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id')),
+                Tables\Filters\SelectFilter::make('titik_id')->label('Titik')->options(fn () => Titik::orderBy('urutan')->pluck('nama', 'id')),
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([

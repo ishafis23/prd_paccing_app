@@ -14,6 +14,7 @@ use App\Models\OrderItem;
 use App\Models\OrderTechnician;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
+use App\Models\Titik;
 use App\Models\User;
 use App\Models\WorkReport;
 use Illuminate\Support\Facades\DB;
@@ -237,10 +238,22 @@ class OrderService
                     $alamat = $customerService->createAddress($customer, $alamatBaru, $creator);
                 }
 
+                if (filled($blok['team_id'] ?? null) && filled($blok['teknisi_id'] ?? null)) {
+                    throw new BusinessRuleException("{$label}: pilih salah satu — Assign Teknisi ATAU Assign Tim, tidak keduanya.");
+                }
+
                 $teknisi = null;
                 if (! empty($blok['teknisi_id'])) {
                     $teknisi = User::findOrFail($blok['teknisi_id']);
                     $this->assertRole($teknisi, [RoleName::Teknisi]);
+                }
+
+                $titik = null;
+                if (filled($blok['titik_id'] ?? null)) {
+                    $titik = Titik::find($blok['titik_id']);
+                    if ($titik === null || ! $titik->aktif) {
+                        throw new BusinessRuleException("{$label}: Titik tidak ditemukan atau nonaktif.");
+                    }
                 }
 
                 $items = array_values($blok['items'] ?? []);
@@ -297,7 +310,8 @@ class OrderService
                     'alamat_pengerjaan' => $alamat?->alamat ?? $customer->alamat,
                     'jenis_pelanggan' => $data['jenis_pelanggan'] ?? $customer->jenis?->value,
                     'tanggal_jadwal' => $blok['tanggal_jadwal'] ?? null,
-                    'jam_jadwal' => $blok['jam_jadwal'] ?? null,
+                    'jam_jadwal' => $titik?->jam,
+                    'titik_id' => $titik?->id,
                     'status' => $teknisi ? OrderStatus::Terjadwal : OrderStatus::Baru,
                     'catatan_admin' => filled($blok['catatan_admin'] ?? null) ? $blok['catatan_admin'] : null,
                     'is_klaim' => $blok['is_klaim'] ?? false,
@@ -317,6 +331,10 @@ class OrderService
 
                 if ($teknisi !== null) {
                     OrderTechnician::create(['order_id' => $order->id, 'teknisi_id' => $teknisi->id]);
+                }
+
+                if (filled($blok['team_id'] ?? null)) {
+                    $order = $this->assignTeam($order, Team::findOrFail($blok['team_id']), $creator);
                 }
 
                 $orders[] = $order->fresh();
