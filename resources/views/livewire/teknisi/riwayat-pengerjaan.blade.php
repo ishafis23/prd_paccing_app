@@ -1,5 +1,26 @@
 <div class="space-y-3 px-4 pt-4">
 
+    <div class="space-y-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <input type="text" wire:model.live.debounce.400ms="cariNama" placeholder="Cari nama customer…"
+            class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-blue-500">
+        <div class="grid grid-cols-2 gap-2">
+            <input type="date" wire:model.live="tanggal"
+                class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-blue-500">
+            <select wire:model.live="jenisLayanan"
+                class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-blue-500">
+                <option value="">Semua Layanan</option>
+                @foreach ($opsiLayanan as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+        @if ($cariNama !== '' || $tanggal !== '' || $jenisLayanan !== '')
+            <button type="button" wire:click="resetFilter" class="text-xs font-semibold text-blue-600">
+                Reset Filter
+            </button>
+        @endif
+    </div>
+
     @forelse ($orders as $order)
         @php
             // List riwayat sengaja TANPA render foto (ringan walau sudah banyak
@@ -35,8 +56,13 @@
             <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
                 <x-heroicon-o-clipboard-document-list class="h-8 w-8 text-blue-300" />
             </span>
-            <p class="mt-4 font-bold text-gray-700">Belum ada riwayat pengerjaan</p>
-            <p class="mt-1 text-sm text-gray-400">Order yang sudah Anda selesaikan akan tercatat di sini.</p>
+            @if ($cariNama !== '' || $tanggal !== '' || $jenisLayanan !== '')
+                <p class="mt-4 font-bold text-gray-700">Tidak ada yang cocok</p>
+                <p class="mt-1 text-sm text-gray-400">Coba ubah/hapus filter di atas.</p>
+            @else
+                <p class="mt-4 font-bold text-gray-700">Belum ada riwayat pengerjaan</p>
+                <p class="mt-1 text-sm text-gray-400">Order yang sudah Anda selesaikan akan tercatat di sini.</p>
+            @endif
         </div>
     @endforelse
 

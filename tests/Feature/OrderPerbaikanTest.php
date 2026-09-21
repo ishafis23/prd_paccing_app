@@ -4,6 +4,7 @@ use App\Enums\OrderStatus;
 use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
+use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\User;
@@ -126,6 +127,44 @@ it('setujuiPerbaikan menolak kalau tidak ada laporan menunggu konfirmasi', funct
     app(OrderService::class)->setujuiPerbaikan($order, ['nama_layanan' => 'X', 'harga' => 1000], $admin);
 })->throws(BusinessRuleException::class, 'Tidak ada laporan perbaikan');
 
+it('setujuiPerbaikan TETAP berhasil walau order sudah selesai/batal sebelum admin sempat menyetujui', function (OrderStatus $statusSetelah) {
+    // Client (dev-plan/teknisi/LIST Portal Teknisi.pdf, poin 2): teknisi
+    // lapor perbaikan lalu keburu klik "Selesaikan Order" sebelum admin
+    // sempat menyetujui — sebelumnya setujuiPerbaikan() ikut ditolak
+    // guard Selesai/Batal milik tambahLayanan() biasa ("Order selesai/
+    // batal tidak bisa ditambah layanan"), padahal perbaikannya sendiri
+    // sudah dilaporkan SAAT order masih aktif.
+    $admin = ($this->mkAdmin)();
+    $teknisi = ($this->mkTeknisi)();
+    $order = ($this->mkOrder)($teknisi, OrderStatus::Dikerjakan);
+    app(TeknisiService::class)->laporPerbaikan($order, $teknisi, 'Kapasitor lemah', 75000);
+
+    $order->status = $statusSetelah;
+    $order->save();
+
+    $item = app(OrderService::class)->setujuiPerbaikan($order, [
+        'nama_layanan' => 'Ganti Kapasitor',
+        'harga' => 75000,
+        'jumlah' => 1,
+    ], $admin);
+
+    expect($item->nama_layanan)->toBe('Ganti Kapasitor')
+        ->and($order->fresh()->perbaikan_menunggu_konfirmasi)->toBeFalse();
+})->with([
+    'selesai' => [OrderStatus::Selesai],
+    'batal' => [OrderStatus::Batal],
+]);
+
+it('tambahLayanan (biasa, bukan lewat setujuiPerbaikan) TETAP menolak order selesai/batal — tidak ikut longgar', function (OrderStatus $status) {
+    $admin = ($this->mkAdmin)();
+    $order = Order::factory()->create(['status' => $status]);
+
+    app(OrderService::class)->tambahLayanan($order, ['nama_layanan' => 'X', 'harga' => 1000], $admin);
+})->with([
+    'selesai' => [OrderStatus::Selesai],
+    'batal' => [OrderStatus::Batal],
+])->throws(BusinessRuleException::class, 'Order selesai/batal tidak bisa ditambah layanan.');
+
 it('tolakPerbaikan membersihkan flag tanpa menambah order_item', function () {
     $admin = ($this->mkAdmin)();
     $teknisi = ($this->mkTeknisi)();
@@ -201,7 +240,7 @@ it('aksi Setujui/Tolak Perbaikan hanya muncul saat order menunggu konfirmasi', f
     $normal = ($this->mkOrder)($teknisi, OrderStatus::Dikerjakan);
 
     Livewire::actingAs($admin)
-        ->test(\App\Filament\Resources\OrderResource\Pages\ListOrders::class)
+        ->test(ListOrders::class)
         ->assertTableActionVisible('setujuiPerbaikan', $menunggu)
         ->assertTableActionVisible('tolakPerbaikan', $menunggu)
         ->assertTableActionHidden('setujuiPerbaikan', $normal)
@@ -215,7 +254,7 @@ it('aksi Setujui Perbaikan via admin table membuat order_item & membersihkan fla
     app(TeknisiService::class)->laporPerbaikan($order, $teknisi, 'Kapasitor lemah', 75000);
 
     Livewire::actingAs($admin)
-        ->test(\App\Filament\Resources\OrderResource\Pages\ListOrders::class)
+        ->test(ListOrders::class)
         ->callTableAction('setujuiPerbaikan', $order, data: [
             'nama_layanan' => 'Ganti Kapasitor',
             'harga' => 75000,
@@ -236,7 +275,7 @@ it('aksi Tolak Perbaikan via admin table membersihkan flag tanpa order_item baru
     $jumlahItemAwal = $order->fresh()->orderItems->count();
 
     Livewire::actingAs($admin)
-        ->test(\App\Filament\Resources\OrderResource\Pages\ListOrders::class)
+        ->test(ListOrders::class)
         ->callTableAction('tolakPerbaikan', $order, data: ['catatan' => 'Customer tidak setuju'])
         ->assertNotified();
 

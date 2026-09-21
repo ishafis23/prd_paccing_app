@@ -531,6 +531,11 @@ class OrderService
             throw new BusinessRuleException('Order selesai/batal tidak bisa ditambah layanan.');
         }
 
+        return $this->buatOrderItem($order, $data, $actor);
+    }
+
+    private function buatOrderItem(Order $order, array $data, User $actor): OrderItem
+    {
         $namaLayanan = trim((string) ($data['nama_layanan'] ?? ''));
         if ($namaLayanan === '') {
             throw new BusinessRuleException('Nama layanan wajib diisi.');
@@ -613,7 +618,13 @@ class OrderService
         }
 
         return DB::transaction(function () use ($order, $data, $actor): OrderItem {
-            $item = $this->tambahLayanan($order, $data, $actor);
+            // TANPA guard Selesai/Batal-nya tambahLayanan() — perbaikan ini
+            // sudah dilaporkan teknisi SAAT order masih aktif, admin cuma
+            // telat menyetujui sampai teknisi keburu klik "Selesaikan
+            // Order" duluan (client: dev-plan/teknisi/LIST Portal
+            // Teknisi.pdf poin 2). Order sudah selesai bukan alasan
+            // menolak sesuatu yg sudah disepakati sebelum order ditutup.
+            $item = $this->buatOrderItem($order, $data, $actor);
 
             $order->perbaikan_menunggu_konfirmasi = false;
             $order->perbaikan_catatan = null;
