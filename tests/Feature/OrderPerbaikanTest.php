@@ -155,15 +155,21 @@ it('setujuiPerbaikan TETAP berhasil walau order sudah selesai/batal sebelum admi
     'batal' => [OrderStatus::Batal],
 ]);
 
-it('tambahLayanan (biasa, bukan lewat setujuiPerbaikan) TETAP menolak order selesai/batal — tidak ikut longgar', function (OrderStatus $status) {
+it('tambahLayanan (biasa) BOLEH utk order selesai (klarifikasi 21 Sep) — beda dgn dulu', function () {
     $admin = ($this->mkAdmin)();
-    $order = Order::factory()->create(['status' => $status]);
+    $order = Order::factory()->create(['status' => OrderStatus::Selesai]);
+
+    $item = app(OrderService::class)->tambahLayanan($order, ['nama_layanan' => 'Tambahan Setelah Selesai', 'harga' => 50000], $admin);
+
+    expect($item->nama_layanan)->toBe('Tambahan Setelah Selesai');
+});
+
+it('tambahLayanan TETAP menolak order batal', function () {
+    $admin = ($this->mkAdmin)();
+    $order = Order::factory()->create(['status' => OrderStatus::Batal]);
 
     app(OrderService::class)->tambahLayanan($order, ['nama_layanan' => 'X', 'harga' => 1000], $admin);
-})->with([
-    'selesai' => [OrderStatus::Selesai],
-    'batal' => [OrderStatus::Batal],
-])->throws(BusinessRuleException::class, 'Order selesai/batal tidak bisa ditambah layanan.');
+})->throws(BusinessRuleException::class, 'dibatalkan tidak bisa ditambah layanan');
 
 it('tolakPerbaikan membersihkan flag tanpa menambah order_item', function () {
     $admin = ($this->mkAdmin)();

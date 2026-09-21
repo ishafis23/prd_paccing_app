@@ -4,6 +4,7 @@ use App\Enums\OrderStatus;
 use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
+use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
@@ -93,25 +94,33 @@ it('tambahLayanan menolak nama kosong, harga negatif, atau bukan admin/owner', f
         ->toThrow(AuthorizationException::class);
 });
 
-it('tambahLayanan menolak order yg sudah selesai/batal', function (OrderStatus $status) {
+it('tambahLayanan BOLEH utk order selesai (klarifikasi 21 Sep 2026)', function () {
     $admin = ($this->mkAdmin)();
-    $order = Order::factory()->create(['status' => $status]);
+    $order = Order::factory()->create(['status' => OrderStatus::Selesai]);
+
+    $item = app(OrderService::class)->tambahLayanan($order, ['nama_layanan' => 'X', 'harga' => 10000], $admin);
+
+    expect($item->nama_layanan)->toBe('X');
+});
+
+it('tambahLayanan menolak order yg sudah batal', function () {
+    $admin = ($this->mkAdmin)();
+    $order = Order::factory()->create(['status' => OrderStatus::Batal]);
 
     app(OrderService::class)->tambahLayanan($order, ['nama_layanan' => 'X', 'harga' => 10000], $admin);
-})->with([
-    [OrderStatus::Selesai],
-    [OrderStatus::Batal],
-])->throws(BusinessRuleException::class);
+})->throws(BusinessRuleException::class);
 
-it('aksi Tambah Layanan di tabel admin tersedia utk order aktif, tersembunyi utk selesai/batal', function () {
+it('aksi Tambah Layanan di tabel admin tersedia utk order aktif & selesai, tersembunyi utk batal', function () {
     $admin = ($this->mkAdmin)();
     $aktif = Order::factory()->create(['status' => OrderStatus::Dikerjakan]);
     $selesai = Order::factory()->create(['status' => OrderStatus::Selesai]);
+    $batal = Order::factory()->create(['status' => OrderStatus::Batal]);
 
     Livewire::actingAs($admin)
-        ->test(\App\Filament\Resources\OrderResource\Pages\ListOrders::class)
+        ->test(ListOrders::class)
         ->assertTableActionVisible('tambahLayanan', $aktif)
-        ->assertTableActionHidden('tambahLayanan', $selesai);
+        ->assertTableActionVisible('tambahLayanan', $selesai)
+        ->assertTableActionHidden('tambahLayanan', $batal);
 });
 
 it('aksi Tambah Layanan via admin table membuat order_item baru', function () {
@@ -119,10 +128,42 @@ it('aksi Tambah Layanan via admin table membuat order_item baru', function () {
     $order = Order::factory()->create(['status' => OrderStatus::Dikerjakan]);
 
     Livewire::actingAs($admin)
-        ->test(\App\Filament\Resources\OrderResource\Pages\ListOrders::class)
+        ->test(ListOrders::class)
         ->callTableAction('tambahLayanan', $order, data: [
             'nama_layanan' => 'Tambah Freon',
             'harga' => 50000,
+            'jumlah' => 1,
+        ])
+        ->assertNotified();
+
+    expect($order->fresh()->orderItems)->toHaveCount(2);
+});
+
+it('aksi Tambah Layanan menampilkan peringatan hanya kalau order sudah selesai', function () {
+    $admin = ($this->mkAdmin)();
+    $aktif = Order::factory()->create(['status' => OrderStatus::Dikerjakan]);
+    $selesai = Order::factory()->create(['status' => OrderStatus::Selesai]);
+
+    Livewire::actingAs($admin)
+        ->test(ListOrders::class)
+        ->mountTableAction('tambahLayanan', $selesai)
+        ->assertSee('Order ini sudah Selesai');
+
+    Livewire::actingAs($admin)
+        ->test(ListOrders::class)
+        ->mountTableAction('tambahLayanan', $aktif)
+        ->assertDontSee('Order ini sudah Selesai');
+});
+
+it('aksi Tambah Layanan via admin table TETAP bisa membuat order_item baru walau order sudah selesai', function () {
+    $admin = ($this->mkAdmin)();
+    $order = Order::factory()->create(['status' => OrderStatus::Selesai]);
+
+    Livewire::actingAs($admin)
+        ->test(ListOrders::class)
+        ->callTableAction('tambahLayanan', $order, data: [
+            'nama_layanan' => 'Tambahan Pasca Selesai',
+            'harga' => 30000,
             'jumlah' => 1,
         ])
         ->assertNotified();

@@ -38,6 +38,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\HtmlString;
 
 class OrderResource extends BaseResource
 {
@@ -431,10 +432,23 @@ class OrderResource extends BaseResource
                         ->icon('heroicon-o-plus-circle')
                         ->color('gray')
                         ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
-                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal]))
+                            && $record->status !== OrderStatus::Batal)
                         ->modalHeading('Tambah Layanan ke Order')
                         ->modalDescription('Mis. sparepart pengganti yg sudah disepakati dgn customer (alur "Ada Perbaikan"). Harga diisi manual sesuai hasil nego.')
                         ->form([
+                            // Klarifikasi 21 Sep 2026: order Selesai BOLEH
+                            // ditambah layanan (mis. customer telepon lagi
+                            // setelah ditutup) — tapi tampilkan peringatan
+                            // dulu, order ini kemungkinan sudah ditagih.
+                            Forms\Components\Placeholder::make('peringatanSelesai')
+                                ->label('')
+                                ->visible(fn (Order $record) => $record->status === OrderStatus::Selesai)
+                                ->content(new HtmlString(
+                                    '<div class="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-amber-200">'
+                                    .'<strong>Order ini sudah Selesai.</strong> Tagihan mungkin sudah dikirim/dibayar customer — '
+                                    .'pastikan sudah dikonfirmasi ulang sebelum menambah layanan, karena total tagihan akan berubah.'
+                                    .'</div>'
+                                )),
                             Forms\Components\TextInput::make('nama_layanan')
                                 ->label('Nama Layanan/Sparepart')
                                 ->required()

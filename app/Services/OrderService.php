@@ -518,17 +518,25 @@ class OrderService
     }
 
     /**
-     * Admin menambah baris layanan ke order yg sedang jalan (dev-plan/13
-     * §1/§2 "Ada Perbaikan") — mis. sparepart pengganti yg disepakati
-     * dgn customer setelah teknisi lapor kebutuhan perbaikan. Harga
-     * SELALU diisi manual (hasil nego per kasus), bukan dari katalog.
+     * Admin menambah baris layanan ke order (dev-plan/13 §1/§2 "Ada
+     * Perbaikan") — mis. sparepart pengganti yg disepakati dgn customer
+     * setelah teknisi lapor kebutuhan perbaikan. Harga SELALU diisi
+     * manual (hasil nego per kasus), bukan dari katalog.
+     *
+     * Order `selesai` BOLEH ditambah layanan (klarifikasi 21 Sep 2026) —
+     * mis. customer telepon lagi setelah order ditutup, atau koreksi
+     * tagihan — UI Filament menampilkan peringatan dulu (lihat
+     * OrderResource) supaya admin sadar order ini sudah final/mungkin
+     * sudah ditagih sebelum menambah. Order `batal` TETAP ditolak —
+     * order yang dibatalkan tidak punya alasan bisnis utk ditambah
+     * layanan baru.
      */
     public function tambahLayanan(Order $order, array $data, User $actor): OrderItem
     {
         $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
 
-        if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
-            throw new BusinessRuleException('Order selesai/batal tidak bisa ditambah layanan.');
+        if ($order->status === OrderStatus::Batal) {
+            throw new BusinessRuleException('Order yang dibatalkan tidak bisa ditambah layanan.');
         }
 
         return $this->buatOrderItem($order, $data, $actor);
