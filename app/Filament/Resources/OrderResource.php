@@ -26,6 +26,7 @@ use App\Services\PaymentService;
 use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
@@ -74,8 +75,8 @@ class OrderResource extends BaseResource
                     ->label('Customer')
                     ->options(fn () => Customer::query()->pluck('nama', 'id'))
                     ->searchable()
-                    ->required(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
-                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
+                    ->required(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
+                    ->visible(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->live()
                     ->afterStateUpdated(function (Forms\Set $set, $state) {
                         $customer = Customer::find($state);
@@ -87,12 +88,12 @@ class OrderResource extends BaseResource
                 Forms\Components\Select::make('customer_address_id')
                     ->label('Alamat (opsional)')
                     ->helperText('Alamat mana yg akan dikerjakan — default alamat utama customer (dev-plan/14).')
-                    ->options(fn (Forms\Get $get) => filled($get('customer_id'))
+                    ->options(fn (Get $get) => filled($get('customer_id'))
                         ? CustomerAddress::query()->where('customer_id', $get('customer_id'))->orderBy('id')->get()
                             ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()])
                         : [])
                     ->searchable()
-                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
+                    ->visible(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->live()
                     ->afterStateUpdated(function (Forms\Set $set, $state) {
                         $alamat = CustomerAddress::find($state);
@@ -103,19 +104,19 @@ class OrderResource extends BaseResource
                 // dev-plan/16, B57/B58: blok "Pelanggan Baru" — nama/no HP/
                 // jenis/area/sumber lead/email + unit AC pertama (opsional).
                 Forms\Components\Section::make('Data Pelanggan Baru')
-                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') === 'baru')
+                    ->visible(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') === 'baru')
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('pelanggan_baru_nama')
                             ->label('Nama')
-                            ->required(fn (Forms\Get $get): bool => $get('mode_pelanggan') === 'baru')
+                            ->required(fn (Get $get): bool => $get('mode_pelanggan') === 'baru')
                             ->maxLength(255),
                         Forms\Components\TextInput::make('pelanggan_baru_no_hp')
                             ->label('No. HP/WA')
-                            ->required(fn (Forms\Get $get): bool => $get('mode_pelanggan') === 'baru')
+                            ->required(fn (Get $get): bool => $get('mode_pelanggan') === 'baru')
                             ->maxLength(20)
                             ->live(onBlur: true)
-                            ->helperText(function (Forms\Get $get): ?string {
+                            ->helperText(function (Get $get): ?string {
                                 $noHp = trim((string) $get('pelanggan_baru_no_hp'));
                                 if ($noHp === '') {
                                     return null;
@@ -136,7 +137,7 @@ class OrderResource extends BaseResource
                         Forms\Components\Select::make('pelanggan_baru_area')
                             ->label('Area')
                             ->options(EnumOptions::for(CustomerArea::class))
-                            ->required(fn (Forms\Get $get): bool => $get('mode_pelanggan') === 'baru'),
+                            ->required(fn (Get $get): bool => $get('mode_pelanggan') === 'baru'),
                         Forms\Components\Select::make('pelanggan_baru_sumber_lead')
                             ->label('Sumber Lead')
                             ->options(EnumOptions::for(LeadSource::class))
@@ -172,7 +173,7 @@ class OrderResource extends BaseResource
                 Forms\Components\Select::make('customer_ac_unit_id')
                     ->label('Unit AC (opsional)')
                     ->helperText('Pilih unit spesifik di ALAMAT terpilih — supaya laporan teknisi menunjuk ke unit yang benar.')
-                    ->options(function (Forms\Get $get) {
+                    ->options(function (Get $get) {
                         return CustomerAcUnit::query()
                             ->where('customer_id', $get('customer_id'))
                             ->when(filled($get('customer_address_id')), fn ($q) => $q->where('customer_address_id', $get('customer_address_id')))
@@ -181,7 +182,7 @@ class OrderResource extends BaseResource
                             ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]);
                     })
                     ->searchable()
-                    ->visible(fn (Forms\Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru'),
+                    ->visible(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru'),
                 Forms\Components\Select::make('teknisi_id')
                     ->label('Assign Teknisi (opsional)')
                     ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
@@ -191,7 +192,7 @@ class OrderResource extends BaseResource
                 Forms\Components\Select::make('jenis_pelanggan')
                     ->label('Jenis Pelanggan')
                     ->options([
-                        CustomerJenis::Perorangan->value => 'Rumahan',
+                        CustomerJenis::Perorangan->value => 'Cust Umum',
                         CustomerJenis::Company->value => 'Instansi',
                     ])
                     ->helperText('Menentukan wajib/tidaknya upload bukti pembayaran oleh teknisi. Default mengikuti data customer, bisa diubah di sini.')
@@ -227,7 +228,7 @@ class OrderResource extends BaseResource
                             ->badge()
                             ->formatStateUsing(fn (?CustomerJenis $state): ?string => match ($state) {
                                 CustomerJenis::Company => 'Instansi',
-                                CustomerJenis::Perorangan => 'Rumahan',
+                                CustomerJenis::Perorangan => 'Cust Umum',
                                 default => null,
                             })
                             ->placeholder('—'),
@@ -737,11 +738,25 @@ class OrderResource extends BaseResource
                                 ->options(EnumOptions::for(PaymentMethod::class))
                                 ->default(PaymentMethod::Cash->value)
                                 ->required(),
+                            Forms\Components\TextInput::make('total_tagihan')
+                                ->label('Total Tagihan')
+                                ->helperText('Default harga katalog. Ubah kalau ada ongkir/material tambahan (naikkan) atau diskon (turunkan).')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->required()
+                                ->minValue(1)
+                                ->live()
+                                ->default(fn (Order $record) => $record->latestPayment?->total_tagihan ?? $record->total()),
                             Forms\Components\TextInput::make('jumlah_dibayar')
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->required()
                                 ->minValue(1),
+                            Forms\Components\Textarea::make('catatan')
+                                ->label('Alasan Penyesuaian')
+                                ->helperText('Wajib diisi karena Total Tagihan diubah dari nilai sebelumnya.')
+                                ->visible(fn (Get $get, Order $record): bool => abs((float) ($get('total_tagihan') ?? 0) - (float) ($record->latestPayment?->total_tagihan ?? $record->total())) > 0.009)
+                                ->required(fn (Get $get, Order $record): bool => abs((float) ($get('total_tagihan') ?? 0) - (float) ($record->latestPayment?->total_tagihan ?? $record->total())) > 0.009),
                             Forms\Components\DatePicker::make('tanggal_bayar')
                                 ->default(now()),
                         ])
@@ -753,6 +768,8 @@ class OrderResource extends BaseResource
                                     (float) $data['jumlah_dibayar'],
                                     auth()->user(),
                                     $data['tanggal_bayar'] ?? null,
+                                    isset($data['total_tagihan']) ? (float) $data['total_tagihan'] : null,
+                                    filled($data['catatan'] ?? null) ? $data['catatan'] : null,
                                 );
                                 Notification::make()->success()->title('Pembayaran tercatat')->body("Status: {$payment->status->value}")->send();
                             } catch (BusinessRuleException|AuthorizationException $e) {

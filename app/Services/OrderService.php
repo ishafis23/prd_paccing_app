@@ -238,14 +238,30 @@ class OrderService
                     $alamat = $customerService->createAddress($customer, $alamatBaru, $creator);
                 }
 
-                if (filled($blok['team_id'] ?? null) && filled($blok['teknisi_id'] ?? null)) {
-                    throw new BusinessRuleException("{$label}: pilih salah satu — Assign Teknisi ATAU Assign Tim, tidak keduanya.");
+                // dev-plan/admin/03 (B80): wizard cuma kirim
+                // teknisi_id (PIC) + pendamping_teknisi_id, ad-hoc per
+                // order — bukan lewat master data Team (Team/"Assign Tim"
+                // tetap ada, tapi cuma sbg aksi terpisah pasca-order-dibuat
+                // di tabel Order/Orderan Harian, lihat assignTeam()).
+                if (filled($blok['pendamping_teknisi_id'] ?? null) && empty($blok['teknisi_id'])) {
+                    throw new BusinessRuleException("{$label}: Pendamping butuh Teknisi/PIC dipilih dulu.");
+                }
+
+                if (filled($blok['pendamping_teknisi_id'] ?? null)
+                    && (int) $blok['pendamping_teknisi_id'] === (int) ($blok['teknisi_id'] ?? 0)) {
+                    throw new BusinessRuleException("{$label}: Pendamping tidak boleh sama dengan Teknisi/PIC.");
                 }
 
                 $teknisi = null;
                 if (! empty($blok['teknisi_id'])) {
                     $teknisi = User::findOrFail($blok['teknisi_id']);
                     $this->assertRole($teknisi, [RoleName::Teknisi]);
+                }
+
+                $pendamping = null;
+                if (! empty($blok['pendamping_teknisi_id'])) {
+                    $pendamping = User::findOrFail($blok['pendamping_teknisi_id']);
+                    $this->assertRole($pendamping, [RoleName::Teknisi]);
                 }
 
                 $titik = null;
@@ -333,8 +349,8 @@ class OrderService
                     OrderTechnician::create(['order_id' => $order->id, 'teknisi_id' => $teknisi->id]);
                 }
 
-                if (filled($blok['team_id'] ?? null)) {
-                    $order = $this->assignTeam($order, Team::findOrFail($blok['team_id']), $creator);
+                if ($pendamping !== null) {
+                    OrderTechnician::create(['order_id' => $order->id, 'teknisi_id' => $pendamping->id]);
                 }
 
                 $orders[] = $order->fresh();

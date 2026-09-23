@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -70,7 +71,7 @@ class CustomerImportService
         }
         $ws->getStyle('A1:I1')->getFont()->setBold(true);
         $ws->getStyle('A1:I1')->getFill()
-            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setRGB('DCE6F1');
         $ws->freezePane('A2');
 
@@ -194,18 +195,21 @@ class CustomerImportService
             if ($nama === '') {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: Nama wajib diisi.";
+
                 continue;
             }
 
             if ($noHp === '') {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: No. HP wajib diisi.";
+
                 continue;
             }
 
             if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: Email tidak valid ({$email}).";
+
                 continue;
             }
 
@@ -213,6 +217,7 @@ class CustomerImportService
             if ($jenis === null) {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: Jenis tidak valid ('{$jenisStr}').";
+
                 continue;
             }
 
@@ -220,6 +225,7 @@ class CustomerImportService
             if ($area === null) {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: Area tidak valid ('{$areaStr}').";
+
                 continue;
             }
 
@@ -227,6 +233,7 @@ class CustomerImportService
             if ($sumber === null) {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: Sumber Lead tidak valid ('{$sumberStr}').";
+
                 continue;
             }
 
@@ -234,6 +241,7 @@ class CustomerImportService
             if ($status === null) {
                 $gagal++;
                 $rincian[] = "Baris {$nomorExcel}: Status tidak valid ('{$statusStr}').";
+
                 continue;
             }
 
@@ -242,6 +250,7 @@ class CustomerImportService
             if ($kunciNoHp !== '' && (isset($noHpTerdaftar[$kunciNoHp]) || isset($noHpDilihat[$kunciNoHp]))) {
                 $dilewati++;
                 $rincian[] = "Baris {$nomorExcel}: No. HP {$noHp} sudah terdaftar — dilewati (data lama tidak diubah).";
+
                 continue;
             }
             $noHpDilihat[$kunciNoHp] = true;
@@ -264,6 +273,13 @@ class CustomerImportService
 
         foreach (array_chunk($antrianInsert, self::UKURAN_CHUNK_INSERT) as $chunk) {
             Customer::query()->insert($chunk);
+        }
+
+        // insert() di atas bulk & tidak memicu Eloquent event, jadi hook
+        // sinkron alamat di Customer::booted() tidak jalan utk baris ini —
+        // backfill eksplisit (dev-plan/admin/03, B76).
+        if ($antrianInsert !== []) {
+            app(CustomerAddressSyncService::class)->backfillMissing();
         }
 
         return compact('berhasil', 'dilewati', 'gagal', 'rincian');

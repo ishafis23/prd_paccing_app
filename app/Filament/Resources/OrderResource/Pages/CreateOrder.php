@@ -13,7 +13,6 @@ use App\Models\CustomerAcUnit;
 use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
-use App\Models\Team;
 use App\Models\Titik;
 use App\Models\User;
 use App\Services\CustomerService;
@@ -32,13 +31,15 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 
 /**
- * Wizard 3-langkah (dev-plan/18): Data Pelanggan -> Alamat & Layanan (bisa
- * >1 titik alamat, tiap titik >1 unit AC + layanan) -> Ringkasan & Total.
- * SATU submission bisa menghasilkan LEBIH DARI SATU Order (1 per alamat,
- * ikut aturan "1 order = 1 kunjungan = 1 alamat" yg sudah baku di
- * OrderService) — lihat OrderService::createOrders(). Form ini di-override
- * di level PAGE (bukan OrderResource::form()) supaya tidak menular ke
- * halaman lain kalau nanti ada Edit Order yg butuh form single-alamat biasa.
+ * Wizard 3-langkah (dev-plan/18, direvisi dev-plan/admin/03): Data
+ * Pelanggan -> Layanan (bisa >1 titik alamat, tiap titik >1 unit AC +
+ * layanan, alamat titik pertama otomatis default alamat utama customer)
+ * -> Ringkasan & Total. SATU submission bisa menghasilkan LEBIH DARI SATU
+ * Order (1 per alamat, ikut aturan "1 order = 1 kunjungan = 1 alamat" yg
+ * sudah baku di OrderService) — lihat OrderService::createOrders(). Form
+ * ini di-override di level PAGE (bukan OrderResource::form()) supaya
+ * tidak menular ke halaman lain kalau nanti ada Edit Order yg butuh form
+ * single-alamat biasa.
  */
 class CreateOrder extends CreateRecord
 {
@@ -90,7 +91,7 @@ class CreateOrder extends CreateRecord
                 Forms\Components\Select::make('jenis_pelanggan')
                     ->label('Jenis Pelanggan')
                     ->options([
-                        'perorangan' => 'Rumahan',
+                        'perorangan' => 'Cust Umum',
                         'company' => 'Instansi',
                     ])
                     ->helperText('Berlaku utk semua alamat di submission ini. Menentukan wajib/tidaknya bukti pembayaran diupload teknisi.')
@@ -147,7 +148,7 @@ class CreateOrder extends CreateRecord
 
     protected function stepAlamatLayanan(): Forms\Components\Wizard\Step
     {
-        return Forms\Components\Wizard\Step::make('Alamat & Layanan')
+        return Forms\Components\Wizard\Step::make('Layanan')
             ->schema([
                 Forms\Components\Repeater::make('alamat')
                     ->label('')
@@ -174,7 +175,7 @@ class CreateOrder extends CreateRecord
 
                         Forms\Components\Select::make('customer_address_id')
                             ->label('Pilih Alamat')
-                            ->helperText('Kosongkan utk pakai alamat utama customer.')
+                            ->helperText('Otomatis terisi alamat utama customer. Ganti kalau order ini di alamat lain.')
                             ->options(fn (Get $get) => filled($get('../../customer_id'))
                                 ? Customer::find($get('../../customer_id'))?->addresses()->orderBy('id')->get()
                                     ->mapWithKeys(fn (CustomerAddress $a) => [$a->id => $a->labelTampil()])
@@ -196,6 +197,18 @@ class CreateOrder extends CreateRecord
                             // customer, dan versi remote-search closure begini
                             // riskan gagal resolve path yg sama saat request AJAX
                             // pencarian terpisah dari render biasa.
+                            //
+                            // ->default() (dev-plan/admin/03, B79): pra-isi
+                            // alamat utama customer supaya dropdown TIDAK
+                            // pernah tampak kosong utk customer yang sudah
+                            // punya alamat tersimpan (akar kebingungan admin
+                            // yg berujung isi Assign Teknisi+Tim sekaligus,
+                            // lihat OrderService::createOrders() guard
+                            // konflik) — admin tetap bebas ganti ke alamat
+                            // lain kalau order ini memang di lokasi berbeda.
+                            ->default(fn (Get $get) => filled($get('../../customer_id'))
+                                ? Customer::find($get('../../customer_id'))?->alamatUtama()?->id
+                                : null)
                             ->visible(fn (Get $get): bool => $get('../../mode_pelanggan') !== 'baru' && $get('mode') !== 'baru')
                             ->live(),
 
@@ -216,13 +229,16 @@ class CreateOrder extends CreateRecord
                             ->visible(fn (Get $get): bool => $get('../../mode_pelanggan') === 'baru' || $get('mode') === 'baru'),
 
                         Forms\Components\Select::make('teknisi_id')
-                            ->label('Assign Teknisi (opsional)')
-                            ->helperText('Isi salah satu: Assign Teknisi ATAU Assign Tim, bukan keduanya.')
+                            ->label('Teknisi/PIC (opsional)')
                             ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
-                            ->searchable(),
-                        Forms\Components\Select::make('team_id')
-                            ->label('Atau Assign Tim (opsional)')
-                            ->options(fn () => Team::where('aktif', true)->pluck('nama', 'id'))
+                            ->searchable()
+                            ->live(),
+                        Forms\Components\Select::make('pendamping_teknisi_id')
+                            ->label('Pendamping (opsional)')
+                            ->helperText('Kalau teknisi ini jalan berdua (rekan sedang sakit/tdk masuk dianggap jalan sendiri, kosongkan).')
+                            ->options(fn (Get $get) => User::role(RoleName::Teknisi->value)
+                                ->when(filled($get('teknisi_id')), fn ($q) => $q->whereKeyNot($get('teknisi_id')))
+                                ->pluck('name', 'id'))
                             ->searchable(),
                         Forms\Components\DatePicker::make('tanggal_jadwal'),
                         Forms\Components\Select::make('titik_id')
@@ -390,11 +406,12 @@ class CreateOrder extends CreateRecord
                                     ? (CustomerAddress::find($blok['customer_address_id'])?->labelTampil() ?? '—')
                                     : '— alamat utama customer —');
 
-                            $penanggungJawab = filled($blok['team_id'] ?? null)
-                                ? 'Tim '.(Team::find($blok['team_id'])?->nama ?? '—')
-                                : (filled($blok['teknisi_id'] ?? null)
-                                    ? User::find($blok['teknisi_id'])?->name
-                                    : '— belum di-assign —');
+                            $penanggungJawab = filled($blok['teknisi_id'] ?? null)
+                                ? (User::find($blok['teknisi_id'])?->name ?? '—')
+                                    .(filled($blok['pendamping_teknisi_id'] ?? null)
+                                        ? ' + '.(User::find($blok['pendamping_teknisi_id'])?->name ?? '—')
+                                        : '')
+                                : '— belum di-assign —';
 
                             $titik = filled($blok['titik_id'] ?? null) ? Titik::find($blok['titik_id']) : null;
                             $titikLabel = $titik !== null

@@ -19,6 +19,7 @@ class Payment extends Model
         'status',
         'total_tagihan',
         'jumlah_dibayar',
+        'catatan',
         'tanggal_bayar',
         'dicatat_oleh',
     ];

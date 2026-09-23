@@ -177,4 +177,36 @@ perubahan keputusan, catat di sini dengan tanggal revisi.
   bisa dipalsukan via fake-GPS app). Mode QR tidak dihapus, admin bisa
   pindah kapan saja. 22 test Pest baru. Lihat
   `19-usulan-mode-absensi-qr-atau-lokasi.md`.
+- 23 September 2026: B75–B80 disetujui & DIEKSEKUSI (revisi Portal Admin
+  dari PDF client — wizard Buat Order, sinkron alamat, Catat Pembayaran).
+  Akar masalah "Pilih Alamat kosong bikin Proses Order error": dua sumber
+  alamat tidak sinkron — `customers.alamat` (field teks "Alamat Utama")
+  vs `customer_addresses` (dev-plan/14, dipakai wizard). **B75/B76**:
+  `CustomerAddressSyncService` — begitu Alamat Utama terisi & customer
+  belum punya `customer_addresses` sama sekali, otomatis dibuatkan 1
+  baris (`is_utama`); dipasang di `CreateCustomer::afterCreate()` &
+  `EditCustomer::afterSave()` (BUKAN `Customer::booted()` — supaya tidak
+  ikut jalan di tiap `Customer::factory()` test/seeder lain), plus
+  `backfillMissing()` dipanggil dari command baru
+  `customers:sync-alamat-utama` (jalankan sekali pasca-deploy utk ~4000
+  customer lama) dan otomatis di ujung `CustomerImportService::import()`
+  (bulk insert Excel melewati Eloquent event). **B77/B78**: "Catat
+  Pembayaran" sekarang punya field "Total Tagihan" yang bisa disesuaikan
+  admin (ongkir/tambahan naik, diskon turun) + "Alasan Penyesuaian"
+  wajib diisi HANYA saat total benar-benar berubah dari nilai
+  sebelumnya (bukan tiap panggilan lanjutan yang melanjutkan penyesuaian
+  lama) — migrasi kolom `payments.catatan`,
+  `PaymentService::recordPayment()` dapat 2 parameter baru. **B79**:
+  dropdown "Pilih Alamat" di wizard sekarang otomatis ter-default ke
+  alamat utama customer (bukan disembunyikan — tetap bisa diganti admin
+  kalau order di alamat lain); step 2 wizard di-rename "Alamat & Layanan"
+  → "Layanan". **B80**: "Assign Teknisi"/"Atau Assign Tim" (yang saling
+  eksklusif & jadi sumber error kalau keduanya keisi) diganti "Teknisi/
+  PIC" + "Pendamping (opsional)" ad-hoc per order (bukan lewat master
+  data Team — Team/`assignTeam()`/aksi "Assign Tim" tabel Order & Orderan
+  Harian TIDAK disentuh, tetap dipakai utk tim tetap terdaftar). Poin 1
+  PDF: label "Jenis Pelanggan" Rumahan → **Cust Umum** di 4 titik tampil
+  (nilai enum `perorangan` tidak berubah). 705 test lulus (termasuk
+  ~25 test baru), Pint bersih di file yang disentuh. Lihat
+  `admin/03-revisi-wizard-order-alamat-pembayaran-23sep.md`.
 - Perubahan setelah tanggal ini harus dicatat di sini.

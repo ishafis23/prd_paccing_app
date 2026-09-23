@@ -25,9 +25,16 @@ class PaymentService
 
     /**
      * Catat pembayaran order (Admin/Finance/Owner).
-     * - Total tagihan selalu mengikuti service_catalog (keputusan B6).
+     * - Total tagihan default mengikuti service_catalog (keputusan B6),
+     *   tapi bisa disesuaikan admin lewat $totalTagihanOverride
+     *   (dev-plan/admin/03, B77 — ongkir/material tambahan tak terduga,
+     *   atau diskon). Kalau order ini sudah punya pembayaran DP
+     *   sebelumnya dgn total yang sudah disesuaikan, penyesuaian itu
+     *   TETAP dipakai di panggilan berikutnya walau $totalTagihanOverride
+     *   tidak diisi lagi (tidak balik ke harga katalog begitu saja).
      * - Income & reminder servis berikutnya dibuat OTOMATIS saat lunas
-     *   (keputusan B5, PRD alur B2).
+     *   (keputusan B5, PRD alur B2), nominalnya ikut total (yang mungkin
+     *   sudah disesuaikan) — bukan selalu harga katalog.
      *
      * @throws BusinessRuleException|AuthorizationException
      */
@@ -36,7 +43,9 @@ class PaymentService
         PaymentMethod $metode,
         float $jumlahDibayar,
         User $by,
-        ?string $tanggalBayar = null
+        ?string $tanggalBayar = null,
+        ?float $totalTagihanOverride = null,
+        ?string $catatan = null
     ): Payment {
         $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
 
@@ -50,7 +59,25 @@ class PaymentService
             throw new BusinessRuleException('Order ini sudah berstatus lunas.');
         }
 
-        $total = $order->total();
+        // Baseline: total yang berlaku SEBELUM panggilan ini — total
+        // pembayaran sebelumnya (kalau sudah pernah disesuaikan) atau
+        // harga katalog kalau belum pernah ada pembayaran sama sekali.
+        $baseline = (float) ($payment?->total_tagihan ?? $order->total());
+        $total = $totalTagihanOverride ?? $baseline;
+
+        if ($total <= 0) {
+            throw new BusinessRuleException('Total tagihan harus lebih dari 0.');
+        }
+
+        // Wajib catatan HANYA saat total BERUBAH dari baseline (bukan
+        // sekadar beda dari harga katalog — panggilan lanjutan yg
+        // melanjutkan penyesuaian sebelumnya tanpa mengubahnya lagi tidak
+        // perlu catatan baru, catatan lama sudah tersimpan di baris
+        // payment yg sama).
+        if (abs($total - $baseline) > 0.009 && blank($catatan)) {
+            throw new BusinessRuleException('Total tagihan disesuaikan — wajib isi alasan penyesuaian.');
+        }
+
         $sudahDibayar = (float) ($payment?->jumlah_dibayar ?? 0);
         $sisa = $total - $sudahDibayar;
 
@@ -70,7 +97,7 @@ class PaymentService
         }
 
         // Semua efek (payment, income, reminder, status order) satu transaksi.
-        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar): Payment {
+        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar, $catatan): Payment {
             $baruDibayar = $sudahDibayar + $jumlahDibayar;
 
             $payment ??= new Payment(['order_id' => $order->id]);
@@ -78,6 +105,10 @@ class PaymentService
             $payment->total_tagihan = $total;
             $payment->jumlah_dibayar = $baruDibayar;
             $payment->dicatat_oleh = $by->id;
+
+            if ($catatan !== null) {
+                $payment->catatan = $catatan;
+            }
 
             if ($baruDibayar >= $total - 0.009) {
                 $payment->status = PaymentStatus::Lunas;
@@ -132,7 +163,7 @@ class PaymentService
                 'kategori' => $kategori,
                 'nominal' => $payment->total_tagihan,
                 'tanggal' => $payment->tanggal_bayar ?? now()->toDateString(),
-                'keterangan' => 'Otomatis dari pembayaran lunas order #' . $order->id,
+                'keterangan' => 'Otomatis dari pembayaran lunas order #'.$order->id,
             ]);
         }
     }

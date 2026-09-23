@@ -54,7 +54,7 @@
                                         $tim = collect([$order->teknisi->name]);
                                     }
                                     $laporan = $order->workReports->sortByDesc('id')->first();
-                                    $jenisPelanggan = $order->jenis_pelanggan?->value === 'company' ? 'Instansi' : 'Rumahan';
+                                    $jenisPelanggan = $order->jenis_pelanggan?->value === 'company' ? 'Instansi' : 'Cust Umum';
                                 @endphp
                                 <tr class="hover:bg-gray-50/60">
                                     <td class="whitespace-nowrap px-4 py-3 font-medium text-gray-700">

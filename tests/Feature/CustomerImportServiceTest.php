@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\RoleName;
+use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\User;
 use App\Services\CustomerImportService;
@@ -8,6 +9,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -75,6 +77,24 @@ it('import baris valid membuat customer dgn default jenis/area/sumber/status', f
     expect($sari->status->value)->toBe('lead'); // default
 });
 
+it('import Excel dgn kolom alamat terisi otomatis bikin customer_addresses (dev-plan/admin/03 B76 — bulk insert lewati Eloquent event)', function () {
+    $admin = ciAdmin();
+
+    $path = ciBuatFile([
+        ['PT Kalla Toyota', 'company', '081234567890', '', 'Jl Mawar 4', 'gowa', '', '', ''],
+        ['Tanpa Alamat', '', '081200000001', '', '', '', '', '', ''],
+    ]);
+
+    app(CustomerImportService::class)->import($path, $admin);
+
+    $adaAlamat = Customer::where('no_hp', '081234567890')->firstOrFail();
+    $tanpaAlamat = Customer::where('no_hp', '081200000001')->firstOrFail();
+
+    expect($adaAlamat->addresses()->count())->toBe(1)
+        ->and($adaAlamat->alamatUtama()->alamat)->toBe('Jl Mawar 4')
+        ->and($tanpaAlamat->addresses()->count())->toBe(0);
+});
+
 it('no_hp duplikat (format beda 0812.../62812...) dilewati, data lama tidak berubah', function () {
     $admin = ciAdmin();
     Customer::factory()->create(['nama' => 'Lama', 'no_hp' => '081234567890']);
@@ -124,7 +144,7 @@ it('menolak file lebih dari MAX_BARIS baris', function () {
     $path = ciBuatFile($baris);
 
     expect(fn () => app(CustomerImportService::class)->import($path, $admin))
-        ->toThrow(\App\Exceptions\BusinessRuleException::class);
+        ->toThrow(BusinessRuleException::class);
 });
 
 it('import ribuan baris (skala nyata ~4000) selesai & tersimpan lengkap', function () {
@@ -149,5 +169,5 @@ it('import ribuan baris (skala nyata ~4000) selesai & tersimpan lengkap', functi
 it('unduh template menghasilkan file xlsx dgn header yg benar', function () {
     $response = app(CustomerImportService::class)->unduhTemplate();
 
-    expect($response)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
+    expect($response)->toBeInstanceOf(StreamedResponse::class);
 });

@@ -93,12 +93,10 @@ it('titik yg tidak ada ditolak', function () {
     ], $admin))->toThrow(BusinessRuleException::class, 'tidak ditemukan');
 });
 
-it('team_id diisi -> seluruh anggota tim tercatat, PIC = pic tim, status terjadwal', function () {
+it('teknisi_id (PIC) + pendamping_teknisi_id diisi -> keduanya tercatat di order_technicians, status terjadwal (dev-plan/admin/03 B80)', function () {
     $admin = ttUser(RoleName::Admin);
     $pic = ttUser(RoleName::Teknisi);
-    $anggota = ttUser(RoleName::Teknisi);
-    $team = Team::factory()->create(['aktif' => true, 'pic_teknisi_id' => $pic->id]);
-    $team->members()->sync([$pic->id, $anggota->id]);
+    $pendamping = ttUser(RoleName::Teknisi);
 
     $customer = Customer::factory()->create();
     $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
@@ -111,7 +109,8 @@ it('team_id diisi -> seluruh anggota tim tercatat, PIC = pic tim, status terjadw
             [
                 'mode' => 'existing',
                 'customer_address_id' => $alamat->id,
-                'team_id' => $team->id,
+                'teknisi_id' => $pic->id,
+                'pendamping_teknisi_id' => $pendamping->id,
                 'items' => [['service_catalog_id' => $catalog->id, 'unit_mode' => 'tidak_ada']],
             ],
         ],
@@ -119,18 +118,14 @@ it('team_id diisi -> seluruh anggota tim tercatat, PIC = pic tim, status terjadw
 
     $order = $orders[0];
     expect($order->teknisi_id)->toBe($pic->id)
-        ->and($order->team_id)->toBe($team->id)
         ->and($order->status)->toBe(OrderStatus::Terjadwal)
         ->and($order->orderTechnicians()->pluck('teknisi_id')->sort()->values()->all())
-        ->toBe(collect([$pic->id, $anggota->id])->sort()->values()->all());
+        ->toBe(collect([$pic->id, $pendamping->id])->sort()->values()->all());
 });
 
-it('team_id & teknisi_id diisi bersamaan -> ditolak', function () {
+it('pendamping_teknisi_id diisi tanpa teknisi_id (PIC) -> ditolak', function () {
     $admin = ttUser(RoleName::Admin);
-    $teknisi = ttUser(RoleName::Teknisi);
-    $pic = ttUser(RoleName::Teknisi);
-    $team = Team::factory()->create(['aktif' => true, 'pic_teknisi_id' => $pic->id]);
-    $team->members()->sync([$pic->id]);
+    $pendamping = ttUser(RoleName::Teknisi);
 
     $customer = Customer::factory()->create();
     $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
@@ -143,12 +138,34 @@ it('team_id & teknisi_id diisi bersamaan -> ditolak', function () {
             [
                 'mode' => 'existing',
                 'customer_address_id' => $alamat->id,
-                'team_id' => $team->id,
-                'teknisi_id' => $teknisi->id,
+                'pendamping_teknisi_id' => $pendamping->id,
                 'items' => [['service_catalog_id' => $catalog->id, 'unit_mode' => 'tidak_ada']],
             ],
         ],
-    ], $admin))->toThrow(BusinessRuleException::class, 'pilih salah satu');
+    ], $admin))->toThrow(BusinessRuleException::class, 'Pendamping butuh Teknisi/PIC');
+});
+
+it('pendamping_teknisi_id sama dengan teknisi_id (PIC) -> ditolak', function () {
+    $admin = ttUser(RoleName::Admin);
+    $teknisi = ttUser(RoleName::Teknisi);
+
+    $customer = Customer::factory()->create();
+    $alamat = CustomerAddress::factory()->create(['customer_id' => $customer->id]);
+    $catalog = ServiceCatalog::factory()->create();
+
+    expect(fn () => $this->orderService->createOrders([
+        'mode_pelanggan' => 'terdaftar',
+        'customer_id' => $customer->id,
+        'alamat' => [
+            [
+                'mode' => 'existing',
+                'customer_address_id' => $alamat->id,
+                'teknisi_id' => $teknisi->id,
+                'pendamping_teknisi_id' => $teknisi->id,
+                'items' => [['service_catalog_id' => $catalog->id, 'unit_mode' => 'tidak_ada']],
+            ],
+        ],
+    ], $admin))->toThrow(BusinessRuleException::class, 'tidak boleh sama');
 });
 
 it('team_id & teknisi_id keduanya kosong -> order tetap baru tanpa PIC (regresi)', function () {
