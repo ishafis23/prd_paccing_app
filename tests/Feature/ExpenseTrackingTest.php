@@ -46,7 +46,7 @@ class ExpenseTrackingTest extends TestCase
         $response->assertStatus(201)
             ->assertJsonStructure(['success', 'data' => ['id', 'teknisi_id', 'status']]);
 
-        $this->assertDatabaseHas('teknis_expenses', [
+        $this->assertDatabaseHas('teknisi_expenses', [
             'teknisi_id' => $this->teknisi->id,
             'kategori' => 'bensin',
             'nominal' => 100000,
@@ -137,7 +137,7 @@ class ExpenseTrackingTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonStructure(['success', 'data' => ['status', 'approved_by']]);
 
-        $this->assertDatabaseHas('teknis_expenses', [
+        $this->assertDatabaseHas('teknisi_expenses', [
             'id' => $expense->id,
             'status' => 'approved',
             'approved_by' => $this->admin->id,
@@ -163,7 +163,7 @@ class ExpenseTrackingTest extends TestCase
 
         $response->assertStatus(200);
 
-        $this->assertDatabaseHas('teknis_expenses', [
+        $this->assertDatabaseHas('teknisi_expenses', [
             'id' => $expense->id,
             'status' => 'rejected',
             'catatan_approval' => 'Receipt not provided',
@@ -264,7 +264,7 @@ class ExpenseTrackingTest extends TestCase
 
         $response->assertStatus(200);
 
-        $this->assertDatabaseMissing('teknis_expenses', ['id' => $expense->id]);
+        $this->assertDatabaseMissing('teknisi_expenses', ['id' => $expense->id]);
     }
 
     /** @test */
@@ -285,6 +285,6 @@ class ExpenseTrackingTest extends TestCase
         $response->assertStatus(422);
 
         // Verify not deleted
-        $this->assertDatabaseHas('teknis_expenses', ['id' => $expense->id]);
+        $this->assertDatabaseHas('teknisi_expenses', ['id' => $expense->id]);
     }
 }

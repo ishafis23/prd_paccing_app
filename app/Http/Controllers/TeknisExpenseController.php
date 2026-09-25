@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TeknisExpense;
+use App\Models\TeknisiExpense;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
@@ -33,7 +33,7 @@ class TeknisExpenseController extends Controller
                 $validated['bukti_file'] = $path;
             }
 
-            $expense = TeknisExpense::create($validated);
+            $expense = TeknisiExpense::create($validated);
 
             return response()->json([
                 'success' => true,
@@ -54,7 +54,7 @@ class TeknisExpenseController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = TeknisExpense::query();
+        $query = TeknisiExpense::query();
 
         // Filter by teknisi if user is not admin
         if (!auth()->user()->isAdmin()) {
@@ -99,7 +99,7 @@ class TeknisExpenseController extends Controller
     /**
      * Get expense detail
      */
-    public function show(TeknisExpense $expense): JsonResponse
+    public function show(TeknisiExpense $expense): JsonResponse
     {
         if (!$this->canView($expense)) {
             return response()->json([
@@ -117,7 +117,7 @@ class TeknisExpenseController extends Controller
     /**
      * Update expense (teknisi only, if still pending)
      */
-    public function update(Request $request, TeknisExpense $expense): JsonResponse
+    public function update(Request $request, TeknisiExpense $expense): JsonResponse
     {
         if (!$this->canEdit($expense)) {
             return response()->json([
@@ -158,7 +158,7 @@ class TeknisExpenseController extends Controller
     /**
      * Delete expense (teknisi only, if still pending)
      */
-    public function destroy(TeknisExpense $expense): JsonResponse
+    public function destroy(TeknisiExpense $expense): JsonResponse
     {
         if (!$this->canEdit($expense)) {
             return response()->json([
@@ -193,7 +193,7 @@ class TeknisExpenseController extends Controller
     /**
      * Approve expense (admin only)
      */
-    public function approve(Request $request, TeknisExpense $expense): JsonResponse
+    public function approve(Request $request, TeknisiExpense $expense): JsonResponse
     {
         if (!auth()->user()->isAdmin()) {
             return response()->json([
@@ -244,7 +244,7 @@ class TeknisExpenseController extends Controller
     /**
      * Reject expense (admin only)
      */
-    public function reject(Request $request, TeknisExpense $expense): JsonResponse
+    public function reject(Request $request, TeknisiExpense $expense): JsonResponse
     {
         if (!auth()->user()->isAdmin()) {
             return response()->json([
@@ -341,12 +341,12 @@ class TeknisExpenseController extends Controller
 
     // Private helper methods
 
-    private function canView(TeknisExpense $expense): bool
+    private function canView(TeknisiExpense $expense): bool
     {
         return auth()->user()->isAdmin() || $expense->teknisi_id === auth()->id();
     }
 
-    private function canEdit(TeknisExpense $expense): bool
+    private function canEdit(TeknisiExpense $expense): bool
     {
         return !auth()->user()->isAdmin() && $expense->teknisi_id === auth()->id();
     }
