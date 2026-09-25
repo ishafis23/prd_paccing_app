@@ -383,6 +383,11 @@ class OrderDetail extends Component
 
     public function submitLaporan(): void
     {
+        // Validate foto per layanan first
+        if (! $this->validateFotoPerLayanan()) {
+            return;
+        }
+
         $this->validate([
             'catatan' => ['required', 'string', 'min:3'],
             'materials.*.stock_item_id' => ['nullable', 'exists:stock_items,id'],
@@ -401,6 +406,18 @@ class OrderDetail extends Component
             foreach ($this->fotoKategori as $slots) {
                 foreach ($slots as $file) {
                     $tambahBytes += (int) ($file?->getSize() ?? 0);
+                }
+            }
+
+            // Add storage quota untuk fotoPerLayanan (Phase 03)
+            foreach ($this->fotoPerLayanan as $type => $units) {
+                if ($this->isSectionSkipped($type)) {
+                    continue;
+                }
+                foreach ($units as $slots) {
+                    foreach ($slots as $file) {
+                        $tambahBytes += (int) ($file?->getSize() ?? 0);
+                    }
                 }
             }
 
@@ -464,10 +481,75 @@ class OrderDetail extends Component
                 );
             }
 
+            // Upload fotoPerLayanan (Phase 03) after laporan submitted
+            try {
+                $this->uploadFotoPerLayanan();
+            } catch (\Exception $e) {
+                \Log::error('Error uploading fotoPerLayanan: ' . $e->getMessage());
+                // Don't fail submission if photo upload fails - photos can be re-uploaded later
+            }
+
             $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
+            $this->resetFotoPerLayanan();
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Upload fotoPerLayanan ke order_photos table via direct storage save
+     * Called after submitLaporan succeeds (Phase 03)
+     */
+    private function uploadFotoPerLayanan(): void
+    {
+        $uploadedCount = 0;
+
+        foreach ($this->fotoPerLayanan as $type => $units) {
+            if ($this->isSectionSkipped($type)) {
+                continue;
+            }
+
+            foreach ($units as $unitNum => $slots) {
+                foreach ($slots as $position => $file) {
+                    if ($file === null) {
+                        continue;
+                    }
+
+                    // Store file to storage
+                    $filePath = $file->store('order-photos', 'public');
+
+                    // Create OrderPhoto record
+                    \App\Models\OrderPhoto::create([
+                        'order_id' => $this->order->id,
+                        'type' => $type,
+                        'unit_number' => $unitNum,
+                        'photo_position' => $position,
+                        'file_path' => $filePath,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_size' => $file->getSize(),
+                        'mime_type' => $file->getMimeType(),
+                        'status' => 'pending',
+                    ]);
+
+                    $uploadedCount++;
+                }
+            }
+        }
+
+        if ($uploadedCount > 0) {
+            StorageQuotaService::lupakanCache();
+        }
+    }
+
+    /**
+     * Reset fotoPerLayanan structure after successful submission
+     */
+    private function resetFotoPerLayanan(): void
+    {
+        $this->fotoPerLayanan = [];
+        $this->skipSections = [];
+        $this->unitCounts = [];
+        $this->initializeFotoPerLayanan();
     }
 
     /**
