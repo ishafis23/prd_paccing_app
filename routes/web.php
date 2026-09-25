@@ -5,6 +5,7 @@ use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
 use App\Http\Controllers\TeknisExpenseController;
+use App\Livewire\Admin\ManajemenPengeluaranTeknisi;
 use App\Livewire\Auth\Login;
 use App\Livewire\Portal\Dashboard as PortalDashboard;
 use App\Livewire\Portal\Login as PortalLogin;
@@ -82,6 +83,10 @@ Route::middleware('auth:customer')->prefix('portal')->group(function () {
 
 // Admin approval endpoints (Phase 03)
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+    // Expense Management UI
+    Route::get('/pengeluaran-teknisi', ManajemenPengeluaranTeknisi::class)->name('admin.pengeluaran-teknisi');
+
+    // Expense API endpoints
     Route::post('/expense/{teknisExpense}/approve', [TeknisExpenseController::class, 'approve'])->name('admin.expense.approve');
     Route::post('/expense/{teknisExpense}/reject', [TeknisExpenseController::class, 'reject'])->name('admin.expense.reject');
     Route::get('/expenses', [TeknisExpenseController::class, 'index'])->name('admin.expense.index');
