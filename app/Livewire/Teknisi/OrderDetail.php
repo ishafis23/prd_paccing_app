@@ -625,6 +625,34 @@ class OrderDetail extends Component
     // Photo Per Layanan methods (Phase 03)
 
     /**
+     * Check apakah Game 2 deadline sudah lewat (Phase 03 - Task 2.3)
+     */
+    public function isGame2Expired(): bool
+    {
+        try {
+            $setting = \App\Models\Game2Setting::first();
+            $deadlineTime = $setting?->deadline_time ?? '08:30:00';
+            $deadline = \Carbon\Carbon::now()->setTimeFromTimeString($deadlineTime);
+            return \Carbon\Carbon::now()->greaterThanOrEqualTo($deadline);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get Game 2 deadline time
+     */
+    public function getGame2DeadlineTime(): string
+    {
+        try {
+            $setting = \App\Models\Game2Setting::first();
+            return $setting?->deadline_time ?? '08:30';
+        } catch (\Exception $e) {
+            return '08:30';
+        }
+    }
+
+    /**
      * Get struktur foto per layanan untuk display
      */
     public function getFotoPerLayananStructureProperty(): array

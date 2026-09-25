@@ -166,16 +166,24 @@ class PhotoController extends Controller
 
     private function isGame2Photo(array $validated): bool
     {
-        // Game 2 adalah special photo yang di-upload pada hari order
-        // Sesuai spec, ini bisa ditentukan berdasarkan context
-        // Untuk now, return false (bisa di-refine nanti)
+        // Game 2 photos di-identifikasi berdasarkan context laporan hari ini
+        // Untuk sekarang, return false karena Game 2 lock ditangani di component level
+        // Bisa di-refine nanti jika perlu double-check di backend
         return false;
     }
 
     private function isGame2Allowed(): bool
     {
-        // Check if current time is before 08:30
-        $deadline = \Carbon\Carbon::now()->setTimeFromTimeString('08:30:00');
+        // Get Game 2 deadline dari database atau default 08:30
+        try {
+            $setting = \App\Models\Game2Setting::first();
+            $deadlineTime = $setting?->deadline_time ?? '08:30:00';
+        } catch (\Exception $e) {
+            $deadlineTime = '08:30:00';
+        }
+
+        // Check if current time is before deadline
+        $deadline = \Carbon\Carbon::now()->setTimeFromTimeString($deadlineTime);
         return \Carbon\Carbon::now()->lessThan($deadline);
     }
 
