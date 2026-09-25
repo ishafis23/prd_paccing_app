@@ -12,6 +12,7 @@ use App\Livewire\Teknisi\AbsensiScan;
 use App\Livewire\Teknisi\Akun;
 use App\Livewire\Teknisi\CapaianKerja;
 use App\Livewire\Teknisi\JadwalHariIni;
+use App\Livewire\Teknisi\LaporanPengeluaran;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Livewire\Teknisi\RiwayatAbsensi;
 use App\Livewire\Teknisi\RiwayatPengerjaan;
@@ -39,6 +40,7 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     Route::get('/riwayat-absensi', RiwayatAbsensi::class)->name('teknisi.riwayat-absensi');
     Route::get('/riwayat', RiwayatPengerjaan::class)->name('teknisi.riwayat');
     Route::get('/capaian', CapaianKerja::class)->name('teknisi.capaian');
+    Route::get('/laporan-pengeluaran', LaporanPengeluaran::class)->name('teknisi.laporan-pengeluaran');
     Route::get('/akun', Akun::class)->name('teknisi.akun');
 
     // Photo endpoints (Phase 03)
