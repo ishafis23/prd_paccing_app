@@ -301,4 +301,9 @@ class Order extends Model
     {
         return $this->ditutup_pada !== null;
     }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(OrderPhoto::class);
+    }
 }

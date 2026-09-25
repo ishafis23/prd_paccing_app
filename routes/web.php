@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
+use App\Http\Controllers\TeknisExpenseController;
 use App\Livewire\Auth\Login;
 use App\Livewire\Portal\Dashboard as PortalDashboard;
 use App\Livewire\Portal\Login as PortalLogin;
@@ -38,6 +40,20 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     Route::get('/riwayat', RiwayatPengerjaan::class)->name('teknisi.riwayat');
     Route::get('/capaian', CapaianKerja::class)->name('teknisi.capaian');
     Route::get('/akun', Akun::class)->name('teknisi.akun');
+
+    // Photo endpoints (Phase 03)
+    Route::post('/order/{order}/photo', [PhotoController::class, 'store'])->name('teknisi.photo.store');
+    Route::get('/order/{order}/photos', [PhotoController::class, 'getByOrder'])->name('teknisi.photo.index');
+    Route::delete('/photo/{photo}', [PhotoController::class, 'destroy'])->name('teknisi.photo.destroy');
+
+    // Expense endpoints (Phase 03)
+    Route::post('/expense', [TeknisExpenseController::class, 'store'])->name('teknisi.expense.store');
+    Route::get('/expenses', [TeknisExpenseController::class, 'index'])->name('teknisi.expense.index');
+    Route::get('/expense/{teknisExpense}', [TeknisExpenseController::class, 'show'])->name('teknisi.expense.show');
+    Route::put('/expense/{teknisExpense}', [TeknisExpenseController::class, 'update'])->name('teknisi.expense.update');
+    Route::delete('/expense/{teknisExpense}', [TeknisExpenseController::class, 'destroy'])->name('teknisi.expense.destroy');
+    Route::get('/expense-summary/daily', [TeknisExpenseController::class, 'dailySummary'])->name('teknisi.expense.daily-summary');
+    Route::get('/expense-summary/monthly', [TeknisExpenseController::class, 'monthlySummary'])->name('teknisi.expense.monthly-summary');
 });
 
 // Resi publik (B14a) — read-only tanpa login; token acak di orders.resi_token.
@@ -60,4 +76,13 @@ Route::post('/portal/logout', function () {
 
 Route::middleware('auth:customer')->prefix('portal')->group(function () {
     Route::get('/', PortalDashboard::class)->name('portal.dashboard');
+});
+
+// Admin approval endpoints (Phase 03)
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+    Route::post('/expense/{teknisExpense}/approve', [TeknisExpenseController::class, 'approve'])->name('admin.expense.approve');
+    Route::post('/expense/{teknisExpense}/reject', [TeknisExpenseController::class, 'reject'])->name('admin.expense.reject');
+    Route::get('/expenses', [TeknisExpenseController::class, 'index'])->name('admin.expense.index');
+    Route::get('/expense-summary/daily', [TeknisExpenseController::class, 'dailySummary'])->name('admin.expense.daily-summary');
+    Route::get('/expense-summary/monthly', [TeknisExpenseController::class, 'monthlySummary'])->name('admin.expense.monthly-summary');
 });
