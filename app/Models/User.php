@@ -100,4 +100,9 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasRole(RoleName::Owner->value);
     }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(RoleName::Admin->value);
+    }
 }
