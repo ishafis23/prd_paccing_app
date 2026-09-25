@@ -16,6 +16,7 @@ use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
 use App\Support\FotoLaporanSlot;
+use App\Support\PhotoLayananStructure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -61,11 +62,53 @@ class OrderDetail extends Component
 
     public $buktiPembayaran;
 
+    // Photo per Layanan (Phase 03 - Foto terstruktur)
+    /** @var array<string, array<int, array<string, mixed>>> [type => [unit => [position => file]]] */
+    public array $fotoPerLayanan = [];
+
+    /** @var array<string, bool> [type => skipSection] */
+    public array $skipSections = [];
+
+    /** @var array<string, int> [type => unitCount] */
+    public array $unitCounts = [];
+
     public function mount(Order $order): void
     {
         abort_if(! $order->diassignkanKe(auth()->user()), 403, 'Order ini bukan tugas Anda.');
 
         $this->orderId = $order->id;
+
+        // Initialize photo per layanan structure
+        $this->initializeFotoPerLayanan();
+    }
+
+    /**
+     * Initialize foto per layanan dengan struktur default
+     */
+    private function initializeFotoPerLayanan(): void
+    {
+        foreach (PhotoLayananStructure::types() as $type) {
+            $this->skipSections[$type] = false;
+            $this->unitCounts[$type] = PhotoLayananStructure::isRepeatable($type) ? 1 : 0;
+
+            // Initialize unit slots
+            if (! isset($this->fotoPerLayanan[$type])) {
+                $this->fotoPerLayanan[$type] = [];
+            }
+
+            if ($this->unitCounts[$type] > 0) {
+                for ($unit = 1; $unit <= $this->unitCounts[$type]; $unit++) {
+                    if (! isset($this->fotoPerLayanan[$type][$unit])) {
+                        $this->fotoPerLayanan[$type][$unit] = [];
+                    }
+                }
+            } else {
+                // Lokasi type - no units
+                if (! isset($this->fotoPerLayanan[$type][1])) {
+                    $this->fotoPerLayanan[$type][1] = [];
+                }
+            }
+        }
     }
 
     public function getOrderProperty(): Order
@@ -495,6 +538,141 @@ class OrderDetail extends Component
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
+    }
+
+    // Photo Per Layanan methods (Phase 03)
+
+    /**
+     * Get struktur foto per layanan untuk display
+     */
+    public function getFotoPerLayananStructureProperty(): array
+    {
+        return PhotoLayananStructure::struktur();
+    }
+
+    /**
+     * Add unit untuk repeatable type (Cuci/Service)
+     */
+    public function addUnit(string $type): void
+    {
+        if (! PhotoLayananStructure::isRepeatable($type)) {
+            return;
+        }
+
+        $newUnit = ($this->unitCounts[$type] ?? 1) + 1;
+        $this->unitCounts[$type] = $newUnit;
+
+        if (! isset($this->fotoPerLayanan[$type][$newUnit])) {
+            $this->fotoPerLayanan[$type][$newUnit] = [];
+        }
+
+        $this->dispatch('unit-added', type: $type, unit: $newUnit);
+    }
+
+    /**
+     * Remove unit (tidak bisa remove unit 1, minimum 1)
+     */
+    public function removeUnit(string $type, int $unit): void
+    {
+        if (! PhotoLayananStructure::isRepeatable($type) || $unit <= 1) {
+            return;
+        }
+
+        if ($unit === $this->unitCounts[$type]) {
+            $this->unitCounts[$type]--;
+            unset($this->fotoPerLayanan[$type][$unit]);
+        }
+    }
+
+    /**
+     * Toggle skip section checkbox
+     */
+    public function toggleSkipSection(string $type): void
+    {
+        $this->skipSections[$type] = ! ($this->skipSections[$type] ?? false);
+
+        // Clear photos jika skip
+        if ($this->skipSections[$type]) {
+            $this->fotoPerLayanan[$type] = [];
+        }
+    }
+
+    /**
+     * Check apakah section di-skip
+     */
+    public function isSectionSkipped(string $type): bool
+    {
+        return $this->skipSections[$type] ?? false;
+    }
+
+    /**
+     * Get progress foto per layanan
+     * @return array{total: int, uploaded: int, percent: int}
+     */
+    public function getFotoPerLayananProgressProperty(): array
+    {
+        $total = 0;
+        $uploaded = 0;
+
+        foreach (PhotoLayananStructure::types() as $type) {
+            if ($this->isSectionSkipped($type)) {
+                continue;
+            }
+
+            $positions = PhotoLayananStructure::positions($type);
+            $units = $this->unitCounts[$type] ?? 1;
+
+            if ($type === PhotoLayananStructure::TYPE_LOKASI) {
+                $total += count($positions);
+                $uploaded += count(array_filter($this->fotoPerLayanan[$type][1] ?? [], fn ($f) => $f !== null));
+            } else {
+                $total += count($positions) * $units;
+                for ($u = 1; $u <= $units; $u++) {
+                    $uploaded += count(array_filter($this->fotoPerLayanan[$type][$u] ?? [], fn ($f) => $f !== null));
+                }
+            }
+        }
+
+        $percent = $total > 0 ? round(($uploaded / $total) * 100) : 0;
+
+        return [
+            'total' => $total,
+            'uploaded' => $uploaded,
+            'percent' => $percent,
+        ];
+    }
+
+    /**
+     * Validate foto per layanan sebelum submit
+     */
+    public function validateFotoPerLayanan(): bool
+    {
+        foreach (PhotoLayananStructure::types() as $type) {
+            if ($this->isSectionSkipped($type)) {
+                continue;
+            }
+
+            $positions = PhotoLayananStructure::positions($type);
+            $units = $this->unitCounts[$type] ?? 1;
+
+            if ($type === PhotoLayananStructure::TYPE_LOKASI) {
+                $uploads = array_filter($this->fotoPerLayanan[$type][1] ?? []);
+                if (count($uploads) < count($positions)) {
+                    $this->addError('fotoPerLayanan', "Foto {$type} tidak lengkap");
+                    return false;
+                }
+            } else {
+                for ($u = 1; $u <= $units; $u++) {
+                    $uploads = array_filter($this->fotoPerLayanan[$type][$u] ?? []);
+                    if (count($uploads) < count($positions)) {
+                        $this->addError('fotoPerLayanan', "Foto {$type} unit {$u} tidak lengkap");
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     public function render()
