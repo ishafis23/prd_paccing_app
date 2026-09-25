@@ -4,7 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\ExpenseCategory;
 use App\Filament\Resources\ExpenseResource\Pages;
-use App\Models\Expense;
+use App\Models\TeknisiExpense;
 use App\Models\Order;
 use App\Support\EnumOptions;
 use Filament\Forms;
@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ExpenseResource extends BaseResource
 {
-    protected static ?string $model = Expense::class;
+    protected static ?string $model = TeknisiExpense::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-down';
 
