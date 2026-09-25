@@ -337,6 +337,9 @@
                 </button>
             </div>
 
+            {{-- Foto Per Layanan (Phase 03 - NEW) --}}
+            @include('livewire.teknisi.partials.foto-per-layanan')
+
             {{-- Foto per kategori order_item (dev-plan/13 §3): tiap baris
                  layanan punya slot fotonya sendiri sesuai kategori. --}}
             @if ($order->orderItems->isNotEmpty())
