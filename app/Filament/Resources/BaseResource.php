@@ -36,6 +36,13 @@ abstract class BaseResource extends Resource
             }
         }
 
-        return Url::absolute(static::getRouteBaseName(panel: $panel).".{$name}", $parameters);
+        $routeName = static::getRouteBaseName(panel: $panel).".{$name}";
+
+        try {
+            return Url::absolute($routeName, $parameters);
+        } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException) {
+            // Fallback ke relative URL jika route tidak ada (mungkin sedang proses registrasi)
+            return parent::getUrl($name, $parameters, false, $panel, $tenant);
+        }
     }
 }
