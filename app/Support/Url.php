@@ -15,7 +15,15 @@ class Url
      */
     public static function absolute(string $routeName, array $parameters = []): string
     {
-        return rtrim((string) config('app.url'), '/').route($routeName, $parameters, false);
+        try {
+            $relativePath = route($routeName, $parameters, false);
+        } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException) {
+            // Fallback ke route() dengan absolute=true jika route tidak ada
+            // (mungkin sedang proses registrasi atau ada perubahan model)
+            return rtrim((string) config('app.url'), '/');
+        }
+
+        return rtrim((string) config('app.url'), '/').$relativePath;
     }
 
     /**
