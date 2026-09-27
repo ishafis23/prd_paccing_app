@@ -349,9 +349,10 @@
                         @foreach ($order->orderItems as $item)
                             @php
                                 $isExpanded = $expandedItems[$item->id] ?? true;
-                                $fotoLengkap = $isFotoItemLengkap($item->id);
-                                $uploadedCount = $countUploadedFotoForItem($item->id);
-                                $totalSlots = $countTotalFotoSlotsForItem($item->id);
+                                $status = $itemPhotoStatus[$item->id] ?? ['isLengkap' => true, 'uploadedCount' => 0, 'totalSlots' => 0];
+                                $fotoLengkap = $status['isLengkap'];
+                                $uploadedCount = $status['uploadedCount'];
+                                $totalSlots = $status['totalSlots'];
                             @endphp
                             <div class="rounded-xl bg-gray-50 overflow-hidden shadow-sm ring-1 ring-gray-100">
                                 {{-- Header dengan toggle button dan status --}}

@@ -836,6 +836,16 @@ class OrderDetail extends Component
     {
         $order = $this->order;
 
+        // Build item photo status data for each order item
+        $itemPhotoStatus = [];
+        foreach ($order->orderItems as $item) {
+            $itemPhotoStatus[$item->id] = [
+                'isLengkap' => $this->isFotoItemLengkap($item->id),
+                'uploadedCount' => $this->countUploadedFotoForItem($item->id),
+                'totalSlots' => $this->countTotalFotoSlotsForItem($item->id),
+            ];
+        }
+
         return view('livewire.teknisi.order-detail', [
             'order' => $order,
             'stockItems' => StockItem::query()->where('aktif', true)->orderBy('nama_barang')->get(),
@@ -844,6 +854,7 @@ class OrderDetail extends Component
             'latestPayment' => $order->latestPayment,
             'paymentChannels' => app(PaymentChannelService::class)->daftarAktif(),
             'fotoSlots' => $this->fotoSlots,
+            'itemPhotoStatus' => $itemPhotoStatus,
         ])->layout('layouts.teknisi', ['title' => 'Detail Order']);
     }
 }
