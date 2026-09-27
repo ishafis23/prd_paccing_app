@@ -72,6 +72,9 @@ class OrderDetail extends Component
     /** @var array<string, int> [type => unitCount] */
     public array $unitCounts = [];
 
+    /** @var array<int, bool> Track which order items are expanded [order_item_id => isExpanded] */
+    public array $expandedItems = [];
+
     public function mount(Order $order): void
     {
         abort_if(! $order->diassignkanKe(auth()->user()), 403, 'Order ini bukan tugas Anda.');
@@ -80,6 +83,11 @@ class OrderDetail extends Component
 
         // Initialize photo per layanan structure
         $this->initializeFotoPerLayanan();
+
+        // Initialize expanded items (all expanded by default)
+        foreach ($order->orderItems as $item) {
+            $this->expandedItems[$item->id] = true;
+        }
     }
 
     /**
@@ -783,6 +791,45 @@ class OrderDetail extends Component
         }
 
         return true;
+    }
+
+    /**
+     * Toggle expanded/collapsed state untuk order item
+     */
+    public function toggleItemExpanded(int $itemId): void
+    {
+        $this->expandedItems[$itemId] = ! ($this->expandedItems[$itemId] ?? true);
+    }
+
+    /**
+     * Check apakah semua foto wajib untuk item sudah terupload
+     */
+    public function isFotoItemLengkap(int $itemId): bool
+    {
+        $fotoWajib = $this->fotoSlotsWajib[$itemId] ?? [];
+        if (empty($fotoWajib)) {
+            return true;
+        }
+
+        $uploadedSlots = array_keys(array_filter($this->fotoKategori[$itemId] ?? []));
+
+        return count(array_intersect($fotoWajib, $uploadedSlots)) === count($fotoWajib);
+    }
+
+    /**
+     * Get count foto yang sudah terupload untuk item
+     */
+    public function countUploadedFotoForItem(int $itemId): int
+    {
+        return count(array_filter($this->fotoKategori[$itemId] ?? []));
+    }
+
+    /**
+     * Get total slot foto untuk item
+     */
+    public function countTotalFotoSlotsForItem(int $itemId): int
+    {
+        return count($this->fotoSlots[$itemId] ?? []);
     }
 
     public function render()

@@ -345,56 +345,96 @@
             @if ($order->orderItems->isNotEmpty())
                 <div>
                     <label class="mb-2 block text-sm font-semibold text-gray-700">Foto per Layanan <span class="font-normal text-gray-400">(yang ditandai "Wajib" harus dilengkapi sebelum order berikutnya, JPG/PNG maks 5 MB)</span></label>
-                    <div class="space-y-3">
+                    <div class="space-y-2">
                         @foreach ($order->orderItems as $item)
-                            <div class="rounded-xl bg-gray-50 p-3">
-                                <p class="mb-2 text-sm font-semibold text-gray-700">
-                                    {{ $item->nama_layanan }}
-                                    @if ($item->acUnit)
-                                        <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
-                                    @endif
-                                </p>
-                                <div class="grid grid-cols-2 gap-2">
-                                    @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
-                                        <div x-data="cameraUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}')">
-                                            <label class="relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
-                                                <template x-if="!preview">
-                                                    <div class="flex flex-col items-center">
-                                                        <x-heroicon-o-camera class="h-5 w-5" />
-                                                        <span class="mt-0.5 px-1 text-[11px]">
+                            @php
+                                $isExpanded = $expandedItems[$item->id] ?? true;
+                                $fotoLengkap = $isFotoItemLengkap($item->id);
+                                $uploadedCount = $countUploadedFotoForItem($item->id);
+                                $totalSlots = $countTotalFotoSlotsForItem($item->id);
+                            @endphp
+                            <div class="rounded-xl bg-gray-50 overflow-hidden shadow-sm ring-1 ring-gray-100">
+                                {{-- Header dengan toggle button dan status --}}
+                                <button
+                                    type="button"
+                                    wire:click="toggleItemExpanded({{ $item->id }})"
+                                    class="w-full flex items-center justify-between gap-2 p-3 text-left hover:bg-gray-100 transition"
+                                >
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-semibold text-gray-700">
+                                            {{ $item->nama_layanan }}
+                                            @if ($item->acUnit)
+                                                <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
+                                            @endif
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-gray-500">{{ $uploadedCount }}/{{ $totalSlots }} foto terupload</p>
+                                    </div>
+
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        {{-- Status indicator --}}
+                                        @if ($fotoLengkap)
+                                            <span class="flex items-center justify-center text-emerald-600">
+                                                <x-heroicon-o-check-circle class="h-5 w-5" />
+                                            </span>
+                                        @else
+                                            <span class="flex items-center justify-center text-amber-600">
+                                                <x-heroicon-o-exclamation-circle class="h-5 w-5" />
+                                            </span>
+                                        @endif
+
+                                        {{-- Chevron icon --}}
+                                        <div class="transition-transform" :class="{'rotate-180': {{ $isExpanded ? 'true' : 'false' }}}">
+                                            <x-heroicon-o-chevron-down class="h-5 w-5 text-gray-400" />
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {{-- Content area (collapsible) --}}
+                                @if ($isExpanded)
+                                    <div class="border-t border-gray-100 p-3">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
+                                                <div x-data="cameraUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}')">
+                                                    <label class="relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
+                                                        <template x-if="!preview">
+                                                            <div class="flex flex-col items-center">
+                                                                <x-heroicon-o-camera class="h-5 w-5" />
+                                                                <span class="mt-0.5 px-1 text-[11px]">
+                                                                    {{ $slotLabel }}
+                                                                    @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
+                                                                        <span class="text-rose-500">*Wajib</span>
+                                                                    @endif
+                                                                </span>
+                                                            </div>
+                                                        </template>
+                                                        <img x-show="preview" :src="preview" alt="Pratinjau {{ $slotLabel }}"
+                                                            class="absolute inset-0 h-full w-full object-cover">
+                                                        <span x-show="preview" x-cloak
+                                                            class="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[9px] leading-tight text-white">
                                                             {{ $slotLabel }}
                                                             @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
-                                                                <span class="text-rose-500">*Wajib</span>
+                                                                <span class="text-rose-300">* Wajib</span>
                                                             @endif
                                                         </span>
-                                                    </div>
-                                                </template>
-                                                <img x-show="preview" :src="preview" alt="Pratinjau {{ $slotLabel }}"
-                                                    class="absolute inset-0 h-full w-full object-cover">
-                                                <span x-show="preview" x-cloak
-                                                    class="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[9px] leading-tight text-white">
-                                                    {{ $slotLabel }}
-                                                    @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
-                                                        <span class="text-rose-300">* Wajib</span>
-                                                    @endif
-                                                </span>
-                                                <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
-                                                    <div class="flex flex-col items-center">
-                                                        <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
-                                                        <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
-                                                    </div>
+                                                        <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
+                                                            <div class="flex flex-col items-center">
+                                                                <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
+                                                                <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
+                                                            </div>
+                                                        </div>
+                                                        <input type="file" accept="image/*" capture="environment"
+                                                            x-on:change="onFile($event)"
+                                                            class="absolute inset-0 cursor-pointer opacity-0">
+                                                    </label>
+                                                    <p x-show="error" x-text="error" class="text-[10px] font-medium text-rose-600"></p>
                                                 </div>
-                                                <input type="file" accept="image/*" capture="environment"
-                                                    x-on:change="onFile($event)"
-                                                    class="absolute inset-0 cursor-pointer opacity-0">
-                                            </label>
-                                            <p x-show="error" x-text="error" class="text-[10px] font-medium text-rose-600"></p>
+                                                @error('fotoKategori.'.$item->id.'.'.$slotKey)
+                                                    <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
+                                                @enderror
+                                            @endforeach
                                         </div>
-                                        @error('fotoKategori.'.$item->id.'.'.$slotKey)
-                                            <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
-                                        @enderror
-                                    @endforeach
-                                </div>
+                                    </div>
+                                @endif
                             </div>
                         @endforeach
                     </div>
