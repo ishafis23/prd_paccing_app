@@ -55,7 +55,7 @@
             ->values();
 
         $metodeDipilih = $order->metode_dipilih?->value;
-        $resiUrl = $order->resi_token ? route('resi.show', [$order->id, $order->resi_token]) : null;
+        $resiUrl = $order->resi_token ? \App\Support\Url::absolute('resi.show', [$order->id, $order->resi_token]) : null;
         $opsiMetode = [
             ['value' => 'cash', 'label' => 'Tunai'],
             ['value' => 'qris', 'label' => 'QRIS'],
