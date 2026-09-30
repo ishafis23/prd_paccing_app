@@ -35,11 +35,11 @@
                     <textarea id="editCatatan" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" rows="3"></textarea>
                 </div>
 
-                <div class="flex gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-                    <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium">
+                <div class="flex gap-3 pt-6" style="border-top:1px solid #e2e8f0;">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 font-medium" style="padding:12px 16px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;color:#334155;cursor:pointer;">
                         Batal
                     </button>
-                    <button type="submit" class="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-lg">
+                    <button type="submit" class="flex-1 font-bold" style="padding:12px 16px;border:1px solid #047857;border-radius:8px;background:#059669;color:#ffffff;cursor:pointer;box-shadow:0 4px 6px -1px rgba(0,0,0,.1);">
                         💾 Simpan
                     </button>
                 </div>
