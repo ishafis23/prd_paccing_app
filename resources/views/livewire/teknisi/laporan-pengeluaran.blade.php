@@ -47,6 +47,22 @@
                     @enderror
                 </div>
 
+                {{-- Order terkait (opsional) --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Order Terkait (opsional)</label>
+                    <select
+                        wire:model="order_id"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <option value="">— Tidak terkait order tertentu —</option>
+                        @foreach ($this->orderOptions as $id => $label)
+                            <option value="{{ $id }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('order_id')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 <div class="grid grid-cols-2 gap-3">
                     {{-- Kategori --}}
                     <div>
@@ -66,14 +82,43 @@
                         @enderror
                     </div>
 
-                    {{-- Nominal --}}
+                    {{-- Qty --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Nominal (Rp)</label>
+                        <label class="block text-sm font-medium text-gray-700">Qty</label>
+                        <input
+                            type="number"
+                            wire:model.live="qty"
+                            min="1"
+                            class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        @error('qty')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    {{-- Harga satuan --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Harga Satuan (Rp)</label>
+                        <input
+                            type="number"
+                            wire:model.live="harga"
+                            placeholder="0"
+                            class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        @error('harga')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Total --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Total (Rp)</label>
                         <input
                             type="number"
                             wire:model="nominal"
                             placeholder="Min 1.000"
                             class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <p class="mt-0.5 text-[11px] text-gray-400">Otomatis Qty × Harga, bisa dikoreksi.</p>
                         @error('nominal')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                         @enderror
@@ -230,7 +275,15 @@
                                     <p class="truncate text-xs text-gray-500">
                                         {{ $expense->keterangan ?: 'Tanpa keterangan' }}
                                     </p>
-                                    <p class="text-[11px] text-gray-400">{{ $expense->tanggal_input->format('d M Y') }}</p>
+                                    <p class="text-[11px] text-gray-400">
+                                        {{ $expense->tanggal_input->format('d M Y') }}
+                                        @if ($expense->qty && $expense->harga)
+                                            · {{ $expense->qty }} × {{ $this->formatRupiah($expense->harga) }}
+                                        @endif
+                                    </p>
+                                    @if ($expense->order_id)
+                                        <p class="text-[11px] font-medium text-blue-500">Order #{{ $expense->order_id }}</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>

@@ -25,7 +25,9 @@ class FinanceService
         ?string $tanggal = null,
         ?string $keterangan = null,
         ?string $bukti = null,
-        ?int $orderId = null
+        ?int $orderId = null,
+        ?int $qty = null,
+        ?float $harga = null
     ): Expense {
         $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
 
@@ -37,6 +39,8 @@ class FinanceService
             'order_id' => $orderId,
             'kategori' => $kategori,
             'nominal' => $nominal,
+            'qty' => $qty,
+            'harga' => $harga,
             'tanggal' => $tanggal ?? now()->toDateString(),
             'keterangan' => $keterangan,
             'bukti' => $bukti,

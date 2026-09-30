@@ -210,6 +210,11 @@ class Order extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function teknisiExpenses(): HasMany
+    {
+        return $this->hasMany(TeknisiExpense::class);
+    }
+
     public function totalCorrections(): HasMany
     {
         return $this->hasMany(OrderTotalCorrection::class);

@@ -13,9 +13,12 @@ class TeknisiExpense extends Model
 
     protected $fillable = [
         'teknisi_id',
+        'order_id',
         'tanggal_input',
         'kategori',
         'nominal',
+        'qty',
+        'harga',
         'keterangan',
         'status',
         'approved_by',
@@ -26,12 +29,19 @@ class TeknisiExpense extends Model
     {
         return [
             'tanggal_input' => 'date',
+            'qty' => 'integer',
+            'harga' => 'integer',
         ];
     }
 
     public function teknisi(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teknisi_id');
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     public function approvedBy(): BelongsTo

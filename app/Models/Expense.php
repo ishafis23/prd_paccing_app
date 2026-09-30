@@ -15,6 +15,8 @@ class Expense extends Model
         'order_id',
         'kategori',
         'nominal',
+        'qty',
+        'harga',
         'tanggal',
         'keterangan',
         'bukti',
@@ -26,6 +28,8 @@ class Expense extends Model
         return [
             'kategori' => ExpenseCategory::class,
             'nominal' => 'decimal:2',
+            'qty' => 'integer',
+            'harga' => 'decimal:2',
             'tanggal' => 'date:Y-m-d',
         ];
     }

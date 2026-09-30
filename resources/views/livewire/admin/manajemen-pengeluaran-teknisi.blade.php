@@ -153,6 +153,12 @@
                                 @if ($expense->keterangan)
                                     <p class="text-[11px] text-gray-500">{{ substr($expense->keterangan, 0, 40) }}...</p>
                                 @endif
+                                @if ($expense->qty && $expense->harga)
+                                    <p class="text-[11px] text-gray-400">{{ $expense->qty }} × {{ $this->formatRupiah($expense->harga) }}</p>
+                                @endif
+                                @if ($expense->order_id)
+                                    <p class="text-[11px] font-medium text-blue-500">Order #{{ $expense->order_id }}</p>
+                                @endif
                             </td>
                             <td class="px-4 py-2 text-xs text-gray-500">
                                 {{ $expense->tanggal_input->format('d M Y') }}
@@ -245,6 +251,18 @@
                         <span class="text-xs text-gray-600">Tanggal:</span>
                         <span class="text-xs font-medium text-gray-900">{{ $selectedExpense->tanggal_input->format('d M Y') }}</span>
                     </div>
+                    @if ($selectedExpense->order_id)
+                        <div class="flex justify-between">
+                            <span class="text-xs text-gray-600">Order:</span>
+                            <span class="text-xs font-medium text-blue-600">#{{ $selectedExpense->order_id }}</span>
+                        </div>
+                    @endif
+                    @if ($selectedExpense->qty && $selectedExpense->harga)
+                        <div class="flex justify-between">
+                            <span class="text-xs text-gray-600">Qty × Harga:</span>
+                            <span class="text-xs font-medium text-gray-900">{{ $selectedExpense->qty }} × {{ $this->formatRupiah($selectedExpense->harga) }}</span>
+                        </div>
+                    @endif
                     <div class="flex justify-between">
                         <span class="text-xs text-gray-600">Keterangan:</span>
                         <span class="text-xs font-medium text-gray-900">{{ $selectedExpense->keterangan ?: '-' }}</span>

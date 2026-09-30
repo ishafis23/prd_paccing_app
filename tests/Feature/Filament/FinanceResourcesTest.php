@@ -26,10 +26,12 @@ it('admin bisa mencatat pengeluaran lewat form -> lewat FinanceService', functio
     Livewire::actingAs($this->admin)
         ->test(CreateExpense::class)
         ->fillForm([
-            'kategori' => 'operasional',
+            'kategori' => 'material',
+            'qty' => 5,
+            'harga' => 10000,
             'nominal' => 50000,
             'tanggal' => now()->toDateString(),
-            'keterangan' => 'BBM operasional',
+            'keterangan' => 'Beli material',
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -37,6 +39,8 @@ it('admin bisa mencatat pengeluaran lewat form -> lewat FinanceService', functio
     $expense = Expense::first();
     expect($expense)->not->toBeNull();
     expect($expense->dicatat_oleh)->toBe($this->admin->id);
+    expect((int) $expense->qty)->toBe(5);
+    expect((float) $expense->harga)->toBe(10000.0);
 });
 
 it('hr tidak bisa melihat resource expense (403)', function () {

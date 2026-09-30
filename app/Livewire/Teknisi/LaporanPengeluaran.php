@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Teknisi;
 
+use App\Models\Order;
 use App\Models\TeknisiExpense;
 use Illuminate\Pagination\Paginator;
 use Livewire\Attributes\Computed;
@@ -18,6 +19,15 @@ class LaporanPengeluaran extends Component
 
     #[Validate('required|in:bensin,makan,material,transport,lainnya')]
     public string $kategori = '';
+
+    #[Validate('nullable|exists:orders,id')]
+    public ?int $order_id = null;
+
+    #[Validate('required|integer|min:1|max:100000')]
+    public int $qty = 1;
+
+    #[Validate('required|integer|min:0|max:5000000')]
+    public int $harga = 0;
 
     #[Validate('required|integer|min:1000|max:5000000')]
     public int $nominal = 0;
@@ -39,6 +49,42 @@ class LaporanPengeluaran extends Component
     {
         $this->tanggal_input = today()->format('Y-m-d');
         $this->filterBulan = today()->format('Y-m');
+    }
+
+    public function updatedQty(): void
+    {
+        $this->recalcNominal();
+    }
+
+    public function updatedHarga(): void
+    {
+        $this->recalcNominal();
+    }
+
+    private function recalcNominal(): void
+    {
+        $this->nominal = (int) ($this->qty * $this->harga);
+    }
+
+    /**
+     * Order yang ditugaskan ke teknisi ini (untuk ditautkan ke pengeluaran).
+     */
+    #[Computed]
+    public function orderOptions(): array
+    {
+        $userId = auth()->id();
+
+        return Order::query()
+            ->where(function ($q) use ($userId) {
+                $q->where('teknisi_id', $userId)
+                    ->orWhereHas('orderTechnicians', fn ($t) => $t->where('teknisi_id', $userId));
+            })
+            ->with('customer')
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->mapWithKeys(fn (Order $o) => [$o->id => "#{$o->id} — ".($o->customer?->nama ?? 'Tanpa nama')])
+            ->all();
     }
 
     /**
@@ -143,16 +189,21 @@ class LaporanPengeluaran extends Component
         try {
             TeknisiExpense::create([
                 'teknisi_id' => auth()->id(),
+                'order_id' => $this->order_id,
                 'tanggal_input' => $this->tanggal_input,
                 'kategori' => $this->kategori,
+                'qty' => $this->qty,
+                'harga' => $this->harga,
                 'nominal' => $this->nominal,
                 'keterangan' => $this->keterangan,
                 'status' => 'pending',
             ]);
 
             session()->flash('status', 'Pengeluaran berhasil dicatat.');
-            $this->reset(['tanggal_input', 'kategori', 'nominal', 'keterangan', 'showForm']);
+            $this->reset(['tanggal_input', 'kategori', 'order_id', 'qty', 'harga', 'nominal', 'keterangan', 'showForm']);
             $this->tanggal_input = today()->format('Y-m-d');
+            $this->qty = 1;
+            $this->harga = 0;
 
         } catch (\Exception $e) {
             session()->flash('error', 'Gagal mencatat pengeluaran: ' . $e->getMessage());

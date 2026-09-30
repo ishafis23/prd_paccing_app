@@ -32,7 +32,10 @@ class ExpenseResource extends BaseResource
         return $form
             ->schema([
                 Forms\Components\Select::make('kategori')
-                    ->options(EnumOptions::for(ExpenseCategory::class))
+                    ->options([
+                        ExpenseCategory::Material->value => 'Material',
+                        ExpenseCategory::Perawatan->value => 'Perawatan',
+                    ])
                     ->required(),
                 Forms\Components\Select::make('order_id')
                     ->label('Order Terkait (opsional)')
@@ -44,11 +47,29 @@ class ExpenseResource extends BaseResource
                         ->get()
                         ->mapWithKeys(fn (Order $o) => [$o->id => "#{$o->id} — {$o->customer?->nama} ({$o->tanggal_jadwal?->format('d M Y')})"]))
                     ->searchable(),
+                Forms\Components\TextInput::make('qty')
+                    ->label('Qty')
+                    ->numeric()
+                    ->default(1)
+                    ->minValue(1)
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
+                Forms\Components\TextInput::make('harga')
+                    ->label('Harga Satuan')
+                    ->numeric()
+                    ->prefix('Rp')
+                    ->minValue(0)
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
                 Forms\Components\TextInput::make('nominal')
+                    ->label('Total')
                     ->numeric()
                     ->prefix('Rp')
                     ->required()
-                    ->minValue(1),
+                    ->minValue(1)
+                    ->helperText('Otomatis dari Qty × Harga, bisa dikoreksi manual.'),
                 Forms\Components\DatePicker::make('tanggal')
                     ->default(now())
                     ->required(),

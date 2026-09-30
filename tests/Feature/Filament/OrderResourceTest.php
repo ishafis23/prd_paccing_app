@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ExpenseCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
@@ -9,7 +10,9 @@ use App\Filament\Resources\OrderResource\Pages\ViewOrder;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
+use App\Models\TeknisiExpense;
 use App\Models\User;
+use App\Services\FinanceService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
 
@@ -160,3 +163,38 @@ it('halaman detail order tetap tampil walau metode_dipilih terisi (regresi enum)
         ->assertSuccessful()
         ->assertSee('Qris');
 });
+
+it('tab pengeluaran menampilkan pengeluaran admin & teknisi yang tertaut order', function () {
+    $order = Order::factory()->create();
+
+    app(FinanceService::class)->createExpense(
+        ExpenseCategory::Material,
+        50000,
+        $this->admin,
+        null,
+        'Beli selang',
+        null,
+        $order->id,
+        2,
+        25000,
+    );
+
+    TeknisiExpense::create([
+        'teknisi_id' => $this->teknisi->id,
+        'order_id' => $order->id,
+        'tanggal_input' => today()->toDateString(),
+        'kategori' => 'bensin',
+        'qty' => 1,
+        'harga' => 20000,
+        'nominal' => 20000,
+        'status' => 'pending',
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test(ViewOrder::class, ['record' => $order->getRouteKey()])
+        ->assertSuccessful()
+        ->assertSee('Material & Perawatan (Admin)')
+        ->assertSee('Operasional (Teknisi)')
+        ->assertSee('Beli selang');
+});
+

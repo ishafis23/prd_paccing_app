@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CustomerArea;
 use App\Enums\CustomerJenis;
+use App\Enums\ExpenseCategory;
 use App\Enums\LeadSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -25,9 +26,12 @@ use App\Services\CustomerService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Support\EnumOptions;
+use Filament\Exceptions\Halt;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Infolists\Components\Actions;
+use Filament\Infolists\Components\Actions\Action as InfolistAction;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
@@ -252,12 +256,63 @@ class OrderResource extends BaseResource
                                             ->state(fn (Order $record) => $record->orderItems),
                                     ]),
                                 Section::make('Total Tagihan')
+                                    ->columns(2)
                                     ->schema([
                                         TextEntry::make('total')
                                             ->label('Total')
                                             ->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.'))
                                             ->size('lg')
                                             ->extraAttributes(['class' => 'font-bold text-success']),
+                                        Actions::make([
+                                            InfolistAction::make('koreksiTotal')
+                                            ->label('Koreksi Total')
+                                            ->icon('heroicon-o-pencil-square')
+                                            ->color('warning')
+                                            ->iconButton()
+                                            ->tooltip('Koreksi Total')
+                                            ->form([
+                                                Forms\Components\TextInput::make('total_terkoreksi')
+                                                    ->label('Total Terkoreksi')
+                                                    ->numeric()
+                                                    ->prefix('Rp')
+                                                    ->required()
+                                                    ->minValue(0)
+                                                    ->default(fn (Order $record) => $record->total()),
+                                                Forms\Components\Textarea::make('alasan')
+                                                    ->label('Alasan Koreksi')
+                                                    ->required()
+                                                    ->maxLength(500),
+                                            ])
+                                            ->action(function (array $data, Order $record): void {
+                                                try {
+                                                    $totalBaru = (float) $data['total_terkoreksi'];
+                                                    $alasan = $data['alasan'];
+
+                                                    app(OrderService::class)->koreksiTotal(
+                                                        $record,
+                                                        $totalBaru,
+                                                        $alasan,
+                                                        auth()->user()
+                                                    );
+
+                                                    Notification::make()
+                                                        ->success()
+                                                        ->title('Total berhasil dikoreksi')
+                                                        ->body("Total lama: Rp".number_format($record->total(), 0, ',', '.')." → Total baru: Rp".number_format($totalBaru, 0, ',', '.'))
+                                                        ->send();
+
+                                                    $record->refresh();
+                                                } catch (\Exception $e) {
+                                                    Notification::make()
+                                                        ->danger()
+                                                        ->title('Gagal mengkoreksi total')
+                                                        ->body($e->getMessage())
+                                                        ->send();
+
+                                                    throw new Halt();
+                                                }
+                                            }),
+                                        ]),
                                     ]),
                             ]),
 
@@ -284,33 +339,115 @@ class OrderResource extends BaseResource
 
                         Tabs\Tab::make('Pengeluaran')
                             ->schema([
-                                Section::make()
+                                Section::make('Material & Perawatan (Admin)')
+                                    ->description('Pengeluaran yang dicatat admin untuk order ini.')
+                                    ->headerActions([
+                                        InfolistAction::make('tambahPengeluaran')
+                                            ->label('Tambah Pengeluaran')
+                                            ->icon('heroicon-o-plus')
+                                            ->color('primary')
+                                            ->modalHeading('Tambah Pengeluaran')
+                                            ->form([
+                                                Forms\Components\Select::make('kategori')
+                                                    ->options([
+                                                        ExpenseCategory::Material->value => 'Material',
+                                                        ExpenseCategory::Perawatan->value => 'Perawatan',
+                                                    ])
+                                                    ->required(),
+                                                Forms\Components\TextInput::make('qty')
+                                                    ->label('Qty')
+                                                    ->numeric()
+                                                    ->default(1)
+                                                    ->minValue(1)
+                                                    ->required()
+                                                    ->live()
+                                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
+                                                Forms\Components\TextInput::make('harga')
+                                                    ->label('Harga Satuan')
+                                                    ->numeric()
+                                                    ->prefix('Rp')
+                                                    ->minValue(0)
+                                                    ->required()
+                                                    ->live()
+                                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
+                                                Forms\Components\TextInput::make('nominal')
+                                                    ->label('Total')
+                                                    ->numeric()
+                                                    ->prefix('Rp')
+                                                    ->required()
+                                                    ->minValue(1)
+                                                    ->helperText('Otomatis dari Qty × Harga, bisa dikoreksi manual.'),
+                                                Forms\Components\DatePicker::make('tanggal')
+                                                    ->default(now())
+                                                    ->required(),
+                                                Forms\Components\Textarea::make('keterangan')
+                                                    ->columnSpanFull(),
+                                                Forms\Components\FileUpload::make('bukti')
+                                                    ->label('Bukti/Struk')
+                                                    ->image()
+                                                    ->directory('expenses'),
+                                            ])
+                                            ->action(function (array $data, Order $record): void {
+                                                try {
+                                                    app(FinanceService::class)->createExpense(
+                                                        ExpenseCategory::from($data['kategori']),
+                                                        (float) $data['nominal'],
+                                                        auth()->user(),
+                                                        $data['tanggal'] ?? null,
+                                                        $data['keterangan'] ?? null,
+                                                        $data['bukti'] ?? null,
+                                                        $record->id,
+                                                        isset($data['qty']) ? (int) $data['qty'] : null,
+                                                        isset($data['harga']) ? (float) $data['harga'] : null,
+                                                    );
+
+                                                    Notification::make()->success()->title('Pengeluaran ditambahkan')->send();
+                                                    $record->refresh();
+                                                    $record->unsetRelation('expenses');
+                                                } catch (\Exception $e) {
+                                                    Notification::make()->danger()->title('Gagal menambah pengeluaran')->body($e->getMessage())->send();
+                                                    throw new Halt();
+                                                }
+                                            }),
+                                    ])
                                     ->schema([
                                         RepeatableEntry::make('expenses')
                                             ->label('')
-                                            ->columns(4)
+                                            ->columns(6)
                                             ->schema([
+                                                TextEntry::make('tanggal')->label('Tanggal')->date('d M Y'),
                                                 TextEntry::make('kategori')->label('Kategori')->badge(),
-                                                TextEntry::make('deskripsi')->label('Deskripsi')->columnSpan(2),
-                                                TextEntry::make('nominal')->label('Nominal')->money('IDR'),
-                                                TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
-                                                    ->visible(fn ($record): bool => filled($record?->catatan)),
-                                                TextEntry::make('dibuat_oleh.name')
-                                                    ->label('Dibuat oleh')
-                                                    ->columnSpanFull(),
+                                                TextEntry::make('keterangan')->label('Keterangan')->placeholder('—')->columnSpan(2),
+                                                TextEntry::make('qty')->label('Qty')->placeholder('—'),
+                                                TextEntry::make('harga')->label('Harga')->money('IDR')->placeholder('—'),
+                                                TextEntry::make('nominal')->label('Total')->money('IDR'),
+                                                TextEntry::make('recordedBy.name')->label('Dicatat oleh')->columnSpanFull(),
                                             ])
-                                            ->visible(fn (Order $record): bool => $record->expenses->isNotEmpty())
-                                            ->placeholder(null),
-                                    ])
-                                    ->visible(fn (Order $record): bool => $record->expenses->isNotEmpty()),
-                                Section::make()
+                                            ->placeholder('Belum ada pengeluaran material/perawatan'),
+                                    ]),
+                                Section::make('Operasional (Teknisi)')
+                                    ->description('Pengeluaran yang diinput teknisi dan tertaut ke order ini.')
                                     ->schema([
-                                        TextEntry::make('placeholder')
+                                        RepeatableEntry::make('teknisiExpenses')
                                             ->label('')
-                                            ->state('Belum ada pengeluaran')
-                                            ->columnSpanFull(),
-                                    ])
-                                    ->visible(fn (Order $record): bool => $record->expenses->isEmpty()),
+                                            ->columns(6)
+                                            ->schema([
+                                                TextEntry::make('tanggal_input')->label('Tanggal')->date('d M Y'),
+                                                TextEntry::make('kategori')->label('Kategori')->badge(),
+                                                TextEntry::make('keterangan')->label('Keterangan')->placeholder('—')->columnSpan(2),
+                                                TextEntry::make('qty')->label('Qty')->placeholder('—'),
+                                                TextEntry::make('harga')->label('Harga')->money('IDR')->placeholder('—'),
+                                                TextEntry::make('nominal')->label('Total')->money('IDR'),
+                                                TextEntry::make('status')->label('Status')->badge()
+                                                    ->color(fn ($state): string => match ($state) {
+                                                        'approved' => 'success',
+                                                        'rejected' => 'danger',
+                                                        default => 'warning',
+                                                    }),
+                                                TextEntry::make('teknisi.name')->label('Teknisi')->columnSpanFull(),
+                                            ])
+                                            ->placeholder('Belum ada pengeluaran teknisi'),
+                                    ]),
                             ]),
 
                         Tabs\Tab::make('Laporan Pengerjaan')
