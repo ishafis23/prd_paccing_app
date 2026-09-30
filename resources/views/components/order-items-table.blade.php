@@ -1,90 +1,42 @@
 <div class="overflow-x-auto">
-    <div class="hidden" x-data="{
-        editModal: { open: false, data: { id: null, nama_layanan: '', jumlah: 0, harga: 0, catatan: '' } },
-        async submitEdit() {
-            try {
-                const response = await fetch(`/api/order-items/${this.editModal.data.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content
-                    },
-                    body: JSON.stringify({
-                        jumlah: this.editModal.data.jumlah,
-                        harga: this.editModal.data.harga,
-                        catatan: this.editModal.data.catatan
-                    })
-                });
-                if (response.ok) {
-                    alert('Item berhasil diupdate');
-                    this.editModal.open = false;
-                    location.reload();
-                } else {
-                    const err = await response.json();
-                    alert('Gagal: ' + (err.message || 'Update gagal'));
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Terjadi kesalahan: ' + error.message);
-            }
-        },
-        async deleteItem(id) {
-            if (!confirm('Apakah Anda yakin ingin menghapus layanan ini?')) return;
-            try {
-                const response = await fetch(`/api/order-items/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content
-                    }
-                });
-                if (response.ok) {
-                    alert('Item berhasil dihapus');
-                    location.reload();
-                } else {
-                    alert('Gagal menghapus item');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Terjadi kesalahan: ' + error.message);
-            }
-        }
-    }">
     <!-- Edit Modal -->
-    <div x-show="editModal.open" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" @click="editModal.open = false">
-        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
+    <div id="editModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Edit Layanan</h3>
-                <button @click="editModal.open = false" class="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                <button onclick="closeEditModal()" class="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
 
-            <form @submit.prevent="submitEdit" class="p-6 space-y-4">
+            <form onsubmit="submitEdit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="editItemId">
+
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nama Layanan</label>
-                    <input x-model="editModal.data.nama_layanan" type="text" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" readonly>
+                    <input id="editNamaLayanan" type="text" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" readonly>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Qty</label>
-                        <input x-model.number="editModal.data.jumlah" type="number" min="1" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white">
+                        <input id="editJumlah" type="number" min="1" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Harga</label>
-                        <input x-model.number="editModal.data.harga" type="number" min="0" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white">
+                        <input id="editHarga" type="number" min="0" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white">
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Catatan</label>
-                    <textarea x-model="editModal.data.catatan" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" rows="3"></textarea>
+                    <textarea id="editCatatan" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" rows="3"></textarea>
                 </div>
 
                 <div class="flex gap-3 pt-4">
-                    <button type="button" @click="editModal.open = false" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                         Batal
                     </button>
                     <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -93,7 +45,6 @@
                 </div>
             </form>
         </div>
-    </div>
     </div>
 
     <table class="w-full border-collapse">
@@ -207,13 +158,49 @@
         }
 
         function openEditModal(id, nama, jumlah, harga, catatan) {
-            const modal = document.querySelector('[x-data*="editModal"]');
-            if (modal && modal.__x) {
-                modal.__x.getUnobservedData().editModal.data = { id, nama_layanan: nama, jumlah, harga, catatan };
-                modal.__x.getUnobservedData().editModal.open = true;
-            }
+            document.getElementById('editItemId').value = id;
+            document.getElementById('editNamaLayanan').value = nama;
+            document.getElementById('editJumlah').value = jumlah;
+            document.getElementById('editHarga').value = harga;
+            document.getElementById('editCatatan').value = catatan;
+            document.getElementById('editModal').classList.remove('hidden');
             // Close dropdown
             document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.add('hidden'));
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        async function submitEdit(event) {
+            event.preventDefault();
+            const id = document.getElementById('editItemId').value;
+            const jumlah = document.getElementById('editJumlah').value;
+            const harga = document.getElementById('editHarga').value;
+            const catatan = document.getElementById('editCatatan').value;
+
+            try {
+                const response = await fetch(`/api/order-items/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ jumlah, harga, catatan })
+                });
+
+                if (response.ok) {
+                    alert('Item berhasil diupdate');
+                    closeEditModal();
+                    location.reload();
+                } else {
+                    const err = await response.json();
+                    alert('Gagal: ' + (err.message || 'Update gagal'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
         }
 
         async function deleteItem(id) {
