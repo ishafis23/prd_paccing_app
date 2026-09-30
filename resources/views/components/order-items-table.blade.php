@@ -1,16 +1,6 @@
 <div class="overflow-x-auto" x-data="{
         openDropdownId: null,
         editModal: { open: false, data: { id: null, nama_layanan: '', jumlah: 0, harga: 0, catatan: '' } },
-        toggleDropdown(id) {
-            console.log('Toggle dropdown untuk ID:', id, 'Current:', this.openDropdownId);
-            this.openDropdownId = this.openDropdownId === id ? null : id;
-            console.log('After toggle:', this.openDropdownId);
-        },
-        openEdit(item) {
-            console.log('Opening edit for:', item);
-            this.editModal.data = item;
-            this.editModal.open = true;
-        },
         async submitEdit() {
             try {
                 const response = await fetch(`/api/order-items/${this.editModal.data.id}`, {
@@ -122,19 +112,19 @@
                     @if ($index > 0)
                     <td class="border border-slate-300 dark:border-slate-600 px-2 py-3 text-center w-12">
                         <div class="relative inline-block">
-                            <button @click="toggleDropdown({{ $item->id }})" class="p-2 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Aksi">
+                            <button type="button" @click.stop="openDropdownId = openDropdownId === {{ $item->id }} ? null : {{ $item->id }}" class="p-2 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Aksi">
                                 <svg class="w-5 h-5 text-slate-600 dark:text-slate-400" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
                                 </svg>
                             </button>
                             <div x-show="openDropdownId === {{ $item->id }}" @click.outside="openDropdownId = null" class="absolute left-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl z-50 border border-slate-200 dark:border-slate-700 overflow-hidden">
-                                <button type="button" @click="openEdit({id: {{ $item->id }}, nama_layanan: '{{ $item->nama_layanan }}', jumlah: {{ $item->jumlah }}, harga: {{ $item->harga }}, catatan: '{{ $item->catatan ?? '' }}'}); openDropdownId = null" class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2">
+                                <button type="button" @click.stop="editModal.data = {id: {{ $item->id }}, nama_layanan: '{{ $item->nama_layanan }}', jumlah: {{ $item->jumlah }}, harga: {{ $item->harga }}, catatan: '{{ $item->catatan ?? '' }}'}; editModal.open = true; openDropdownId = null" class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                     Edit
                                 </button>
-                                <button type="button" @click="deleteItem({{ $item->id }}); openDropdownId = null" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 border-t border-slate-200 dark:border-slate-700">
+                                <button type="button" @click.stop="if(confirm('Apakah Anda yakin ingin menghapus layanan ini?')) { (async () => { try { const res = await fetch('/api/order-items/{{ $item->id }}', {method: 'DELETE', headers: {'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content}}); if(res.ok) { alert('Item berhasil dihapus'); location.reload(); } else { alert('Gagal menghapus'); } } catch(e) { alert('Error: ' + e.message); } })(); } openDropdownId = null" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 border-t border-slate-200 dark:border-slate-700">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
