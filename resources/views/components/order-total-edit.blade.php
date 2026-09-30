@@ -1,3 +1,8 @@
+@php
+    $state = $getState();
+    $total = $state['total'] ?? 0;
+@endphp
+
 <div class="flex items-center justify-between gap-3">
     <div>
         <p class="text-sm font-semibold text-slate-600 dark:text-slate-400">Total Tagihan</p>

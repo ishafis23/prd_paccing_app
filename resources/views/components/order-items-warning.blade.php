@@ -1,3 +1,9 @@
+@php
+    $state = $getState();
+    $totalCalculated = $state['totalCalculated'] ?? 0;
+    $totalActual = $state['totalActual'] ?? 0;
+@endphp
+
 <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 dark:border-red-400 p-4 rounded-r-lg mb-4">
     <div class="flex gap-3">
         <div class="flex-shrink-0">
