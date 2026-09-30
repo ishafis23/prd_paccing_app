@@ -218,7 +218,7 @@ class OrderResource extends BaseResource
                         Tabs\Tab::make('Order')
                             ->schema([
                                 Section::make()
-                                    ->columns(3)
+                                    ->columns(2)
                                     ->schema([
                                         TextEntry::make('customer.nama')->label('Customer'),
                                         TextEntry::make('customerAddress.nama_lokasi')
