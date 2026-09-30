@@ -16,6 +16,7 @@ use App\Models\Customer;
 use App\Models\CustomerAcUnit;
 use App\Models\CustomerAddress;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Models\Titik;
@@ -226,6 +227,13 @@ class OrderResource extends BaseResource
 
                         Tabs\Tab::make('Rincian Layanan')
                             ->schema([
+                                \Filament\Infolists\Components\View::make('order-items-warning')
+                                    ->state(fn (Order $record): array => [
+                                        'totalCalculated' => $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah),
+                                        'totalActual' => $record->total(),
+                                    ])
+                                    ->visible(fn (Order $record): bool => $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah) != $record->total()),
+
                                 Section::make()
                                     ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan".')
                                     ->schema([
