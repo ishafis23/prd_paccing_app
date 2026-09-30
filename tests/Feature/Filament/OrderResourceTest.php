@@ -4,10 +4,12 @@ use App\Enums\ExpenseCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\RoleName;
+use App\Filament\Resources\OrderResource;
 use App\Filament\Resources\OrderResource\Pages\CreateOrder;
 use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Filament\Resources\OrderResource\Pages\ViewOrder;
 use App\Models\Customer;
+use App\Models\Expense;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\TeknisiExpense;
@@ -196,5 +198,26 @@ it('tab pengeluaran menampilkan pengeluaran admin & teknisi yang tertaut order',
         ->assertSee('Material & Perawatan (Admin)')
         ->assertSee('Operasional (Teknisi)')
         ->assertSee('Beli selang');
+});
+
+it('admin bisa menambah pengeluaran lewat aksi di tab pengeluaran order', function () {
+    $order = Order::factory()->create();
+
+    $this->actingAs($this->admin);
+
+    OrderResource::tambahPengeluaran($order, [
+        'kategori' => 'material',
+        'qty' => 2,
+        'harga' => 25000,
+        'nominal' => 50000,
+        'tanggal' => now()->toDateString(),
+        'keterangan' => 'Beli selang',
+    ]);
+
+    $expense = Expense::where('order_id', $order->id)->first();
+    expect($expense)->not->toBeNull();
+    expect((int) $expense->qty)->toBe(2);
+    expect((float) $expense->harga)->toBe(25000.0);
+    expect((float) $expense->nominal)->toBe(50000.0);
 });
 

@@ -16,6 +16,7 @@ use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
 use App\Models\CustomerAddress;
+use App\Models\Expense;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ServiceCatalog;
@@ -23,6 +24,7 @@ use App\Models\Team;
 use App\Models\Titik;
 use App\Models\User;
 use App\Services\CustomerService;
+use App\Services\FinanceService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Support\EnumOptions;
@@ -389,17 +391,7 @@ class OrderResource extends BaseResource
                                             ])
                                             ->action(function (array $data, Order $record): void {
                                                 try {
-                                                    app(FinanceService::class)->createExpense(
-                                                        ExpenseCategory::from($data['kategori']),
-                                                        (float) $data['nominal'],
-                                                        auth()->user(),
-                                                        $data['tanggal'] ?? null,
-                                                        $data['keterangan'] ?? null,
-                                                        $data['bukti'] ?? null,
-                                                        $record->id,
-                                                        isset($data['qty']) ? (int) $data['qty'] : null,
-                                                        isset($data['harga']) ? (float) $data['harga'] : null,
-                                                    );
+                                                    self::tambahPengeluaran($record, $data);
 
                                                     Notification::make()->success()->title('Pengeluaran ditambahkan')->send();
                                                     $record->refresh();
@@ -504,6 +496,26 @@ class OrderResource extends BaseResource
                     ])
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * Catat pengeluaran admin (material/perawatan) yang tertaut ke order.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function tambahPengeluaran(Order $record, array $data): Expense
+    {
+        return app(FinanceService::class)->createExpense(
+            ExpenseCategory::from($data['kategori']),
+            (float) $data['nominal'],
+            auth()->user(),
+            $data['tanggal'] ?? null,
+            $data['keterangan'] ?? null,
+            $data['bukti'] ?? null,
+            $record->id,
+            isset($data['qty']) ? (int) $data['qty'] : null,
+            isset($data['harga']) ? (float) $data['harga'] : null,
+        );
     }
 
     public static function table(Table $table): Table
