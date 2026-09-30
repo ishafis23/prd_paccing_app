@@ -1,7 +1,7 @@
 <div class="overflow-x-auto">
     <!-- Edit Modal -->
-    <div id="editModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
-        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div id="editModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" onclick="if(event.target === this) closeEditModal()">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
             <div class="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Edit Layanan</h3>
                 <button onclick="closeEditModal()" class="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
@@ -35,12 +35,12 @@
                     <textarea id="editCatatan" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" rows="3"></textarea>
                 </div>
 
-                <div class="flex gap-3 pt-4">
-                    <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                <div class="flex gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium">
                         Batal
                     </button>
-                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
-                        Simpan
+                    <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg">
+                        💾 Simpan
                     </button>
                 </div>
             </form>

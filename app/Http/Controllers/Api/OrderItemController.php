@@ -8,8 +8,13 @@ use Illuminate\Http\Request;
 
 class OrderItemController extends Controller
 {
-    public function update(Request $request, OrderItem $orderItem)
+    public function update(Request $request, $id)
     {
+        $orderItem = OrderItem::find($id);
+        if (!$orderItem) {
+            return response()->json(['message' => 'Item not found'], 404);
+        }
+
         $validated = $request->validate([
             'jumlah' => 'required|numeric|min:1',
             'harga' => 'required|numeric|min:0',
@@ -18,11 +23,16 @@ class OrderItemController extends Controller
 
         $orderItem->update($validated);
 
-        return response()->json(['message' => 'Item updated successfully']);
+        return response()->json(['message' => 'Item updated successfully', 'data' => $orderItem]);
     }
 
-    public function destroy(OrderItem $orderItem)
+    public function destroy($id)
     {
+        $orderItem = OrderItem::find($id);
+        if (!$orderItem) {
+            return response()->json(['message' => 'Item not found'], 404);
+        }
+
         $orderItem->delete();
 
         return response()->json(['message' => 'Item deleted successfully']);
