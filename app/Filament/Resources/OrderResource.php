@@ -245,29 +245,11 @@ class OrderResource extends BaseResource
                                     })
                                     ->color('danger'),
 
-                                Section::make()
+                                Section::make('Daftar Layanan')
                                     ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan".')
                                     ->schema([
-                                        RepeatableEntry::make('orderItems')
-                                            ->label('')
-                                            ->columns(4)
-                                            ->schema([
-                                                TextEntry::make('nama_layanan')->label('Layanan'),
-                                                TextEntry::make('kategori')->badge()->placeholder('—'),
-                                                TextEntry::make('jumlah')->label('Jumlah'),
-                                                TextEntry::make('harga')->label('Harga')->money('IDR'),
-                                                TextEntry::make('acUnit')
-                                                    ->label('Unit AC')
-                                                    ->columnSpanFull()
-                                                    ->state(fn ($record) => $record?->acUnit?->labelTampil())
-                                                    ->visible(fn ($record): bool => $record?->customer_ac_unit_id !== null),
-                                                TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
-                                                    ->visible(fn ($record): bool => filled($record?->catatan)),
-                                                TextEntry::make('ditambahkanOleh.name')
-                                                    ->label('Ditambahkan oleh')
-                                                    ->columnSpanFull()
-                                                    ->visible(fn ($record): bool => filled($record?->ditambahkan_oleh)),
-                                            ]),
+                                        \Filament\Infolists\Components\View::make('components.order-items-table')
+                                            ->state(fn (Order $record) => $record->orderItems),
                                     ]),
                                 Section::make('Total Tagihan')
                                     ->schema([
