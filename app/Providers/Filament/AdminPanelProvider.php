@@ -38,6 +38,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandName(fn (): string => app(\App\Services\BusinessInfoService::class)->namaUsaha())
             ->brandLogo(fn (): ?HtmlString => $this->logoUsaha())
             ->brandLogoHeight('2rem')
+            ->favicon(fn (): string => asset('favicon.ico'))
             ->colors([
                 'primary' => Color::Blue,
             ])

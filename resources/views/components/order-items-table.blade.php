@@ -39,7 +39,7 @@
                     <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium">
                         Batal
                     </button>
-                    <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg">
+                    <button type="submit" class="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-lg">
                         💾 Simpan
                     </button>
                 </div>
@@ -142,6 +142,8 @@
     </table>
 
     <script>
+        const orderItemBaseUrl = @json(rtrim(request()->getBaseUrl(), '/'));
+
         function toggleDropdown(button, itemId) {
             const dropdown = button.nextElementSibling;
             const isHidden = dropdown.classList.contains('hidden');
@@ -187,7 +189,7 @@
                 const payload = { jumlah: parseInt(jumlah), harga: parseInt(harga), catatan };
                 console.log('Sending payload:', payload);
 
-                const response = await fetch(`/order-items/${id}`, {
+                const response = await fetch(`${orderItemBaseUrl}/order-items/${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -222,7 +224,7 @@
             if (!confirm('Apakah Anda yakin ingin menghapus layanan ini?')) return;
 
             try {
-                const response = await fetch(`/api/order-items/${id}`, {
+                const response = await fetch(`${orderItemBaseUrl}/order-items/${id}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
