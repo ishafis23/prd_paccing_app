@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ExpenseCategory;
 use App\Enums\ReminderStatus;
 use App\Enums\RoleName;
 use App\Filament\Resources\ExpenseResource\Pages\CreateExpense;
@@ -12,6 +13,7 @@ use App\Models\Income;
 use App\Models\Payment;
 use App\Models\ServiceReminder;
 use App\Models\User;
+use App\Services\FinanceService;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -73,4 +75,58 @@ it('admin tandai reminder sudah dihubungi lewat aksi tabel', function () {
         ->callTableAction('tandaiDihubungi', $reminder);
 
     expect($reminder->fresh()->status_notice)->toBe(ReminderStatus::SudahDihubungi);
+});
+
+it('admin bisa edit & hapus pengeluaran lewat endpoint tabel order', function () {
+    $expense = app(FinanceService::class)->createExpense(
+        ExpenseCategory::Material,
+        50000,
+        $this->admin,
+        null,
+        'Awal',
+        null,
+        null,
+        2,
+        25000,
+    );
+
+    $this->actingAs($this->admin);
+
+    $this->putJson("/expenses/{$expense->id}", [
+        'kategori' => 'perawatan',
+        'qty' => 3,
+        'harga' => 10000,
+        'nominal' => 30000,
+        'tanggal' => now()->toDateString(),
+        'keterangan' => 'Diubah',
+    ])->assertOk();
+
+    $this->assertDatabaseHas('expenses', [
+        'id' => $expense->id,
+        'kategori' => 'perawatan',
+        'qty' => 3,
+    ]);
+
+    $this->deleteJson("/expenses/{$expense->id}")->assertOk();
+    $this->assertDatabaseMissing('expenses', ['id' => $expense->id]);
+});
+
+it('hr tidak bisa edit pengeluaran lewat endpoint', function () {
+    $expense = app(FinanceService::class)->createExpense(
+        ExpenseCategory::Material,
+        50000,
+        $this->admin,
+    );
+
+    $this->actingAs($this->hr);
+
+    $this->putJson("/expenses/{$expense->id}", [
+        'kategori' => 'material',
+        'qty' => 1,
+        'harga' => 50000,
+        'nominal' => 50000,
+        'tanggal' => now()->toDateString(),
+    ])->assertForbidden();
+
+    $this->assertDatabaseHas('expenses', ['id' => $expense->id, 'qty' => null]);
 });

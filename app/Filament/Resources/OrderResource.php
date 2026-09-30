@@ -403,19 +403,9 @@ class OrderResource extends BaseResource
                                             }),
                                     ])
                                     ->schema([
-                                        RepeatableEntry::make('expenses')
-                                            ->label('')
-                                            ->columns(6)
-                                            ->schema([
-                                                TextEntry::make('tanggal')->label('Tanggal')->date('d M Y'),
-                                                TextEntry::make('kategori')->label('Kategori')->badge(),
-                                                TextEntry::make('keterangan')->label('Keterangan')->placeholder('—')->columnSpan(2),
-                                                TextEntry::make('qty')->label('Qty')->placeholder('—'),
-                                                TextEntry::make('harga')->label('Harga')->money('IDR')->placeholder('—'),
-                                                TextEntry::make('nominal')->label('Total')->money('IDR'),
-                                                TextEntry::make('recordedBy.name')->label('Dicatat oleh')->columnSpanFull(),
-                                            ])
-                                            ->placeholder('Belum ada pengeluaran material/perawatan'),
+                                        \Filament\Infolists\Components\View::make('components.expense-table')
+                                            ->state(fn (Order $record) => $record->expenses)
+                                            ->default([]),
                                     ]),
                                 Section::make('Operasional (Teknisi)')
                                     ->description('Pengeluaran yang diinput teknisi dan tertaut ke order ini.')

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\OrderItemController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResiController;
@@ -88,6 +89,12 @@ Route::middleware('auth:customer')->prefix('portal')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::put('/order-items/{orderItem}', [OrderItemController::class, 'update'])->name('order-items.update');
     Route::delete('/order-items/{orderItem}', [OrderItemController::class, 'destroy'])->name('order-items.delete');
+});
+
+// Expense endpoints (admin/material & perawatan)
+Route::middleware('auth')->group(function () {
+    Route::put('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
+    Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.delete');
 });
 
 // Admin approval endpoints (Phase 03)
