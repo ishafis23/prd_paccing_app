@@ -4,7 +4,7 @@
             <tr class="bg-slate-100 dark:bg-slate-700">
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Layanan</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Kategori</th>
-                <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Jumlah</th>
+                <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Qty</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Harga</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Subtotal</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-sm font-semibold text-slate-900 dark:text-white w-12">Aksi</th>
