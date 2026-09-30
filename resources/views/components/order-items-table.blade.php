@@ -1,4 +1,50 @@
-<div class="overflow-x-auto">
+<div class="overflow-x-auto" x-data="orderItemsEditor()">
+    <!-- Edit Modal -->
+    <div x-show="editModal.open" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" @click="editModal.open = false">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
+            <div class="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Edit Layanan</h3>
+                <button @click="editModal.open = false" class="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <form @submit.prevent="submitEdit" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nama Layanan</label>
+                    <input x-model="editModal.data.nama_layanan" type="text" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" readonly>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Qty</label>
+                        <input x-model.number="editModal.data.jumlah" type="number" min="1" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Harga</label>
+                        <input x-model.number="editModal.data.harga" type="number" min="0" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Catatan</label>
+                    <textarea x-model="editModal.data.catatan" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white" rows="3"></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="button" @click="editModal.open = false" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                        Batal
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <table class="w-full border-collapse">
         <thead>
             <tr class="bg-slate-100 dark:bg-slate-700">
@@ -22,13 +68,13 @@
                                 </svg>
                             </button>
                             <div x-show="open" @click.outside="open = false" class="absolute left-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl z-50 border border-slate-200 dark:border-slate-700 overflow-hidden">
-                                <button type="button" onclick="alert('Edit untuk item ID {{ $item->id }} - Fitur akan ditambahkan')" class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2">
+                                <button type="button" @click="openEdit({id: {{ $item->id }}, nama_layanan: '{{ $item->nama_layanan }}', jumlah: {{ $item->jumlah }}, harga: {{ $item->harga }}, catatan: '{{ $item->catatan ?? '' }}'}); open = false" class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                     Edit
                                 </button>
-                                <button type="button" onclick="if(confirm('Apakah Anda yakin ingin menghapus layanan ini?')) { alert('Hapus item ID {{ $item->id }} - Fitur akan ditambahkan'); }" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 border-t border-slate-200 dark:border-slate-700">
+                                <button type="button" @click="deleteItem({{ $item->id }}); open = false" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 border-t border-slate-200 dark:border-slate-700">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
@@ -92,4 +138,70 @@
             </tr>
         </tfoot>
     </table>
+
+    <script>
+        function orderItemsEditor() {
+            return {
+                editModal: {
+                    open: false,
+                    data: {
+                        id: null,
+                        nama_layanan: '',
+                        jumlah: 0,
+                        harga: 0,
+                        catatan: ''
+                    }
+                },
+                openEdit(item) {
+                    this.editModal.data = { ...item };
+                    this.editModal.open = true;
+                },
+                async submitEdit() {
+                    try {
+                        const response = await fetch(`/api/order-items/${this.editModal.data.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            },
+                            body: JSON.stringify(this.editModal.data)
+                        });
+
+                        if (response.ok) {
+                            alert('Item berhasil diupdate');
+                            this.editModal.open = false;
+                            location.reload();
+                        } else {
+                            alert('Gagal mengupdate item');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Terjadi kesalahan');
+                    }
+                },
+                async deleteItem(id) {
+                    if (!confirm('Apakah Anda yakin ingin menghapus layanan ini?')) return;
+
+                    try {
+                        const response = await fetch(`/api/order-items/${id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            }
+                        });
+
+                        if (response.ok) {
+                            alert('Item berhasil dihapus');
+                            location.reload();
+                        } else {
+                            alert('Gagal menghapus item');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Terjadi kesalahan');
+                    }
+                }
+            };
+        }
+    </script>
 </div>
