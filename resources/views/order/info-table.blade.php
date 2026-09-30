@@ -11,7 +11,7 @@
                     <td class="py-4 px-4 font-semibold text-gray-700 dark:text-gray-300 w-1/3 align-top">Alamat</td>
                     <td class="py-4 px-4 align-top">
                         @if ($getState()->customerAddress?->nama_lokasi)
-                            <span class="inline-block px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
+                            <span class="px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
                                 {{ $getState()->customerAddress->nama_lokasi }}
                             </span>
                         @else
@@ -22,7 +22,7 @@
                 <tr class="border-b border-gray-200 dark:border-gray-700">
                     <td class="py-4 px-4 font-semibold text-gray-700 dark:text-gray-300 w-1/3 align-top">Layanan</td>
                     <td class="py-4 px-4 align-top">
-                        <span class="inline-block px-3 py-1 text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+                        <span class="px-3 py-1 text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
                             {{ $getState()->serviceCatalog?->jenis_layanan->value ?? '—' }}
                         </span>
                     </td>
@@ -34,7 +34,7 @@
                 <tr class="border-b border-gray-200 dark:border-gray-700">
                     <td class="py-4 px-4 font-semibold text-gray-700 dark:text-gray-300 w-1/3 align-top">Status</td>
                     <td class="py-4 px-4 align-top">
-                        <span class="inline-block px-3 py-1 text-sm font-medium rounded {{ $getState()->status->value === 'selesai' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : ($getState()->status->value === 'batal' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200') }}">
+                        <span class="px-3 py-1 text-sm font-medium rounded {{ $getState()->status->value === 'selesai' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : ($getState()->status->value === 'batal' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200') }}">
                             {{ ucfirst(str_replace('_', ' ', $getState()->status->value)) }}
                         </span>
                     </td>
@@ -42,7 +42,7 @@
                 <tr class="border-b border-gray-200 dark:border-gray-700">
                     <td class="py-4 px-4 font-semibold text-gray-700 dark:text-gray-300 w-1/3 align-top">Jenis Pelanggan</td>
                     <td class="py-4 px-4 align-top">
-                        <span class="inline-block px-3 py-1 text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded">
+                        <span class="px-3 py-1 text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded">
                             @if ($getState()->jenis_pelanggan?->value === 'company')
                                 Instansi
                             @elseif ($getState()->jenis_pelanggan?->value === 'perorangan')
