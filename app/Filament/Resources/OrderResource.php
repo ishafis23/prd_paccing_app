@@ -30,6 +30,7 @@ use Filament\Forms\Get;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\Tabs;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -212,149 +213,213 @@ class OrderResource extends BaseResource
     {
         return $infolist
             ->schema([
-                Section::make('Order')
-                    ->columns(3)
-                    ->schema([
-                        TextEntry::make('customer.nama')->label('Customer'),
-                        TextEntry::make('customerAddress.nama_lokasi')
-                            ->label('Alamat')
-                            ->badge()
-                            ->placeholder('—'),
-                        TextEntry::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
-                        TextEntry::make('teknisi.name')->label('Teknisi')->placeholder('— belum di-assign —'),
-                        TextEntry::make('status')->badge(),
-                        TextEntry::make('jenis_pelanggan')
-                            ->label('Jenis Pelanggan')
-                            ->badge()
-                            ->formatStateUsing(fn (?CustomerJenis $state): ?string => match ($state) {
-                                CustomerJenis::Company => 'Instansi',
-                                CustomerJenis::Perorangan => 'Cust Umum',
-                                default => null,
-                            })
-                            ->placeholder('—'),
-                        TextEntry::make('tanggal_jadwal')->date('d M Y'),
-                        TextEntry::make('total')->label('Total')->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.')),
-                        TextEntry::make('alamat_pengerjaan')->columnSpanFull(),
-                        TextEntry::make('alasan_kendala')
-                            ->label('Alasan Kendala')
-                            ->columnSpanFull()
-                            ->color('danger')
-                            ->visible(fn (Order $record): bool => filled($record->alasan_kendala)),
-                        TextEntry::make('perbaikan_catatan')
-                            ->label('Menunggu Konfirmasi Perbaikan')
-                            ->columnSpanFull()
-                            ->color('warning')
-                            ->formatStateUsing(fn (Order $record): string => $record->perbaikan_catatan
-                                .($record->perbaikan_estimasi_harga !== null
-                                    ? ' (estimasi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')'
-                                    : '')
-                                .' — dilaporkan '.($record->pelaporPerbaikan?->name ?? '—'))
-                            ->visible(fn (Order $record): bool => $record->perbaikan_menunggu_konfirmasi),
-                        TextEntry::make('catatan_admin')->columnSpanFull()->placeholder('—'),
-                    ]),
-                Section::make('Rincian Layanan')
-                    ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan" (mis. sparepart hasil "Ada Perbaikan").')
-                    ->schema([
-                        RepeatableEntry::make('orderItems')
-                            ->label('')
-                            ->columns(4)
+                Tabs::make('order-tabs')
+                    ->tabs([
+                        Tabs\Tab::make('Order')
                             ->schema([
-                                TextEntry::make('nama_layanan')->label('Layanan'),
-                                TextEntry::make('kategori')->badge()->placeholder('—'),
-                                TextEntry::make('jumlah')->label('Jumlah'),
-                                TextEntry::make('harga')->label('Harga')->money('IDR'),
-                                TextEntry::make('acUnit')
-                                    ->label('Unit AC')
-                                    ->columnSpanFull()
-                                    ->state(fn ($record) => $record?->acUnit?->labelTampil())
-                                    ->visible(fn ($record): bool => $record?->customer_ac_unit_id !== null),
-                                TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
-                                    ->visible(fn ($record): bool => filled($record?->catatan)),
-                                TextEntry::make('ditambahkanOleh.name')
-                                    ->label('Ditambahkan oleh')
-                                    ->columnSpanFull()
-                                    ->visible(fn ($record): bool => filled($record?->ditambahkan_oleh)),
-                            ]),
-                    ])
-                    ->collapsible(),
-                Section::make('Tim Teknisi (B21)')
-                    ->schema([
-                        TextEntry::make('anggota_tim')
-                            ->label('Anggota tim')
-                            ->placeholder('— belum di-assign —')
-                            ->state(function (Order $record): ?string {
-                                $tim = $record->timTeknisi
-                                    ->map(fn (User $u): string => (int) $u->id === (int) $record->teknisi_id
-                                        ? $u->name.' (PIC)'
-                                        : $u->name);
-
-                                if ($tim->isEmpty() && $record->teknisi !== null) {
-                                    $tim = collect([$record->teknisi->name.' (PIC)']);
-                                }
-
-                                return $tim->isEmpty() ? null : $tim->implode(', ');
-                            }),
-                        TextEntry::make('team.nama')
-                            ->label('Di-assign lewat tim')
-                            ->placeholder('— assign manual —'),
-                    ])
-                    ->collapsible(),
-                Section::make('Pembayaran')
-                    ->schema([
-                        TextEntry::make('latestPayment.status')->label('Status')->badge()->placeholder('Belum ada pembayaran'),
-                        TextEntry::make('latestPayment.jumlah_dibayar')->label('Dibayar')->money('IDR')->placeholder('—'),
-                        TextEntry::make('latestPayment.tanggal_bayar')->label('Tanggal')->date('d M Y')->placeholder('—'),
-                        TextEntry::make('metode_dipilih')
-                            ->label('Metode dipilih customer')
-                            ->badge()
-                            ->placeholder('—')
-                            ->formatStateUsing(fn (?PaymentMethod $state): ?string => $state ? ucfirst($state->value) : null),
-                        ImageEntry::make('bukti_pembayaran')
-                            ->label('Bukti Pembayaran')
-                            ->disk('public')
-                            ->visible(fn (Order $record): bool => filled($record->bukti_pembayaran)),
-                    ])
-                    ->columns(2),
-                Section::make('Laporan Pengerjaan')
-                    ->schema([
-                        RepeatableEntry::make('workReports')
-                            ->label('')
-                            ->columns(2)
-                            ->schema([
-                                TextEntry::make('catatan_pengerjaan')->label('Catatan')->columnSpanFull(),
-                                ImageEntry::make('foto_sebelum')
-                                    ->label('Foto Sebelum')
-                                    ->disk('public')
-                                    ->visible(fn ($record): bool => filled($record?->foto_sebelum)),
-                                ImageEntry::make('foto_sesudah')
-                                    ->label('Foto Sesudah')
-                                    ->disk('public')
-                                    ->visible(fn ($record): bool => filled($record?->foto_sesudah)),
-                                RepeatableEntry::make('photos')
-                                    ->label('Foto per Kategori')
-                                    ->columnSpanFull()
-                                    ->columns(4)
+                                Section::make()
+                                    ->columns(3)
                                     ->schema([
-                                        TextEntry::make('orderItem.nama_layanan')
-                                            ->label('Layanan')
-                                            ->formatStateUsing(fn (?string $state, $record): string => $record?->orderItem?->acUnit
-                                                ? $state.' — '.$record->orderItem->acUnit->labelTampil()
-                                                : (string) $state),
-                                        TextEntry::make('slot')->label('Slot')->formatStateUsing(fn (?string $state): string => str($state ?? '')->headline()->toString()),
-                                        ImageEntry::make('path')->label('')->disk('public')->columnSpan(2),
+                                        TextEntry::make('customer.nama')->label('Customer'),
+                                        TextEntry::make('customerAddress.nama_lokasi')
+                                            ->label('Alamat')
+                                            ->badge()
+                                            ->placeholder('—'),
+                                        TextEntry::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
+                                        TextEntry::make('teknisi.name')->label('Teknisi')->placeholder('— belum di-assign —'),
+                                        TextEntry::make('status')->badge(),
+                                        TextEntry::make('jenis_pelanggan')
+                                            ->label('Jenis Pelanggan')
+                                            ->badge()
+                                            ->formatStateUsing(fn (?CustomerJenis $state): ?string => match ($state) {
+                                                CustomerJenis::Company => 'Instansi',
+                                                CustomerJenis::Perorangan => 'Cust Umum',
+                                                default => null,
+                                            })
+                                            ->placeholder('—'),
+                                        TextEntry::make('tanggal_jadwal')->date('d M Y'),
+                                        TextEntry::make('alamat_pengerjaan')->columnSpanFull(),
+                                        TextEntry::make('alasan_kendala')
+                                            ->label('Alasan Kendala')
+                                            ->columnSpanFull()
+                                            ->color('danger')
+                                            ->visible(fn (Order $record): bool => filled($record->alasan_kendala)),
+                                        TextEntry::make('perbaikan_catatan')
+                                            ->label('Menunggu Konfirmasi Perbaikan')
+                                            ->columnSpanFull()
+                                            ->color('warning')
+                                            ->formatStateUsing(fn (Order $record): string => $record->perbaikan_catatan
+                                                .($record->perbaikan_estimasi_harga !== null
+                                                    ? ' (estimasi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')'
+                                                    : '')
+                                                .' — dilaporkan '.($record->pelaporPerbaikan?->name ?? '—'))
+                                            ->visible(fn (Order $record): bool => $record->perbaikan_menunggu_konfirmasi),
+                                        TextEntry::make('catatan_admin')->columnSpanFull()->placeholder('—'),
+                                    ]),
+                                Section::make('Tim Teknisi (B21)')
+                                    ->schema([
+                                        TextEntry::make('anggota_tim')
+                                            ->label('Anggota tim')
+                                            ->placeholder('— belum di-assign —')
+                                            ->state(function (Order $record): ?string {
+                                                $tim = $record->timTeknisi
+                                                    ->map(fn (User $u): string => (int) $u->id === (int) $record->teknisi_id
+                                                        ? $u->name.' (PIC)'
+                                                        : $u->name);
+
+                                                if ($tim->isEmpty() && $record->teknisi !== null) {
+                                                    $tim = collect([$record->teknisi->name.' (PIC)']);
+                                                }
+
+                                                return $tim->isEmpty() ? null : $tim->implode(', ');
+                                            }),
+                                        TextEntry::make('team.nama')
+                                            ->label('Di-assign lewat tim')
+                                            ->placeholder('— assign manual —'),
+                                    ]),
+                            ]),
+
+                        Tabs\Tab::make('Rincian Layanan')
+                            ->schema([
+                                Section::make()
+                                    ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan".')
+                                    ->schema([
+                                        RepeatableEntry::make('orderItems')
+                                            ->label('')
+                                            ->columns(4)
+                                            ->schema([
+                                                TextEntry::make('nama_layanan')->label('Layanan'),
+                                                TextEntry::make('kategori')->badge()->placeholder('—'),
+                                                TextEntry::make('jumlah')->label('Jumlah'),
+                                                TextEntry::make('harga')->label('Harga')->money('IDR'),
+                                                TextEntry::make('acUnit')
+                                                    ->label('Unit AC')
+                                                    ->columnSpanFull()
+                                                    ->state(fn ($record) => $record?->acUnit?->labelTampil())
+                                                    ->visible(fn ($record): bool => $record?->customer_ac_unit_id !== null),
+                                                TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
+                                                    ->visible(fn ($record): bool => filled($record?->catatan)),
+                                                TextEntry::make('ditambahkanOleh.name')
+                                                    ->label('Ditambahkan oleh')
+                                                    ->columnSpanFull()
+                                                    ->visible(fn ($record): bool => filled($record?->ditambahkan_oleh)),
+                                            ]),
+                                    ]),
+                                Section::make('Total')
+                                    ->schema([
+                                        TextEntry::make('total')
+                                            ->label('Total Tagihan')
+                                            ->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.'))
+                                            ->size('lg')
+                                            ->extraAttributes(['class' => 'font-bold text-success']),
+                                    ]),
+                            ]),
+
+                        Tabs\Tab::make('Pembayaran')
+                            ->schema([
+                                Section::make()
+                                    ->columns(2)
+                                    ->schema([
+                                        TextEntry::make('latestPayment.status')->label('Status')->badge()->placeholder('Belum ada pembayaran'),
+                                        TextEntry::make('latestPayment.jumlah_dibayar')->label('Dibayar')->money('IDR')->placeholder('—'),
+                                        TextEntry::make('latestPayment.tanggal_bayar')->label('Tanggal')->date('d M Y')->placeholder('—'),
+                                        TextEntry::make('metode_dipilih')
+                                            ->label('Metode dipilih customer')
+                                            ->badge()
+                                            ->placeholder('—')
+                                            ->formatStateUsing(fn (?PaymentMethod $state): ?string => $state ? ucfirst($state->value) : null),
+                                        ImageEntry::make('bukti_pembayaran')
+                                            ->label('Bukti Pembayaran')
+                                            ->columnSpanFull()
+                                            ->disk('public')
+                                            ->visible(fn (Order $record): bool => filled($record->bukti_pembayaran)),
+                                    ]),
+                            ]),
+
+                        Tabs\Tab::make('Pengeluaran')
+                            ->schema([
+                                Section::make()
+                                    ->schema([
+                                        RepeatableEntry::make('expenses')
+                                            ->label('')
+                                            ->columns(4)
+                                            ->schema([
+                                                TextEntry::make('kategori')->label('Kategori')->badge(),
+                                                TextEntry::make('deskripsi')->label('Deskripsi')->columnSpan(2),
+                                                TextEntry::make('nominal')->label('Nominal')->money('IDR'),
+                                                TextEntry::make('catatan')->label('Catatan')->placeholder('—')->columnSpanFull()
+                                                    ->visible(fn ($record): bool => filled($record?->catatan)),
+                                                TextEntry::make('dibuat_oleh.name')
+                                                    ->label('Dibuat oleh')
+                                                    ->columnSpanFull(),
+                                            ])
+                                            ->visible(fn (Order $record): bool => $record->expenses->isNotEmpty())
+                                            ->placeholder(null),
                                     ])
-                                    ->visible(fn ($record): bool => $record?->photos->isNotEmpty()),
-                                TextEntry::make('waktu_selesai')->label('Selesai')->dateTime('d M Y H:i'),
-                                TextEntry::make('diverifikasi_pada')
-                                    ->label('Verifikasi')
-                                    ->badge()
-                                    ->color(fn ($record) => $record?->sudahDiverifikasi() ? 'success' : 'warning')
-                                    ->formatStateUsing(fn ($state, $record) => $record?->sudahDiverifikasi()
-                                        ? 'Terverifikasi oleh '.($record->verifikator?->name ?? '—')
-                                        : 'Menunggu Verifikasi'),
+                                    ->visible(fn (Order $record): bool => $record->expenses->isNotEmpty()),
+                                Section::make()
+                                    ->schema([
+                                        TextEntry::make('placeholder')
+                                            ->label('')
+                                            ->state('Belum ada pengeluaran')
+                                            ->columnSpanFull(),
+                                    ])
+                                    ->visible(fn (Order $record): bool => $record->expenses->isEmpty()),
+                            ]),
+
+                        Tabs\Tab::make('Laporan Pengerjaan')
+                            ->schema([
+                                Section::make()
+                                    ->schema([
+                                        RepeatableEntry::make('workReports')
+                                            ->label('')
+                                            ->columns(2)
+                                            ->schema([
+                                                TextEntry::make('catatan_pengerjaan')->label('Catatan')->columnSpanFull(),
+                                                ImageEntry::make('foto_sebelum')
+                                                    ->label('Foto Sebelum')
+                                                    ->disk('public')
+                                                    ->visible(fn ($record): bool => filled($record?->foto_sebelum)),
+                                                ImageEntry::make('foto_sesudah')
+                                                    ->label('Foto Sesudah')
+                                                    ->disk('public')
+                                                    ->visible(fn ($record): bool => filled($record?->foto_sesudah)),
+                                                RepeatableEntry::make('photos')
+                                                    ->label('Foto per Kategori')
+                                                    ->columnSpanFull()
+                                                    ->columns(4)
+                                                    ->schema([
+                                                        TextEntry::make('orderItem.nama_layanan')
+                                                            ->label('Layanan')
+                                                            ->formatStateUsing(fn (?string $state, $record): string => $record?->orderItem?->acUnit
+                                                                ? $state.' — '.$record->orderItem->acUnit->labelTampil()
+                                                                : (string) $state),
+                                                        TextEntry::make('slot')->label('Slot')->formatStateUsing(fn (?string $state): string => str($state ?? '')->headline()->toString()),
+                                                        ImageEntry::make('path')->label('')->disk('public')->columnSpan(2),
+                                                    ])
+                                                    ->visible(fn ($record): bool => $record?->photos->isNotEmpty()),
+                                                TextEntry::make('waktu_selesai')->label('Selesai')->dateTime('d M Y H:i'),
+                                                TextEntry::make('diverifikasi_pada')
+                                                    ->label('Verifikasi')
+                                                    ->badge()
+                                                    ->color(fn ($record) => $record?->sudahDiverifikasi() ? 'success' : 'warning')
+                                                    ->formatStateUsing(fn ($state, $record) => $record?->sudahDiverifikasi()
+                                                        ? 'Terverifikasi oleh '.($record->verifikator?->name ?? '—')
+                                                        : 'Menunggu Verifikasi'),
+                                            ]),
+                                    ])
+                                    ->visible(fn (Order $record): bool => $record->workReports->isNotEmpty()),
+                                Section::make()
+                                    ->schema([
+                                        TextEntry::make('placeholder')
+                                            ->label('')
+                                            ->state('Belum ada laporan pengerjaan')
+                                            ->columnSpanFull(),
+                                    ])
+                                    ->visible(fn (Order $record): bool => $record->workReports->isEmpty()),
                             ]),
                     ])
-                    ->collapsible(),
+                    ->columnSpanFull(),
             ]);
     }
 
