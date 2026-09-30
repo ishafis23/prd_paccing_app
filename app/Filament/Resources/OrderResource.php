@@ -252,11 +252,11 @@ class OrderResource extends BaseResource
                                     ]),
                                 Section::make('Total')
                                     ->schema([
-                                        TextEntry::make('total')
-                                            ->label('Total Tagihan')
-                                            ->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.'))
-                                            ->size('lg')
-                                            ->extraAttributes(['class' => 'font-bold text-success']),
+                                        \Filament\Infolists\Components\View::make('order-total-edit')
+                                            ->state(fn (Order $record): array => [
+                                                'total' => $record->total(),
+                                                'submitUrl' => route('orders.koreksi-total', $record),
+                                            ]),
                                     ]),
                             ]),
 
