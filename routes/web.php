@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResiController;
@@ -81,6 +82,12 @@ Route::post('/portal/logout', function () {
 
 Route::middleware('auth:customer')->prefix('portal')->group(function () {
     Route::get('/', PortalDashboard::class)->name('portal.dashboard');
+});
+
+// Order Item endpoints
+Route::middleware('auth')->group(function () {
+    Route::put('/order-items/{orderItem}', [OrderItemController::class, 'update'])->name('order-items.update');
+    Route::delete('/order-items/{orderItem}', [OrderItemController::class, 'destroy'])->name('order-items.delete');
 });
 
 // Admin approval endpoints (Phase 03)

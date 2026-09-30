@@ -180,7 +180,7 @@
             const catatan = document.getElementById('editCatatan').value;
 
             try {
-                const response = await fetch(`/api/order-items/${id}`, {
+                const response = await fetch(`/order-items/${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -189,13 +189,21 @@
                     body: JSON.stringify({ jumlah, harga, catatan })
                 });
 
+                const text = await response.text();
+                console.log('Response status:', response.status);
+                console.log('Response text:', text);
+
                 if (response.ok) {
                     alert('Item berhasil diupdate');
                     closeEditModal();
                     location.reload();
                 } else {
-                    const err = await response.json();
-                    alert('Gagal: ' + (err.message || 'Update gagal'));
+                    try {
+                        const err = JSON.parse(text);
+                        alert('Gagal: ' + (err.message || 'Update gagal'));
+                    } catch (e) {
+                        alert('Gagal: Status ' + response.status);
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
