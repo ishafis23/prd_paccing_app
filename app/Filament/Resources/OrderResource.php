@@ -230,11 +230,11 @@ class OrderResource extends BaseResource
                                 TextEntry::make('warning_discrepancy')
                                     ->label('⚠️ Peringatan Discrepancy')
                                     ->columnSpanFull()
-                                    ->visible(fn (Order $record): bool => {
+                                    ->visible(function (Order $record): bool {
                                         $calculated = $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
                                         return $calculated != $record->total();
                                     })
-                                    ->state(fn (Order $record): string => {
+                                    ->state(function (Order $record): string {
                                         $calculated = $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
                                         $actual = $record->total();
                                         $diff = abs($actual - $calculated);
