@@ -218,64 +218,9 @@ class OrderResource extends BaseResource
                         Tabs\Tab::make('Order')
                             ->schema([
                                 Section::make()
-                                    ->columns(2)
                                     ->schema([
-                                        TextEntry::make('customer.nama')->label('Customer'),
-                                        TextEntry::make('customerAddress.nama_lokasi')
-                                            ->label('Alamat')
-                                            ->badge()
-                                            ->placeholder('—'),
-                                        TextEntry::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
-                                        TextEntry::make('teknisi.name')->label('Teknisi')->placeholder('— belum di-assign —'),
-                                        TextEntry::make('status')->badge(),
-                                        TextEntry::make('jenis_pelanggan')
-                                            ->label('Jenis Pelanggan')
-                                            ->badge()
-                                            ->formatStateUsing(fn (?CustomerJenis $state): ?string => match ($state) {
-                                                CustomerJenis::Company => 'Instansi',
-                                                CustomerJenis::Perorangan => 'Cust Umum',
-                                                default => null,
-                                            })
-                                            ->placeholder('—'),
-                                        TextEntry::make('tanggal_jadwal')->date('d M Y'),
-                                        TextEntry::make('alamat_pengerjaan')->columnSpanFull(),
-                                        TextEntry::make('alasan_kendala')
-                                            ->label('Alasan Kendala')
-                                            ->columnSpanFull()
-                                            ->color('danger')
-                                            ->visible(fn (Order $record): bool => filled($record->alasan_kendala)),
-                                        TextEntry::make('perbaikan_catatan')
-                                            ->label('Menunggu Konfirmasi Perbaikan')
-                                            ->columnSpanFull()
-                                            ->color('warning')
-                                            ->formatStateUsing(fn (Order $record): string => $record->perbaikan_catatan
-                                                .($record->perbaikan_estimasi_harga !== null
-                                                    ? ' (estimasi Rp'.number_format((float) $record->perbaikan_estimasi_harga, 0, ',', '.').')'
-                                                    : '')
-                                                .' — dilaporkan '.($record->pelaporPerbaikan?->name ?? '—'))
-                                            ->visible(fn (Order $record): bool => $record->perbaikan_menunggu_konfirmasi),
-                                        TextEntry::make('catatan_admin')->columnSpanFull()->placeholder('—'),
-                                    ]),
-                                Section::make('Tim Teknisi (B21)')
-                                    ->schema([
-                                        TextEntry::make('anggota_tim')
-                                            ->label('Anggota tim')
-                                            ->placeholder('— belum di-assign —')
-                                            ->state(function (Order $record): ?string {
-                                                $tim = $record->timTeknisi
-                                                    ->map(fn (User $u): string => (int) $u->id === (int) $record->teknisi_id
-                                                        ? $u->name.' (PIC)'
-                                                        : $u->name);
-
-                                                if ($tim->isEmpty() && $record->teknisi !== null) {
-                                                    $tim = collect([$record->teknisi->name.' (PIC)']);
-                                                }
-
-                                                return $tim->isEmpty() ? null : $tim->implode(', ');
-                                            }),
-                                        TextEntry::make('team.nama')
-                                            ->label('Di-assign lewat tim')
-                                            ->placeholder('— assign manual —'),
+                                        \Filament\Infolists\Components\View::make('order.info-table')
+                                            ->state(fn (Order $record): Order => $record),
                                     ]),
                             ]),
 
