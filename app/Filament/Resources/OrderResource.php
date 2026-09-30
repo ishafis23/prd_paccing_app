@@ -227,6 +227,24 @@ class OrderResource extends BaseResource
 
                         Tabs\Tab::make('Rincian Layanan')
                             ->schema([
+                                TextEntry::make('warning_discrepancy')
+                                    ->label('⚠️ Peringatan Discrepancy')
+                                    ->columnSpanFull()
+                                    ->visible(fn (Order $record): bool => {
+                                        $calculated = $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+                                        return $calculated != $record->total();
+                                    })
+                                    ->state(fn (Order $record): string => {
+                                        $calculated = $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+                                        $actual = $record->total();
+                                        $diff = abs($actual - $calculated);
+                                        return "Total yang dihitung dari item (Rp".number_format($calculated, 0, ',', '.')
+                                            .") tidak sama dengan Total Tagihan (Rp".number_format($actual, 0, ',', '.')
+                                            ."). Selisih: Rp".number_format($diff, 0, ',', '.')
+                                            .". Periksa nilai Jumlah di item layanan di atas.";
+                                    })
+                                    ->color('danger'),
+
                                 Section::make()
                                     ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan".')
                                     ->schema([
