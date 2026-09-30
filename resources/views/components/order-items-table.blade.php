@@ -1,4 +1,57 @@
-<div class="overflow-x-auto" x-data="orderItemsEditor()">
+<div class="overflow-x-auto" x-data="{
+        editModal: { open: false, data: { id: null, nama_layanan: '', jumlah: 0, harga: 0, catatan: '' } },
+        openEdit(item) {
+            this.editModal.data = item;
+            this.editModal.open = true;
+        },
+        async submitEdit() {
+            try {
+                const response = await fetch(`/api/order-items/${this.editModal.data.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content
+                    },
+                    body: JSON.stringify({
+                        jumlah: this.editModal.data.jumlah,
+                        harga: this.editModal.data.harga,
+                        catatan: this.editModal.data.catatan
+                    })
+                });
+                if (response.ok) {
+                    alert('Item berhasil diupdate');
+                    this.editModal.open = false;
+                    location.reload();
+                } else {
+                    const err = await response.json();
+                    alert('Gagal: ' + (err.message || 'Update gagal'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
+        },
+        async deleteItem(id) {
+            if (!confirm('Apakah Anda yakin ingin menghapus layanan ini?')) return;
+            try {
+                const response = await fetch(`/api/order-items/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content
+                    }
+                });
+                if (response.ok) {
+                    alert('Item berhasil dihapus');
+                    location.reload();
+                } else {
+                    alert('Gagal menghapus item');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
+        }
+    }">
     <!-- Edit Modal -->
     <div x-show="editModal.open" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" @click="editModal.open = false">
         <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
@@ -138,70 +191,4 @@
             </tr>
         </tfoot>
     </table>
-
-    <script>
-        function orderItemsEditor() {
-            return {
-                editModal: {
-                    open: false,
-                    data: {
-                        id: null,
-                        nama_layanan: '',
-                        jumlah: 0,
-                        harga: 0,
-                        catatan: ''
-                    }
-                },
-                openEdit(item) {
-                    this.editModal.data = { ...item };
-                    this.editModal.open = true;
-                },
-                async submitEdit() {
-                    try {
-                        const response = await fetch(`/api/order-items/${this.editModal.data.id}`, {
-                            method: 'PUT',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify(this.editModal.data)
-                        });
-
-                        if (response.ok) {
-                            alert('Item berhasil diupdate');
-                            this.editModal.open = false;
-                            location.reload();
-                        } else {
-                            alert('Gagal mengupdate item');
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        alert('Terjadi kesalahan');
-                    }
-                },
-                async deleteItem(id) {
-                    if (!confirm('Apakah Anda yakin ingin menghapus layanan ini?')) return;
-
-                    try {
-                        const response = await fetch(`/api/order-items/${id}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            }
-                        });
-
-                        if (response.ok) {
-                            alert('Item berhasil dihapus');
-                            location.reload();
-                        } else {
-                            alert('Gagal menghapus item');
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        alert('Terjadi kesalahan');
-                    }
-                }
-            };
-        }
-    </script>
 </div>
