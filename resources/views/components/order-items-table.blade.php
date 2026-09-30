@@ -39,7 +39,7 @@
                     <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                         Batal
                     </button>
-                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
                         Simpan
                     </button>
                 </div>
@@ -178,20 +178,27 @@
             const jumlah = document.getElementById('editJumlah').value;
             const harga = document.getElementById('editHarga').value;
             const catatan = document.getElementById('editCatatan').value;
+            const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+            console.log('Submit edit - Item ID:', id, 'Jumlah:', jumlah, 'Harga:', harga);
+            console.log('CSRF Token:', csrf ? 'Present' : 'MISSING!');
 
             try {
+                const payload = { jumlah: parseInt(jumlah), harga: parseInt(harga), catatan };
+                console.log('Sending payload:', payload);
+
                 const response = await fetch(`/order-items/${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        'X-CSRF-TOKEN': csrf
                     },
-                    body: JSON.stringify({ jumlah, harga, catatan })
+                    body: JSON.stringify(payload)
                 });
 
                 const text = await response.text();
                 console.log('Response status:', response.status);
-                console.log('Response text:', text);
+                console.log('Response text:', text.substring(0, 200));
 
                 if (response.ok) {
                     alert('Item berhasil diupdate');
@@ -202,11 +209,11 @@
                         const err = JSON.parse(text);
                         alert('Gagal: ' + (err.message || 'Update gagal'));
                     } catch (e) {
-                        alert('Gagal: Status ' + response.status);
+                        alert('Gagal: Status ' + response.status + '\n' + text.substring(0, 100));
                     }
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Fetch error:', error);
                 alert('Terjadi kesalahan: ' + error.message);
             }
         }
