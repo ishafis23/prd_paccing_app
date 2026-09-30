@@ -2,9 +2,12 @@
         openDropdownId: null,
         editModal: { open: false, data: { id: null, nama_layanan: '', jumlah: 0, harga: 0, catatan: '' } },
         toggleDropdown(id) {
+            console.log('Toggle dropdown untuk ID:', id, 'Current:', this.openDropdownId);
             this.openDropdownId = this.openDropdownId === id ? null : id;
+            console.log('After toggle:', this.openDropdownId);
         },
         openEdit(item) {
+            console.log('Opening edit for:', item);
             this.editModal.data = item;
             this.editModal.open = true;
         },
