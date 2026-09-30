@@ -263,7 +263,6 @@ class OrderResource extends BaseResource
                                         \Filament\Infolists\Components\View::make('components.order-total-edit')
                                             ->state(fn (Order $record): array => [
                                                 'total' => $record->total(),
-                                                'submitUrl' => route('orders.koreksi-total', $record),
                                             ]),
                                     ]),
                             ]),
