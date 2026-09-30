@@ -227,13 +227,6 @@ class OrderResource extends BaseResource
 
                         Tabs\Tab::make('Rincian Layanan')
                             ->schema([
-                                \Filament\Infolists\Components\View::make('components.order-items-warning')
-                                    ->state(fn (Order $record): array => [
-                                        'totalCalculated' => $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah),
-                                        'totalActual' => $record->total(),
-                                    ])
-                                    ->visible(fn (Order $record): bool => $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah) != $record->total()),
-
                                 Section::make()
                                     ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan".')
                                     ->schema([
@@ -258,12 +251,13 @@ class OrderResource extends BaseResource
                                                     ->visible(fn ($record): bool => filled($record?->ditambahkan_oleh)),
                                             ]),
                                     ]),
-                                Section::make('Total')
+                                Section::make('Total Tagihan')
                                     ->schema([
-                                        \Filament\Infolists\Components\View::make('components.order-total-edit')
-                                            ->state(fn (Order $record): array => [
-                                                'total' => $record->total(),
-                                            ]),
+                                        TextEntry::make('total')
+                                            ->label('Total')
+                                            ->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.'))
+                                            ->size('lg')
+                                            ->extraAttributes(['class' => 'font-bold text-success']),
                                     ]),
                             ]),
 
