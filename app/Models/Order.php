@@ -210,6 +210,11 @@ class Order extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function totalCorrections(): HasMany
+    {
+        return $this->hasMany(OrderTotalCorrection::class);
+    }
+
     /**
      * Baris layanan order (dev-plan/13) — baris pertama dibuat otomatis
      * saat order dibuat (lihat booted()), baris tambahan (mis. sparepart

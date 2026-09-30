@@ -12,6 +12,7 @@ use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderTechnician;
+use App\Models\OrderTotalCorrection;
 use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Models\Titik;
@@ -732,5 +733,31 @@ class OrderService
         $order->save();
 
         return $order->fresh();
+    }
+
+    /**
+     * Koreksi total order dan catat di audit log (Admin/Owner).
+     */
+    public function koreksiTotal(Order $order, float $totalBaru, ?string $alasan, User $actor): OrderTotalCorrection
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        $totalAsli = $order->total();
+
+        if ($totalBaru < 0) {
+            throw new BusinessRuleException('Total tidak boleh negatif.');
+        }
+
+        if ($totalBaru == $totalAsli) {
+            throw new BusinessRuleException('Total baru harus berbeda dari total lama.');
+        }
+
+        return OrderTotalCorrection::create([
+            'order_id' => $order->id,
+            'total_original' => $totalAsli,
+            'total_terkoreksi' => $totalBaru,
+            'alasan' => $alasan,
+            'dikoreksi_oleh' => $actor->id,
+        ]);
     }
 }
