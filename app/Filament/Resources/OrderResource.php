@@ -227,7 +227,7 @@ class OrderResource extends BaseResource
 
                         Tabs\Tab::make('Rincian Layanan')
                             ->schema([
-                                \Filament\Infolists\Components\View::make('order-items-warning')
+                                \Filament\Infolists\Components\View::make('components.order-items-warning')
                                     ->state(fn (Order $record): array => [
                                         'totalCalculated' => $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah),
                                         'totalActual' => $record->total(),
@@ -260,7 +260,7 @@ class OrderResource extends BaseResource
                                     ]),
                                 Section::make('Total')
                                     ->schema([
-                                        \Filament\Infolists\Components\View::make('order-total-edit')
+                                        \Filament\Infolists\Components\View::make('components.order-total-edit')
                                             ->state(fn (Order $record): array => [
                                                 'total' => $record->total(),
                                                 'submitUrl' => route('orders.koreksi-total', $record),
