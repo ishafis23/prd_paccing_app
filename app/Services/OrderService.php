@@ -571,6 +571,10 @@ class OrderService
         }
 
         $jumlah = max(1, (int) ($data['jumlah'] ?? 1));
+        if ($jumlah > 1000) {
+            throw new BusinessRuleException('Jumlah terlalu besar — maksimal 1000 unit per baris layanan.');
+        }
+
         $kategori = filled($data['kategori'] ?? null) ? ServiceType::from($data['kategori']) : null;
         $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $order->customer);
 

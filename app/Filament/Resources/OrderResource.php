@@ -472,6 +472,7 @@ class OrderResource extends BaseResource
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
+                                ->maxValue(1000)
                                 ->required(),
                             Forms\Components\Textarea::make('catatan')
                                 ->columnSpanFull(),
@@ -518,6 +519,7 @@ class OrderResource extends BaseResource
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
+                                ->maxValue(1000)
                                 ->required(),
                             Forms\Components\Textarea::make('catatan')
                                 ->columnSpanFull(),
