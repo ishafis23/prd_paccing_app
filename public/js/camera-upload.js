@@ -1,5 +1,6 @@
 /**
  * Alpine component untuk upload foto dengan pilihan kamera/gallery
+ * Menggunakan Camera API (getUserMedia) untuk kamera yang lebih reliable
  * Penggunaan: x-data="photoUpload('fieldName', orderId)"
  */
 function photoUpload(fieldName, orderId) {
@@ -13,6 +14,7 @@ function photoUpload(fieldName, orderId) {
         progress: 0,
         error: null,
         tempPhotoId: null,
+        stream: null, // Untuk menyimpan camera stream
 
         /**
          * Buka dialog pilihan kamera/gallery
@@ -23,43 +25,114 @@ function photoUpload(fieldName, orderId) {
         },
 
         /**
-         * Ambil foto langsung dari kamera (real-time)
+         * Ambil foto langsung dari kamera menggunakan Camera API (MORE RELIABLE)
          */
-        openCamera() {
-            this.showDialog = false; // Close dialog first
+        async openCamera() {
+            this.showDialog = false;
+            this.error = null;
+
+            try {
+                // Request camera access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }, // Rear camera
+                    audio: false,
+                });
+
+                // Buat video element temporary
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+
+                // Tunggu video loaded
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = resolve;
+                });
+
+                // Buat canvas untuk capture frame
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+
+                // Stop stream
+                stream.getTracks().forEach((track) => track.stop());
+
+                // Convert canvas ke blob dan handle
+                canvas.toBlob(async (blob) => {
+                    if (!blob) {
+                        this.error = 'Gagal capture foto dari camera';
+                        return;
+                    }
+
+                    // Convert blob ke file
+                    const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+
+                    // Show preview & upload
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.preview = e.target.result;
+                        this.nama = 'camera-photo.jpg';
+                    };
+                    reader.readAsDataURL(blob);
+
+                    await this.uploadToServer(file);
+                }, 'image/jpeg', 0.95);
+            } catch (err) {
+                // Fallback ke file input jika Camera API tidak support
+                if (
+                    err.name === 'NotAllowedError' ||
+                    err.name === 'PermissionDeniedError'
+                ) {
+                    this.error =
+                        'Izin kamera ditolak. Cek setting permissions di device.';
+                } else if (err.name === 'NotFoundError' || err.name === 'NotSupportedError') {
+                    this.error = 'Device tidak punya kamera atau tidak support Camera API.';
+                    // Fallback: gunakan file input dengan capture
+                    this.fallbackOpenCamera();
+                } else {
+                    this.error = `Error: ${err.message}`;
+                    console.error('Camera error:', err);
+                }
+            }
+        },
+
+        /**
+         * Fallback ke file input jika Camera API tidak support
+         */
+        fallbackOpenCamera() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.capture = 'environment'; // Trigger kamera rear
+            input.capture = 'environment';
             input.onchange = (e) => this.handleFile(e);
             input.click();
         },
 
         /**
-         * Ambil foto dari gallery (real-time)
+         * Ambil foto dari gallery (file input biasa, no capture attribute)
          */
         openGallery() {
-            this.showDialog = false; // Close dialog first
+            this.showDialog = false;
+            this.error = null;
+
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            // IMPORTANT: Remove capture attribute completely to force gallery mode
-            if (input.hasAttribute('capture')) {
-                input.removeAttribute('capture');
-            }
+            // PENTING: Jangan set capture attribute untuk gallery mode
             input.onchange = (e) => this.handleFile(e);
             input.click();
         },
 
         /**
-         * Handle file selection (dari kamera atau gallery)
+         * Handle file selection (dari gallery atau fallback camera)
          */
         async handleFile(event) {
             const file = event.target.files?.[0];
             if (!file) return;
 
             this.error = null;
-            this.showDialog = false; // Pastikan dialog tutup
+            this.showDialog = false;
 
             // Validasi
             if (!file.type.startsWith('image/')) {
@@ -97,13 +170,18 @@ function photoUpload(fieldName, orderId) {
             formData.append('order_id', this.orderId);
 
             try {
-                const response = await fetch(`/teknisi/order/${this.orderId}/temp-photo`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    },
-                    body: formData,
-                });
+                const response = await fetch(
+                    `/teknisi/order/${this.orderId}/temp-photo`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector(
+                                'meta[name="csrf-token"]'
+                            )?.content,
+                        },
+                        body: formData,
+                    }
+                );
 
                 if (!response.ok) {
                     const data = await response.json();
@@ -145,7 +223,9 @@ function photoUpload(fieldName, orderId) {
                 const response = await fetch(`/teknisi/temp-photo/${this.tempPhotoId}`, {
                     method: 'DELETE',
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-CSRF-TOKEN': document.querySelector(
+                            'meta[name="csrf-token"]'
+                        )?.content,
                     },
                 });
 
@@ -187,12 +267,17 @@ async function restoreTemporaryPhotos(orderId) {
  */
 async function cleanupTemporaryPhotos(orderId) {
     try {
-        const response = await fetch(`/teknisi/order/${orderId}/temp-photos/cleanup`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-            },
-        });
+        const response = await fetch(
+            `/teknisi/order/${orderId}/temp-photos/cleanup`,
+            {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector(
+                        'meta[name="csrf-token"]'
+                    )?.content,
+                },
+            }
+        );
         return response.ok;
     } catch (err) {
         console.error('Failed to cleanup temporary photos:', err);
