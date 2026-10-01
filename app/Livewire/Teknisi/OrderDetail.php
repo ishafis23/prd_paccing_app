@@ -15,6 +15,7 @@ use App\Services\AttendanceService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
+use App\Models\TemporaryPhotoUpload;
 use App\Support\FotoLaporanSlot;
 use App\Support\PhotoLayananStructure;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -75,6 +76,9 @@ class OrderDetail extends Component
     /** @var array<int, bool> Track which order items are expanded [order_item_id => isExpanded] */
     public array $expandedItems = [];
 
+    /** @var array<string, array> Track temporary photo uploads [fieldName => ['id' => tempId, 'file_path' => path]] */
+    public array $tempPhotos = [];
+
     public function mount(Order $order): void
     {
         abort_if(! $order->diassignkanKe(auth()->user()), 403, 'Order ini bukan tugas Anda.');
@@ -87,6 +91,104 @@ class OrderDetail extends Component
         // Initialize expanded items (all expanded by default)
         foreach ($order->orderItems as $item) {
             $this->expandedItems[$item->id] = true;
+        }
+
+        // Restore temporary photos dari database
+        $this->restoreTemporaryPhotos();
+    }
+
+    /**
+     * Restore temporary photos yang sudah diupload (aman dari logout/error)
+     */
+    private function restoreTemporaryPhotos(): void
+    {
+        $tempPhotos = TemporaryPhotoUpload::query()
+            ->where('user_id', auth()->id())
+            ->where('order_id', $this->orderId)
+            ->get();
+
+        foreach ($tempPhotos as $photo) {
+            $this->tempPhotos[$photo->field_name] = [
+                'id' => $photo->id,
+                'file_path' => $photo->file_path,
+                'file_name' => $photo->file_name,
+            ];
+
+            // Restore ke property Livewire sesuai field name
+            // Contoh: fotoSebelum -> $this->fotoSebelum = UploadedFile-like object
+            // (kami simpan path, bukan UploadedFile, karena file sudah ada di disk)
+            $this->setPhotoFromPath($photo->field_name, $photo->file_path);
+        }
+    }
+
+    /**
+     * Handle upload event dari Alpine component
+     */
+    #[\Livewire\Attributes\On('photo-uploaded')]
+    public function handlePhotoUploaded(array $data): void
+    {
+        $fieldName = $data['fieldName'];
+        $tempPhotoId = $data['tempPhotoId'];
+        $filePath = $data['filePath'];
+
+        // Track temporary photo
+        $this->tempPhotos[$fieldName] = [
+            'id' => $tempPhotoId,
+            'file_path' => $filePath,
+        ];
+
+        // Set property Livewire dengan file path (akan digunakan saat submit)
+        $this->setPropertyFromPath($fieldName, $filePath);
+    }
+
+    /**
+     * Handle remove photo event dari Alpine component
+     */
+    #[\Livewire\Attributes\On('photo-removed')]
+    public function handlePhotoRemoved(array $data): void
+    {
+        $fieldName = $data['fieldName'];
+
+        // Remove dari tracking
+        unset($this->tempPhotos[$fieldName]);
+
+        // Reset property
+        $this->resetProperty($fieldName);
+    }
+
+    /**
+     * Set Livewire property dari file path (untuk fotoSebelum, fotoSesudah, dll)
+     * Ini memungkinkan property menyimpan path file yang sudah tersimpan
+     */
+    private function setPropertyFromPath(string $fieldName, string $filePath): void
+    {
+        // Parse field name untuk nested properties
+        if (str_contains($fieldName, '.')) {
+            $parts = explode('.', $fieldName);
+            // Contoh: fotoKategori.1.slot1 -> $this->fotoKategori[1]['slot1']
+            // TODO: Handle nested properties if needed
+            return;
+        }
+
+        // Simple property (fotoSebelum, fotoSesudah, buktiPembayaran, dll)
+        if (property_exists($this, $fieldName)) {
+            $this->$fieldName = $filePath; // Store the file path
+        }
+    }
+
+    /**
+     * Reset Livewire property
+     */
+    private function resetProperty(string $fieldName): void
+    {
+        if (str_contains($fieldName, '.')) {
+            $parts = explode('.', $fieldName);
+            // Handle nested reset if needed
+            return;
+        }
+
+        if (property_exists($this, $fieldName)) {
+            $this->$fieldName = null;
         }
     }
 
@@ -497,7 +599,14 @@ class OrderDetail extends Component
                 // Don't fail submission if photo upload fails - photos can be re-uploaded later
             }
 
+            // Cleanup temporary photos dari database setelah submit sukses
+            TemporaryPhotoUpload::query()
+                ->where('user_id', auth()->id())
+                ->where('order_id', $this->orderId)
+                ->delete();
+
             $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
+            $this->tempPhotos = [];
             $this->resetFotoPerLayanan();
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());

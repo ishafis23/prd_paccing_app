@@ -51,5 +51,6 @@
     <x-teknisi-bottom-nav />
 
     @livewireScripts
+    <script src="{{ asset('js/camera-upload.js') }}"></script>
 </body>
 </html>

@@ -191,25 +191,12 @@
                     <x-heroicon-o-camera class="h-5 w-5" /> Titik Pertama Hari Ini (Games 2)
                 </p>
                 <p class="mb-3 text-xs text-gray-500">Ini check-in pertama Anda hari ini — upload foto bukti (mis. buka cover AC indoor) sebelum geser check-in.</p>
-                <div x-data="cameraUpload('fotoTitikPertama')" class="relative h-44 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
-                    <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
-                        <template x-if="!preview">
-                            <div class="flex flex-col items-center">
-                                <x-heroicon-o-camera class="h-6 w-6" />
-                                <span class="mt-1 text-xs">Ketuk untuk ambil/pilih foto</span>
-                            </div>
-                        </template>
-                        <img x-show="preview" :src="preview" alt="Pratinjau foto titik pertama" class="absolute inset-0 h-full w-full object-cover">
-                        <input type="file" accept="image/*" capture="environment"
-                            x-on:change="onFile($event)"
-                            class="absolute inset-0 cursor-pointer opacity-0">
-                    </label>
-                    <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
-                        <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
-                        <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
-                    </div>
-                    <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
-                </div>
+                <x-photo-upload-dialog
+                    fieldName="fotoTitikPertama"
+                    label="Ambil/Pilih Foto"
+                    orderId="{{ $order->id }}"
+                    showRemoveBtn="false"
+                />
                 @error('fotoTitikPertama') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
         @endif
@@ -445,57 +432,25 @@
             <div>
                 <label class="mb-2 block text-sm font-semibold text-gray-700">Sertakan Foto <span class="font-normal text-gray-400">(opsional, JPG/PNG maks 5 MB)</span></label>
                 <div class="grid grid-cols-2 gap-3">
-                    <div x-data="cameraUpload('fotoSebelum')" class="relative h-44 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-                        <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
-                            <template x-if="!preview">
-                                <div class="flex flex-col items-center">
-                                    <x-heroicon-o-camera class="h-6 w-6" />
-                                    <span class="mt-1 text-xs">Foto Sebelum</span>
-                                    <span class="mt-0.5 px-2 text-center text-[10px] text-gray-300" x-text="nama || 'Ketuk untuk pilih'"></span>
-                                </div>
-                            </template>
-                            <img x-show="preview" :src="preview" alt="Pratinjau foto sebelum"
-                                class="absolute inset-0 h-full w-full object-cover">
-                            <span x-show="preview" x-cloak
-                                class="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white" x-text="nama"></span>
-                            <input type="file" accept="image/*" capture="environment"
-                                x-on:change="onFile($event)"
-                                class="absolute inset-0 cursor-pointer opacity-0">
-                        </label>
-                        <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
-                            <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
-                            <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
-                        </div>
-                        <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
+                    <div>
+                        <x-photo-upload-dialog
+                            fieldName="fotoSebelum"
+                            label="Foto Sebelum"
+                            orderId="{{ $order->id }}"
+                        />
                     </div>
-                    <div x-data="cameraUpload('fotoSesudah')" class="relative h-44 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-                        <label class="absolute inset-0 flex cursor-pointer flex-col items-center justify-center text-gray-400">
-                            <template x-if="!preview">
-                                <div class="flex flex-col items-center">
-                                    <x-heroicon-o-camera class="h-6 w-6" />
-                                    <span class="mt-1 text-xs">Foto Sesudah</span>
-                                    <span class="mt-0.5 px-2 text-center text-[10px] text-gray-300" x-text="nama || 'Ketuk untuk pilih'"></span>
-                                </div>
-                            </template>
-                            <img x-show="preview" :src="preview" alt="Pratinjau foto sesudah"
-                                class="absolute inset-0 h-full w-full object-cover">
-                            <span x-show="preview" x-cloak
-                                class="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white" x-text="nama"></span>
-                            <input type="file" accept="image/*" capture="environment"
-                                x-on:change="onFile($event)"
-                                class="absolute inset-0 cursor-pointer opacity-0">
-                        </label>
-                        <div x-show="uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70">
-                            <x-heroicon-o-arrow-path class="h-6 w-6 animate-spin text-blue-600" />
-                            <span x-show="progress > 0" x-text="progress + '%'" class="text-[10px] font-bold text-blue-600"></span>
-                        </div>
-                        <p x-show="error" x-text="error" class="absolute inset-x-2 bottom-1 text-center text-[10px] font-medium text-rose-600"></p>
+                    <div>
+                        <x-photo-upload-dialog
+                            fieldName="fotoSesudah"
+                            label="Foto Sesudah"
+                            orderId="{{ $order->id }}"
+                        />
                     </div>
                 </div>
                 @error('fotoSebelum') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 @error('fotoSesudah') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                <p class="mt-2 text-xs text-gray-400" wire:loading.remove wire:target="fotoSebelum,fotoSesudah">
-                    Foto tersimpan otomatis saat laporan dikirim.
+                <p class="mt-2 text-xs text-gray-400">
+                    Foto langsung tersimpan saat dipilih — aman dari logout/error.
                 </p>
             </div>
 
@@ -535,24 +490,13 @@
                     @else
                         <div class="flex h-44 w-full items-center justify-center rounded-xl bg-gray-50 text-xs text-gray-400 ring-1 ring-gray-100">Belum ada foto sebelum</div>
                     @endif
-                    <div x-data="cameraUpload('fotoSebelumBaru')" class="mt-2">
-                        <label class="relative flex h-32 flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 text-center text-gray-400">
-                            <template x-if="!preview">
-                                <div class="flex flex-col items-center">
-                                    <x-heroicon-o-camera class="h-6 w-6" />
-                                    <span class="mt-1 text-xs">Ganti Foto Sebelum</span>
-                                </div>
-                            </template>
-                            <img x-show="preview" :src="preview" alt="Pratinjau foto sebelum baru"
-                                class="absolute inset-0 h-full w-full object-cover">
-                            <input type="file" accept="image/*" capture="environment"
-                                x-on:change="onFile($event)"
-                                class="absolute inset-0 cursor-pointer opacity-0">
-                        </label>
-                        <div x-show="uploading" class="mt-1 text-center text-xs text-gray-400">
-                            Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>...
-                        </div>
-                        <p x-show="error" x-text="error" class="mt-1 text-xs text-rose-600"></p>
+                    <div class="mt-2">
+                        <x-photo-upload-dialog
+                            fieldName="fotoSebelumBaru"
+                            label="Ganti Foto Sebelum"
+                            orderId="{{ $order->id }}"
+                            height="h-32"
+                        />
                     </div>
                     @error('fotoSebelumBaru') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
@@ -564,24 +508,13 @@
                     @else
                         <div class="flex h-44 w-full items-center justify-center rounded-xl bg-gray-50 text-xs text-gray-400 ring-1 ring-gray-100">Belum ada foto sesudah</div>
                     @endif
-                    <div x-data="cameraUpload('fotoSesudahBaru')" class="mt-2">
-                        <label class="relative flex h-32 flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 text-center text-gray-400">
-                            <template x-if="!preview">
-                                <div class="flex flex-col items-center">
-                                    <x-heroicon-o-camera class="h-6 w-6" />
-                                    <span class="mt-1 text-xs">Ganti Foto Sesudah</span>
-                                </div>
-                            </template>
-                            <img x-show="preview" :src="preview" alt="Pratinjau foto sesudah baru"
-                                class="absolute inset-0 h-full w-full object-cover">
-                            <input type="file" accept="image/*" capture="environment"
-                                x-on:change="onFile($event)"
-                                class="absolute inset-0 cursor-pointer opacity-0">
-                        </label>
-                        <div x-show="uploading" class="mt-1 text-center text-xs text-gray-400">
-                            Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>...
-                        </div>
-                        <p x-show="error" x-text="error" class="mt-1 text-xs text-rose-600"></p>
+                    <div class="mt-2">
+                        <x-photo-upload-dialog
+                            fieldName="fotoSesudahBaru"
+                            label="Ganti Foto Sesudah"
+                            orderId="{{ $order->id }}"
+                            height="h-32"
+                        />
                     </div>
                     @error('fotoSesudahBaru') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
@@ -777,21 +710,20 @@
                                     class="mt-2 h-40 w-full rounded-xl object-cover ring-1 ring-gray-100">
                                 <p class="mt-1 text-xs text-gray-400">Pilih file baru di bawah untuk mengganti.</p>
                             @endif
-                            <div x-data="cameraUpload('buktiPembayaran')">
-                                <div class="mt-2 flex items-center gap-2">
-                                    <input type="file" accept="image/*" capture="environment"
-                                        x-on:change="onFile($event)"
-                                        class="flex-1 text-xs text-gray-500">
-                                    <button type="button" wire:click="uploadBuktiPembayaran" wire:loading.attr="disabled" wire:target="uploadBuktiPembayaran"
-                                        x-bind:disabled="uploading"
-                                        class="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white active:bg-blue-700 disabled:opacity-60">
-                                        Simpan
-                                    </button>
-                                </div>
-                                <div x-show="uploading" class="mt-1 text-xs text-gray-400">
-                                    Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>...
-                                </div>
-                                <p x-show="error" x-text="error" class="mt-1 text-xs text-rose-600"></p>
+                            <div class="mt-2">
+                                <x-photo-upload-dialog
+                                    fieldName="buktiPembayaran"
+                                    label="Upload Bukti Pembayaran"
+                                    orderId="{{ $order->id }}"
+                                    height="h-32"
+                                    showRemoveBtn="false"
+                                />
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" wire:click="uploadBuktiPembayaran" wire:loading.attr="disabled" wire:target="uploadBuktiPembayaran"
+                                    class="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white active:bg-blue-700 disabled:opacity-60">
+                                    Simpan
+                                </button>
                             </div>
                             @error('buktiPembayaran') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         @endif

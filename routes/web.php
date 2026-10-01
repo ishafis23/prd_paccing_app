@@ -7,6 +7,7 @@ use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
 use App\Http\Controllers\TeknisExpenseController;
+use App\Http\Controllers\TemporaryPhotoUploadController;
 use App\Livewire\Admin\ManajemenPengeluaranTeknisi;
 use App\Livewire\Auth\Login;
 use App\Livewire\Portal\Dashboard as PortalDashboard;
@@ -52,6 +53,12 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     Route::post('/order/{order}/photo', [PhotoController::class, 'store'])->name('teknisi.photo.store');
     Route::get('/order/{order}/photos', [PhotoController::class, 'getByOrder'])->name('teknisi.photo.index');
     Route::delete('/photo/{photo}', [PhotoController::class, 'destroy'])->name('teknisi.photo.destroy');
+
+    // Temporary Photo Upload (Real-time upload saat file dipilih)
+    Route::post('/order/{order}/temp-photo', [TemporaryPhotoUploadController::class, 'store'])->name('teknisi.temp-photo.store');
+    Route::get('/order/{order}/temp-photos', [TemporaryPhotoUploadController::class, 'index'])->name('teknisi.temp-photo.index');
+    Route::delete('/temp-photo/{tempPhoto}', [TemporaryPhotoUploadController::class, 'destroy'])->name('teknisi.temp-photo.destroy');
+    Route::post('/order/{order}/temp-photos/cleanup', [TemporaryPhotoUploadController::class, 'cleanup'])->name('teknisi.temp-photo.cleanup');
 
     // Expense endpoints (Phase 03)
     Route::post('/expense', [TeknisExpenseController::class, 'store'])->name('teknisi.expense.store');
