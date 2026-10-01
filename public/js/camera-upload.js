@@ -3,6 +3,55 @@
  * Menggunakan Camera API (getUserMedia) untuk kamera yang lebih reliable
  * Penggunaan: x-data="photoUpload('fieldName', orderId)"
  */
+function compressImageFile(file, maxDimension = 1200, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+
+            let { width, height } = img;
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    reject(new Error('Gagal memproses gambar.'));
+                    return;
+                }
+
+                resolve(
+                    new File(
+                        [blob],
+                        (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg',
+                        { type: 'image/jpeg' }
+                    )
+                );
+            }, 'image/jpeg', quality);
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Gagal membaca gambar.'));
+        };
+
+        img.src = url;
+    });
+}
+
 function photoUpload(fieldName, orderId) {
     return {
         fieldName,
@@ -110,21 +159,28 @@ function photoUpload(fieldName, orderId) {
                 return;
             }
 
-            if (file.size > 5 * 1024 * 1024) {
+            // Preview pakai file asli (cepat, tanpa menunggu kompres)
+            this.preview = URL.createObjectURL(file);
+            this.nama = file.name;
+
+            // Kompres dulu supaya tidak kena limit 5 MB & upload cepat
+            let compressed = file;
+            try {
+                compressed = await compressImageFile(file);
+            } catch (err) {
+                this.error = 'Gagal memproses foto: ' + (err?.message ?? err);
+                this.preview = null;
+                this.nama = '';
+                return;
+            }
+
+            if (compressed.size > 5 * 1024 * 1024) {
                 this.error = 'Ukuran file maksimal 5 MB';
                 return;
             }
 
-            // Show preview
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.preview = e.target.result;
-                this.nama = file.name;
-            };
-            reader.readAsDataURL(file);
-
             // Upload real-time ke server
-            await this.uploadToServer(file);
+            await this.uploadToServer(compressed);
         },
 
         /**
@@ -148,17 +204,39 @@ function photoUpload(fieldName, orderId) {
                             'X-CSRF-TOKEN': document.querySelector(
                                 'meta[name="csrf-token"]'
                             )?.content,
+                            Accept: 'application/json',
                         },
                         body: formData,
                     }
                 );
 
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.message || 'Upload gagal');
+                // Baca sebagai teks dulu: kalau server balas HTML (login
+                // expired / 500), jangan sampai muncul "Unexpected token".
+                const teks = await response.text();
+                let data = {};
+                try {
+                    data = teks ? JSON.parse(teks) : {};
+                } catch (parseErr) {
+                    throw new Error(
+                        response.status === 419
+                            ? 'Sesi berakhir. Muat ulang halaman lalu coba lagi.'
+                            : `Server error (${response.status}). Coba lagi.`
+                    );
                 }
 
-                const data = await response.json();
+                if (!response.ok) {
+                    const msgValidasi = data?.errors
+                        ? Object.values(data.errors).flat()[0]
+                        : null;
+                    throw new Error(
+                        msgValidasi || data.message || `Upload gagal (${response.status})`
+                    );
+                }
+
+                if (!data.data) {
+                    throw new Error('Respons server tidak valid');
+                }
+
                 this.tempPhotoId = data.data.id;
 
                 // Dispatch event ke Livewire untuk update model
