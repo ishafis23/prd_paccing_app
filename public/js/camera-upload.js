@@ -30,7 +30,7 @@ function photoUpload(fieldName, orderId) {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.capture = 'environment'; // Trigger kamera langsung
+            input.capture = 'environment'; // Trigger kamera rear
             input.onchange = (e) => this.handleFile(e);
             input.click();
         },
@@ -43,7 +43,10 @@ function photoUpload(fieldName, orderId) {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            // Tidak pakai capture untuk gallery - biar benar-benar browsing files
+            // IMPORTANT: Remove capture attribute completely to force gallery mode
+            if (input.hasAttribute('capture')) {
+                input.removeAttribute('capture');
+            }
             input.onchange = (e) => this.handleFile(e);
             input.click();
         },
