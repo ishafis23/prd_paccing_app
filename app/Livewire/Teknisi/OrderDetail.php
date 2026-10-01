@@ -117,7 +117,7 @@ class OrderDetail extends Component
             // Restore ke property Livewire sesuai field name
             // Contoh: fotoSebelum -> $this->fotoSebelum = UploadedFile-like object
             // (kami simpan path, bukan UploadedFile, karena file sudah ada di disk)
-            $this->setPhotoFromPath($photo->field_name, $photo->file_path);
+            $this->setPropertyFromPath($photo->field_name, $photo->file_path);
         }
     }
 
