@@ -25,16 +25,34 @@ function photoUpload(fieldName, orderId) {
         },
 
         /**
-         * Ambil foto langsung dari kamera menggunakan Camera API (MORE RELIABLE)
+         * Detect apakah device adalah mobile
+         */
+        isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                navigator.userAgent
+            );
+        },
+
+        /**
+         * Ambil foto langsung dari kamera
+         * - Mobile: Gunakan Camera API (getUserMedia)
+         * - Laptop: Gunakan file input dengan capture="environment"
          */
         async openCamera() {
             this.showDialog = false;
             this.error = null;
 
+            // Di laptop, langsung gunakan file input (lebih reliable)
+            if (!this.isMobileDevice()) {
+                this.useCameraFileInput();
+                return;
+            }
+
+            // Di mobile, coba Camera API dulu
             try {
-                // Request camera access
+                // Request camera access (generic, pakai default camera)
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' }, // Rear camera
+                    video: true,
                     audio: false,
                 });
 
@@ -58,7 +76,7 @@ function photoUpload(fieldName, orderId) {
                 // Stop stream
                 stream.getTracks().forEach((track) => track.stop());
 
-                // Convert canvas ke blob dan handle
+                // Convert canvas ke blob
                 canvas.toBlob(async (blob) => {
                     if (!blob) {
                         this.error = 'Gagal capture foto dari camera';
@@ -66,7 +84,9 @@ function photoUpload(fieldName, orderId) {
                     }
 
                     // Convert blob ke file
-                    const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+                    const file = new File([blob], 'camera-photo.jpg', {
+                        type: 'image/jpeg',
+                    });
 
                     // Show preview & upload
                     const reader = new FileReader();
@@ -79,32 +99,20 @@ function photoUpload(fieldName, orderId) {
                     await this.uploadToServer(file);
                 }, 'image/jpeg', 0.95);
             } catch (err) {
-                // Fallback ke file input jika Camera API tidak support
-                if (
-                    err.name === 'NotAllowedError' ||
-                    err.name === 'PermissionDeniedError'
-                ) {
-                    this.error =
-                        'Izin kamera ditolak. Cek setting permissions di device.';
-                } else if (err.name === 'NotFoundError' || err.name === 'NotSupportedError') {
-                    this.error = 'Device tidak punya kamera atau tidak support Camera API.';
-                    // Fallback: gunakan file input dengan capture
-                    this.fallbackOpenCamera();
-                } else {
-                    this.error = `Error: ${err.message}`;
-                    console.error('Camera error:', err);
-                }
+                // Fallback ke file input jika Camera API error di mobile
+                console.warn('Camera API error, fallback to file input:', err);
+                this.useCameraFileInput();
             }
         },
 
         /**
-         * Fallback ke file input jika Camera API tidak support
+         * Fallback: Gunakan file input dengan capture attribute untuk kamera
          */
-        fallbackOpenCamera() {
+        useCameraFileInput() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.capture = 'environment';
+            input.capture = 'environment'; // Untuk mobile kamera
             input.onchange = (e) => this.handleFile(e);
             input.click();
         },
