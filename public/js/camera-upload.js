@@ -190,14 +190,27 @@ function photoUpload(fieldName, orderId) {
             this.uploading = true;
             this.error = null;
 
+            if (!this.orderId) {
+                this.error = 'Order tidak dikenali. Muat ulang halaman lalu coba lagi.';
+                this.uploading = false;
+                return;
+            }
+
             const formData = new FormData();
             formData.append('file', file);
             formData.append('field_name', this.fieldName);
             formData.append('order_id', this.orderId);
 
+            // Pakai URL dari server (route()) agar tetap benar walau app
+            // dipasang di subfolder / tanpa mod_rewrite (index.php).
+            const storeTemplate =
+                window.photoUploadConfig?.store ||
+                '/teknisi/order/__ORDER__/temp-photo';
+            const storeUrl = storeTemplate.replace('__ORDER__', this.orderId);
+
             try {
                 const response = await fetch(
-                    `/teknisi/order/${this.orderId}/temp-photo`,
+                    storeUrl,
                     {
                         method: 'POST',
                         headers: {
@@ -267,8 +280,13 @@ function photoUpload(fieldName, orderId) {
 
             if (!confirm('Hapus foto ini?')) return;
 
+            const destroyTemplate =
+                window.photoUploadConfig?.destroy ||
+                '/teknisi/temp-photo/__ID__';
+            const destroyUrl = destroyTemplate.replace('__ID__', this.tempPhotoId);
+
             try {
-                const response = await fetch(`/teknisi/temp-photo/${this.tempPhotoId}`, {
+                const response = await fetch(destroyUrl, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector(

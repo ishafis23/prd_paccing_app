@@ -51,6 +51,12 @@
     <x-teknisi-bottom-nav />
 
     @livewireScripts
+    <script>
+        window.photoUploadConfig = {
+            store: @json(route('teknisi.temp-photo.store', ['order' => '__ORDER__'])),
+            destroy: @json(route('teknisi.temp-photo.destroy', ['tempPhoto' => '__ID__'])),
+        };
+    </script>
     <script src="{{ asset('js/camera-upload.js') }}?v={{ @filemtime(public_path('js/camera-upload.js')) }}"></script>
 </body>
 </html>
