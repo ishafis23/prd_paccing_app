@@ -109,27 +109,55 @@ function photoUpload(fieldName, orderId) {
          * Fallback: Gunakan file input dengan capture attribute untuk kamera
          */
         useCameraFileInput() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.capture = 'environment'; // Untuk mobile kamera
-            input.onchange = (e) => this.handleFile(e);
-            input.click();
+            this.openFilePicker({ accept: 'image/*', capture: 'environment' });
         },
 
         /**
-         * Ambil foto dari gallery (file input biasa, no capture attribute)
+         * Ambil foto dari gallery (file input tanpa capture)
+         *
+         * PENTING: Di Android, accept="image/*" memicu intent yg diklaim
+         * aplikasi Kamera (sehingga galeri malah buka kamera). Untuk galeri
+         * kita buang accept agar sistem membuka file picker/galeri, bukan
+         * intent kamera. Validasi tipe gambar tetap dilakukan di handleFile().
          */
         openGallery() {
             this.showDialog = false;
             this.error = null;
 
+            this.openFilePicker({ accept: '' });
+        },
+
+        /**
+         * Buat + tempel input ke DOM lalu klik.
+         * Menempel ke DOM penting utk WebView Android: input yg terlepas
+         * (detached) kadang membuat accept/capture diabaikan.
+         */
+        openFilePicker({ accept = 'image/*', capture = null } = {}) {
             const input = document.createElement('input');
             input.type = 'file';
-            input.accept = 'image/*';
-            // PENTING: Jangan set capture attribute untuk gallery mode
-            input.onchange = (e) => this.handleFile(e);
+            if (accept) {
+                input.accept = accept;
+            }
+            if (capture) {
+                input.capture = capture;
+            }
+            input.style.position = 'fixed';
+            input.style.left = '-9999px';
+            input.style.width = '1px';
+            input.style.height = '1px';
+            input.style.opacity = '0';
+
+            const cleanup = () => input.remove();
+            input.onchange = (e) => {
+                this.handleFile(e);
+                cleanup();
+            };
+
+            document.body.appendChild(input);
             input.click();
+
+            // Fallback cleanup bila picker dibatalkan (tidak ada event change)
+            setTimeout(cleanup, 120000);
         },
 
         /**

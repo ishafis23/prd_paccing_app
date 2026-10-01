@@ -51,6 +51,6 @@
     <x-teknisi-bottom-nav />
 
     @livewireScripts
-    <script src="{{ asset('js/camera-upload.js') }}"></script>
+    <script src="{{ asset('js/camera-upload.js') }}?v={{ @filemtime(public_path('js/camera-upload.js')) }}"></script>
 </body>
 </html>
