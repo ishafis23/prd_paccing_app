@@ -100,12 +100,12 @@
                                 {{-- Photo slots grid (2 columns untuk responsive) --}}
                                 <div class="grid grid-cols-2 gap-2">
                                     @foreach ($struktur['positions'] as $posKey => $position)
-                                        <div
-                                            x-data="cameraUpload('fotoPerLayanan.{{ $type }}.{{ $unit }}.{{ $posKey }}')"
-                                            class="relative">
-                                            {{-- Photo upload card --}}
-                                            <label
-                                                class="relative flex h-32 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center transition hover:border-blue-400">
+                                        <div x-data="photoUpload('fotoPerLayanan.{{ $type }}.{{ $unit }}.{{ $posKey }}', {{ $order->id ?? 0 }})">
+                                            {{-- Photo upload button --}}
+                                            <button
+                                                type="button"
+                                                @click="openDialog()"
+                                                class="relative flex h-32 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center transition hover:border-blue-400 hover:bg-blue-50">
                                                 {{-- Empty state --}}
                                                 <template x-if="!preview">
                                                     <div class="flex flex-col items-center gap-1 px-2">
@@ -132,28 +132,50 @@
                                                     class="absolute bottom-1 left-1 right-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-[8px] leading-tight text-white">
                                                     {{ $position['label'] }}
                                                 </span>
+                                            </button>
 
-                                                {{-- Upload progress --}}
-                                                <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
-                                                    <div class="flex flex-col items-center gap-1">
-                                                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin text-blue-600" />
-                                                        <span
-                                                            x-show="progress > 0"
-                                                            x-text="progress + '%'"
-                                                            class="text-[8px] font-bold text-blue-600"></span>
+                                            {{-- Dialog Pilihan --}}
+                                            <div x-show="showDialog" x-cloak
+                                                class="fixed inset-0 z-50 flex items-end bg-black/40 transition"
+                                                @click="showDialog = false"
+                                            >
+                                                <div class="w-full rounded-t-2xl bg-white shadow-xl" @click.stop>
+                                                    <div class="border-b border-gray-100 px-4 py-3">
+                                                        <h3 class="text-sm font-bold text-gray-900">{{ $position['label'] }}</h3>
+                                                        <p class="mt-0.5 text-xs text-gray-500">Pilih sumber foto</p>
+                                                    </div>
+                                                    <div class="space-y-2 p-4">
+                                                        <button type="button" @click="openCamera()"
+                                                            class="flex w-full items-center gap-3 rounded-xl bg-blue-50 px-4 py-3 text-left font-medium text-blue-700 active:bg-blue-100">
+                                                            <x-heroicon-o-camera class="h-5 w-5 shrink-0" />
+                                                            <div>
+                                                                <p class="font-semibold">Buka Kamera</p>
+                                                                <p class="text-xs text-blue-600">Ambil foto langsung</p>
+                                                            </div>
+                                                        </button>
+                                                        <button type="button" @click="openGallery()"
+                                                            class="flex w-full items-center gap-3 rounded-xl bg-green-50 px-4 py-3 text-left font-medium text-green-700 active:bg-green-100">
+                                                            <x-heroicon-o-photo class="h-5 w-5 shrink-0" />
+                                                            <div>
+                                                                <p class="font-semibold">Pilih dari Gallery</p>
+                                                                <p class="text-xs text-green-600">Dari galeri perangkat</p>
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                    <div class="border-t border-gray-100 p-4">
+                                                        <button type="button" @click="showDialog = false"
+                                                            class="w-full rounded-xl bg-gray-100 py-2.5 font-semibold text-gray-600 active:bg-gray-200">
+                                                            Batal
+                                                        </button>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {{-- File input --}}
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    capture="environment"
-                                                    x-on:change="onFile($event)"
-                                                    class="absolute inset-0 cursor-pointer opacity-0">
-                                            </label>
-
-                                            {{-- Error message --}}
+                                            {{-- Upload progress & Error --}}
+                                            <div x-show="uploading" x-cloak class="mt-1 flex items-center gap-1 text-[9px] text-blue-600">
+                                                <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
+                                                Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>
+                                            </div>
                                             <p x-show="error" x-text="error" class="mt-1 text-[9px] font-medium text-rose-600"></p>
                                         </div>
                                     @endforeach

@@ -382,8 +382,12 @@
                                     <div class="border-t border-gray-100 p-3">
                                         <div class="grid grid-cols-2 gap-2">
                                             @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
-                                                <div x-data="cameraUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}')">
-                                                    <label class="relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400">
+                                                <div x-data="photoUpload('fotoKategori.{{ $item->id }}.{{ $slotKey }}', {{ $order->id }})">
+                                                    <button
+                                                        type="button"
+                                                        @click="openDialog()"
+                                                        class="relative flex h-28 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400 transition hover:border-blue-400 hover:bg-blue-50"
+                                                    >
                                                         <template x-if="!preview">
                                                             <div class="flex flex-col items-center">
                                                                 <x-heroicon-o-camera class="h-5 w-5" />
@@ -404,17 +408,51 @@
                                                                 <span class="text-rose-300">* Wajib</span>
                                                             @endif
                                                         </span>
-                                                        <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
-                                                            <div class="flex flex-col items-center">
-                                                                <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-blue-600" />
-                                                                <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-blue-600"></span>
+                                                    </button>
+
+                                                    {{-- Dialog Pilihan --}}
+                                                    <div x-show="showDialog" x-cloak
+                                                        class="fixed inset-0 z-50 flex items-end bg-black/40 transition"
+                                                        @click="showDialog = false"
+                                                    >
+                                                        <div class="w-full rounded-t-2xl bg-white shadow-xl" @click.stop>
+                                                            <div class="border-b border-gray-100 px-4 py-3">
+                                                                <h3 class="text-sm font-bold text-gray-900">{{ $slotLabel }}</h3>
+                                                                <p class="mt-0.5 text-xs text-gray-500">Pilih sumber foto</p>
+                                                            </div>
+                                                            <div class="space-y-2 p-4">
+                                                                <button type="button" @click="openCamera()"
+                                                                    class="flex w-full items-center gap-3 rounded-xl bg-blue-50 px-4 py-3 text-left font-medium text-blue-700 active:bg-blue-100">
+                                                                    <x-heroicon-o-camera class="h-5 w-5 shrink-0" />
+                                                                    <div>
+                                                                        <p class="font-semibold">Buka Kamera</p>
+                                                                        <p class="text-xs text-blue-600">Ambil foto langsung</p>
+                                                                    </div>
+                                                                </button>
+                                                                <button type="button" @click="openGallery()"
+                                                                    class="flex w-full items-center gap-3 rounded-xl bg-green-50 px-4 py-3 text-left font-medium text-green-700 active:bg-green-100">
+                                                                    <x-heroicon-o-photo class="h-5 w-5 shrink-0" />
+                                                                    <div>
+                                                                        <p class="font-semibold">Pilih dari Gallery</p>
+                                                                        <p class="text-xs text-green-600">Dari galeri perangkat</p>
+                                                                    </div>
+                                                                </button>
+                                                            </div>
+                                                            <div class="border-t border-gray-100 p-4">
+                                                                <button type="button" @click="showDialog = false"
+                                                                    class="w-full rounded-xl bg-gray-100 py-2.5 font-semibold text-gray-600 active:bg-gray-200">
+                                                                    Batal
+                                                                </button>
                                                             </div>
                                                         </div>
-                                                        <input type="file" accept="image/*" capture="environment"
-                                                            x-on:change="onFile($event)"
-                                                            class="absolute inset-0 cursor-pointer opacity-0">
-                                                    </label>
-                                                    <p x-show="error" x-text="error" class="text-[10px] font-medium text-rose-600"></p>
+                                                    </div>
+
+                                                    {{-- Loading & Error --}}
+                                                    <div x-show="uploading" x-cloak class="mt-1 flex items-center gap-1 text-[10px] text-blue-600">
+                                                        <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
+                                                        Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>
+                                                    </div>
+                                                    <p x-show="error" x-text="error" class="mt-1 text-[10px] font-medium text-rose-600"></p>
                                                 </div>
                                                 @error('fotoKategori.'.$item->id.'.'.$slotKey)
                                                     <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
@@ -553,8 +591,12 @@
             </p>
             <div class="mt-3 grid grid-cols-2 gap-2">
                 @foreach ($this->fotoWajibKurang as $kurang)
-                    <div x-data="cameraUpload('fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}')">
-                        <label class="relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500">
+                    <div x-data="photoUpload('fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}', {{ $order->id }})">
+                        <button
+                            type="button"
+                            @click="openDialog()"
+                            class="relative flex h-28 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-amber-300 bg-white text-center text-amber-500 transition hover:border-amber-400 hover:bg-amber-50"
+                        >
                             <template x-if="!preview">
                                 <div class="flex flex-col items-center">
                                     <x-heroicon-o-camera class="h-5 w-5" />
@@ -565,17 +607,51 @@
                                 class="absolute inset-0 h-full w-full object-cover">
                             <span x-show="preview" x-cloak
                                 class="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[9px] leading-tight text-white">{{ $kurang['label'] }}</span>
-                            <div x-show="uploading" class="absolute inset-0 flex items-center justify-center bg-white/70">
-                                <div class="flex flex-col items-center">
-                                    <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin text-amber-600" />
-                                    <span x-show="progress > 0" x-text="progress + '%'" class="text-[9px] font-bold text-amber-600"></span>
+                        </button>
+
+                        {{-- Dialog Pilihan --}}
+                        <div x-show="showDialog" x-cloak
+                            class="fixed inset-0 z-50 flex items-end bg-black/40 transition"
+                            @click="showDialog = false"
+                        >
+                            <div class="w-full rounded-t-2xl bg-white shadow-xl" @click.stop>
+                                <div class="border-b border-gray-100 px-4 py-3">
+                                    <h3 class="text-sm font-bold text-gray-900">{{ $kurang['label'] }}</h3>
+                                    <p class="mt-0.5 text-xs text-gray-500">Pilih sumber foto</p>
+                                </div>
+                                <div class="space-y-2 p-4">
+                                    <button type="button" @click="openCamera()"
+                                        class="flex w-full items-center gap-3 rounded-xl bg-blue-50 px-4 py-3 text-left font-medium text-blue-700 active:bg-blue-100">
+                                        <x-heroicon-o-camera class="h-5 w-5 shrink-0" />
+                                        <div>
+                                            <p class="font-semibold">Buka Kamera</p>
+                                            <p class="text-xs text-blue-600">Ambil foto langsung</p>
+                                        </div>
+                                    </button>
+                                    <button type="button" @click="openGallery()"
+                                        class="flex w-full items-center gap-3 rounded-xl bg-green-50 px-4 py-3 text-left font-medium text-green-700 active:bg-green-100">
+                                        <x-heroicon-o-photo class="h-5 w-5 shrink-0" />
+                                        <div>
+                                            <p class="font-semibold">Pilih dari Gallery</p>
+                                            <p class="text-xs text-green-600">Dari galeri perangkat</p>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div class="border-t border-gray-100 p-4">
+                                    <button type="button" @click="showDialog = false"
+                                        class="w-full rounded-xl bg-gray-100 py-2.5 font-semibold text-gray-600 active:bg-gray-200">
+                                        Batal
+                                    </button>
                                 </div>
                             </div>
-                            <input type="file" accept="image/*" capture="environment"
-                                x-on:change="onFile($event)"
-                                class="absolute inset-0 cursor-pointer opacity-0">
-                        </label>
-                        <p x-show="error" x-text="error" class="text-[10px] font-medium text-rose-600"></p>
+                        </div>
+
+                        {{-- Loading & Error --}}
+                        <div x-show="uploading" x-cloak class="mt-1 flex items-center gap-1 text-[10px] text-amber-600">
+                            <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
+                            Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>
+                        </div>
+                        <p x-show="error" x-text="error" class="mt-1 text-[10px] font-medium text-rose-600"></p>
                     </div>
                     @error('fotoLengkapi.'.$kurang['order_item']->id.'.'.$kurang['kode_slot'])
                         <p class="col-span-2 text-xs text-red-600">{{ $message }}</p>
