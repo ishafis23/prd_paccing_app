@@ -25,84 +25,18 @@ function photoUpload(fieldName, orderId) {
         },
 
         /**
-         * Detect apakah device adalah mobile
+         * Ambil foto langsung dari kamera.
+         *
+         * Pakai file input + capture="environment" supaya aplikasi kamera
+         * bawaan HP terbuka. Pendekatan getUserMedia sebelumnya dibuang:
+         * tidak ada UI preview/shutter, butuh HTTPS/izin khusus, dan sering
+         * menghasilkan error "Gagal capture foto dari camera" (video 0x0).
          */
-        isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-                navigator.userAgent
-            );
-        },
-
-        /**
-         * Ambil foto langsung dari kamera
-         * - Mobile: Gunakan Camera API (getUserMedia)
-         * - Laptop: Gunakan file input dengan capture="environment"
-         */
-        async openCamera() {
+        openCamera() {
             this.showDialog = false;
             this.error = null;
 
-            // Di laptop, langsung gunakan file input (lebih reliable)
-            if (!this.isMobileDevice()) {
-                this.useCameraFileInput();
-                return;
-            }
-
-            // Di mobile, coba Camera API dulu
-            try {
-                // Request camera access (generic, pakai default camera)
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: false,
-                });
-
-                // Buat video element temporary
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.play();
-
-                // Tunggu video loaded
-                await new Promise((resolve) => {
-                    video.onloadedmetadata = resolve;
-                });
-
-                // Buat canvas untuk capture frame
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0);
-
-                // Stop stream
-                stream.getTracks().forEach((track) => track.stop());
-
-                // Convert canvas ke blob
-                canvas.toBlob(async (blob) => {
-                    if (!blob) {
-                        this.error = 'Gagal capture foto dari camera';
-                        return;
-                    }
-
-                    // Convert blob ke file
-                    const file = new File([blob], 'camera-photo.jpg', {
-                        type: 'image/jpeg',
-                    });
-
-                    // Show preview & upload
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        this.preview = e.target.result;
-                        this.nama = 'camera-photo.jpg';
-                    };
-                    reader.readAsDataURL(blob);
-
-                    await this.uploadToServer(file);
-                }, 'image/jpeg', 0.95);
-            } catch (err) {
-                // Fallback ke file input jika Camera API error di mobile
-                console.warn('Camera API error, fallback to file input:', err);
-                this.useCameraFileInput();
-            }
+            this.useCameraFileInput();
         },
 
         /**
