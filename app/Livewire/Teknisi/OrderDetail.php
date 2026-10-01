@@ -125,12 +125,8 @@ class OrderDetail extends Component
      * Handle upload event dari Alpine component
      */
     #[\Livewire\Attributes\On('photo-uploaded')]
-    public function handlePhotoUploaded(array $data): void
+    public function handlePhotoUploaded(string $fieldName, int|string $tempPhotoId, string $filePath): void
     {
-        $fieldName = $data['fieldName'];
-        $tempPhotoId = $data['tempPhotoId'];
-        $filePath = $data['filePath'];
-
         // Track temporary photo
         $this->tempPhotos[$fieldName] = [
             'id' => $tempPhotoId,
@@ -145,10 +141,8 @@ class OrderDetail extends Component
      * Handle remove photo event dari Alpine component
      */
     #[\Livewire\Attributes\On('photo-removed')]
-    public function handlePhotoRemoved(array $data): void
+    public function handlePhotoRemoved(string $fieldName): void
     {
-        $fieldName = $data['fieldName'];
-
         // Remove dari tracking
         unset($this->tempPhotos[$fieldName]);
 
