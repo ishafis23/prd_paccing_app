@@ -93,61 +93,6 @@ class OrderDetail extends Component
             $this->expandedItems[$item->id] = true;
         }
 
-        // Restore temporary photos dari database
-        $this->restoreTemporaryPhotos();
-    }
-
-    /**
-     * Restore temporary photos yang sudah diupload (aman dari logout/error)
-     */
-    private function restoreTemporaryPhotos(): void
-    {
-        $tempPhotos = TemporaryPhotoUpload::query()
-            ->where('user_id', auth()->id())
-            ->where('order_id', $this->orderId)
-            ->get();
-
-        foreach ($tempPhotos as $photo) {
-            $this->tempPhotos[$photo->field_name] = [
-                'id' => $photo->id,
-                'file_path' => $photo->file_path,
-                'file_name' => $photo->file_name,
-            ];
-
-            // Restore ke property Livewire sesuai field name
-            // Contoh: fotoSebelum -> $this->fotoSebelum = UploadedFile-like object
-            // (kami simpan path, bukan UploadedFile, karena file sudah ada di disk)
-            $this->setPropertyFromPath($photo->field_name, $photo->file_path);
-        }
-    }
-
-    /**
-     * Handle upload event dari Alpine component
-     */
-    #[\Livewire\Attributes\On('photo-uploaded')]
-    public function handlePhotoUploaded(string $fieldName, int|string $tempPhotoId, string $filePath): void
-    {
-        // Track temporary photo
-        $this->tempPhotos[$fieldName] = [
-            'id' => $tempPhotoId,
-            'file_path' => $filePath,
-        ];
-
-        // Set property Livewire dengan file path (akan digunakan saat submit)
-        $this->setPropertyFromPath($fieldName, $filePath);
-    }
-
-    /**
-     * Handle remove photo event dari Alpine component
-     */
-    #[\Livewire\Attributes\On('photo-removed')]
-    public function handlePhotoRemoved(string $fieldName): void
-    {
-        // Remove dari tracking
-        unset($this->tempPhotos[$fieldName]);
-
-        // Reset property
-        $this->resetProperty($fieldName);
     }
 
     /**

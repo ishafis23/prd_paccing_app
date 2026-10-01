@@ -189,125 +189,43 @@ function photoUpload(fieldName, orderId) {
         async uploadToServer(file) {
             this.uploading = true;
             this.error = null;
+            this.progress = 0;
 
-            if (!this.orderId) {
-                this.error = 'Order tidak dikenali. Muat ulang halaman lalu coba lagi.';
-                this.uploading = false;
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('field_name', this.fieldName);
-            formData.append('order_id', this.orderId);
-
-            // Pakai URL dari server (route()) agar tetap benar walau app
-            // dipasang di subfolder / tanpa mod_rewrite (index.php).
-            const storeTemplate =
-                window.photoUploadConfig?.store ||
-                '/teknisi/order/__ORDER__/temp-photo';
-            const storeUrl = storeTemplate.replace('__ORDER__', this.orderId);
-
-            try {
-                const response = await fetch(
-                    storeUrl,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector(
-                                'meta[name="csrf-token"]'
-                            )?.content,
-                            Accept: 'application/json',
-                        },
-                        body: formData,
-                    }
-                );
-
-                // Baca sebagai teks dulu: kalau server balas HTML (login
-                // expired / 500), jangan sampai muncul "Unexpected token".
-                const teks = await response.text();
-                let data = {};
-                try {
-                    data = teks ? JSON.parse(teks) : {};
-                } catch (parseErr) {
-                    throw new Error(
-                        response.status === 419
-                            ? 'Sesi berakhir. Muat ulang halaman lalu coba lagi.'
-                            : `Server error (${response.status}). Coba lagi.`
-                    );
+            // Upload lewat Livewire supaya property di server menjadi
+            // UploadedFile yang valid (dipakai saat submit: ->store(),
+            // ->getSize(), validasi 'image', dll). Endpoint temp-photo
+            // custom tidak dipakai lagi karena dulu mengubah property
+            // menjadi string path sehingga submit error
+            // "Call to a member function getSize() on string".
+            this.$wire.upload(
+                this.fieldName,
+                file,
+                () => {
+                    this.uploading = false;
+                },
+                (message) => {
+                    this.uploading = false;
+                    this.error = 'Gagal upload foto: ' + message;
+                    this.preview = null;
+                    this.nama = '';
+                },
+                (event) => {
+                    this.progress = event.detail.progress;
                 }
-
-                if (!response.ok) {
-                    const msgValidasi = data?.errors
-                        ? Object.values(data.errors).flat()[0]
-                        : null;
-                    throw new Error(
-                        msgValidasi || data.message || `Upload gagal (${response.status})`
-                    );
-                }
-
-                if (!data.data) {
-                    throw new Error('Respons server tidak valid');
-                }
-
-                this.tempPhotoId = data.data.id;
-
-                // Dispatch event ke Livewire untuk update model
-                this.$dispatch('photo-uploaded', {
-                    fieldName: this.fieldName,
-                    tempPhotoId: this.tempPhotoId,
-                    filePath: data.data.file_path,
-                });
-            } catch (err) {
-                this.error = err.message || 'Terjadi kesalahan saat upload';
-                this.preview = null;
-                this.nama = '';
-                this.tempPhotoId = null;
-            } finally {
-                this.uploading = false;
-            }
+            );
         },
 
         /**
-         * Hapus foto yang sudah diupload
+         * Hapus foto yang sudah dipilih
          */
         async removePhoto() {
-            if (!this.tempPhotoId) {
-                this.preview = null;
-                this.nama = '';
-                return;
-            }
-
             if (!confirm('Hapus foto ini?')) return;
 
-            const destroyTemplate =
-                window.photoUploadConfig?.destroy ||
-                '/teknisi/temp-photo/__ID__';
-            const destroyUrl = destroyTemplate.replace('__ID__', this.tempPhotoId);
-
-            try {
-                const response = await fetch(destroyUrl, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector(
-                            'meta[name="csrf-token"]'
-                        )?.content,
-                    },
-                });
-
-                if (!response.ok) throw new Error('Gagal menghapus foto');
-
-                this.preview = null;
-                this.nama = '';
-                this.tempPhotoId = null;
-
-                // Dispatch event ke Livewire
-                this.$dispatch('photo-removed', {
-                    fieldName: this.fieldName,
-                });
-            } catch (err) {
-                this.error = 'Gagal menghapus foto: ' + err.message;
-            }
+            this.$wire.set(this.fieldName, null);
+            this.preview = null;
+            this.nama = '';
+            this.tempPhotoId = null;
+            this.error = null;
         },
     };
 }
