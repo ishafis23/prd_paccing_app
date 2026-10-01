@@ -26,6 +26,7 @@ function photoUpload(fieldName, orderId) {
          * Ambil foto langsung dari kamera (real-time)
          */
         openCamera() {
+            this.showDialog = false; // Close dialog first
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
@@ -38,10 +39,11 @@ function photoUpload(fieldName, orderId) {
          * Ambil foto dari gallery (real-time)
          */
         openGallery() {
+            this.showDialog = false; // Close dialog first
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.capture = 'user'; // Selfie camera
+            // Tidak pakai capture untuk gallery - biar benar-benar browsing files
             input.onchange = (e) => this.handleFile(e);
             input.click();
         },
@@ -52,6 +54,9 @@ function photoUpload(fieldName, orderId) {
         async handleFile(event) {
             const file = event.target.files?.[0];
             if (!file) return;
+
+            this.error = null;
+            this.showDialog = false; // Pastikan dialog tutup
 
             // Validasi
             if (!file.type.startsWith('image/')) {
@@ -74,7 +79,6 @@ function photoUpload(fieldName, orderId) {
 
             // Upload real-time ke server
             await this.uploadToServer(file);
-            this.showDialog = false;
         },
 
         /**
