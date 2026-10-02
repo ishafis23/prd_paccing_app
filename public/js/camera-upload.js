@@ -204,15 +204,60 @@ function photoUpload(fieldName, orderId) {
                     this.uploading = false;
                 },
                 (message) => {
-                    this.uploading = false;
-                    this.error = 'Gagal upload foto: ' + message;
-                    this.preview = null;
-                    this.nama = '';
+                    // Cadangan: kalau upload lewat Livewire gagal (mis. route
+                    // upload tidak terjangkau di subfolder), simpan lewat
+                    // endpoint temp-photo lama. Server akan mengambil foto dari
+                    // record `temporary_photo_uploads` saat tombol simpan ditekan.
+                    this.uploadToLegacy(file).then((ok) => {
+                        this.uploading = false;
+                        if (ok) {
+                            this.error = null;
+
+                            return;
+                        }
+
+                        this.error = 'Gagal upload foto: ' + message;
+                        this.preview = null;
+                        this.nama = '';
+                    });
                 },
                 (event) => {
                     this.progress = event.detail.progress;
                 }
             );
+        },
+
+        /**
+         * Jalur cadangan upload: POST ke endpoint temp-photo lama
+         * (`teknisi.temp-photo.store`). Dipakai hanya kalau upload Livewire
+         * gagal, supaya foto tetap bisa disimpan.
+         */
+        async uploadToLegacy(file) {
+            if (!this.orderId || !window.photoUploadConfig?.store) {
+                return false;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('field_name', this.fieldName);
+                formData.append('order_id', this.orderId);
+
+                const url = window.photoUploadConfig.store.replace('__ORDER__', this.orderId);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        Accept: 'application/json',
+                    },
+                    body: formData,
+                });
+
+                return response.ok;
+            } catch (err) {
+                return false;
+            }
         },
 
         /**

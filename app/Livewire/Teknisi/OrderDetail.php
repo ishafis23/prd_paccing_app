@@ -7,18 +7,23 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
+use App\Models\Game2Setting;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderPhoto;
 use App\Models\StockItem;
+use App\Models\TemporaryPhotoUpload;
 use App\Models\WorkReport;
 use App\Services\AttendanceService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
-use App\Models\TemporaryPhotoUpload;
 use App\Support\FotoLaporanSlot;
 use App\Support\PhotoLayananStructure;
+use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -104,6 +109,7 @@ class OrderDetail extends Component
         // Parse field name untuk nested properties
         if (str_contains($fieldName, '.')) {
             $parts = explode('.', $fieldName);
+
             // Contoh: fotoKategori.1.slot1 -> $this->fotoKategori[1]['slot1']
             // TODO: Handle nested properties if needed
             return;
@@ -122,6 +128,7 @@ class OrderDetail extends Component
     {
         if (str_contains($fieldName, '.')) {
             $parts = explode('.', $fieldName);
+
             // Handle nested reset if needed
             return;
         }
@@ -273,23 +280,62 @@ class OrderDetail extends Component
     {
         $fotoKategori = [];
         foreach ($this->fotoLengkapi as $orderItemId => $slots) {
+            if (! is_array($slots)) {
+                continue;
+            }
+
             foreach ($slots as $slot => $file) {
-                if ($file === null) {
+                if (! $file instanceof UploadedFile) {
                     continue;
                 }
 
                 $fotoKategori[] = [
                     'order_item_id' => (int) $orderItemId,
-                    'slot' => $slot,
+                    'slot' => (string) $slot,
                     'path' => $file->store('work-reports', 'public'),
                 ];
             }
+        }
+
+        // Jalur cadangan: kalau binding file Livewire tidak sampai (mis. JS
+        // lama masih ter-cache di HP teknisi sehingga upload dikirim ke
+        // endpoint temp-photo lama), ambil foto dari record
+        // `temporary_photo_uploads` dengan field_name "fotoLengkapi.<item>.<slot>".
+        // Ini yang bikin tombol "Simpan Foto" dulu tidak menyimpan apa-apa.
+        $fotoTemp = [];
+        $terpakai = [];
+        foreach ($fotoKategori as $row) {
+            $terpakai[$row['order_item_id'].'|'.$row['slot']] = true;
+        }
+
+        foreach ($this->fotoLengkapiDariTemp() as $temp) {
+            if (isset($terpakai[$temp['order_item_id'].'|'.$temp['slot']])) {
+                continue;
+            }
+
+            $fotoKategori[] = [
+                'order_item_id' => $temp['order_item_id'],
+                'slot' => $temp['slot'],
+                'path' => $temp['path'],
+            ];
+            $fotoTemp[] = $temp['record'];
+        }
+
+        if ($fotoKategori === []) {
+            $this->addError('fotoLengkapi', 'Tidak ada foto yang terkirim. Pilih ulang foto, tunggu sampai selesai mengunggah, lalu tekan Simpan Foto lagi.');
+
+            return;
         }
 
         try {
             $teknisiService = app(TeknisiService::class);
             $teknisiService->lengkapiFotoWajib($this->order, auth()->user(), $fotoKategori);
             StorageQuotaService::lupakanCache();
+
+            foreach ($fotoTemp as $photo) {
+                $photo->deleteFile();
+                $photo->delete();
+            }
 
             $sisaKurang = $teknisiService->fotoWajibKurang($this->order->fresh('orderItems'));
 
@@ -301,6 +347,48 @@ class OrderDetail extends Component
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Ambil foto wajib dari record temp-photo lama (endpoint
+     * `teknisi.temp-photo.store`). File dipindah ke `work-reports` supaya
+     * tidak ikut terhapus saat record temp dibersihkan.
+     *
+     * @return array<int, array{order_item_id: int, slot: string, path: string, record: TemporaryPhotoUpload}>
+     */
+    private function fotoLengkapiDariTemp(): array
+    {
+        $hasil = [];
+
+        $records = TemporaryPhotoUpload::query()
+            ->where('user_id', auth()->id())
+            ->where('order_id', $this->orderId)
+            ->where('field_name', 'like', 'fotoLengkapi.%')
+            ->get();
+
+        foreach ($records as $photo) {
+            $bagian = explode('.', $photo->field_name);
+            if (count($bagian) !== 3) {
+                continue;
+            }
+
+            $path = $photo->file_path;
+            if (blank($path) || ! Storage::disk('public')->exists($path)) {
+                continue;
+            }
+
+            $tujuan = 'work-reports/'.basename($path);
+            Storage::disk('public')->copy($path, $tujuan);
+
+            $hasil[] = [
+                'order_item_id' => (int) $bagian[1],
+                'slot' => (string) $bagian[2],
+                'path' => $tujuan,
+                'record' => $photo,
+            ];
+        }
+
+        return $hasil;
     }
 
     public function tambahMaterial(): void
@@ -534,7 +622,7 @@ class OrderDetail extends Component
             try {
                 $this->uploadFotoPerLayanan();
             } catch (\Exception $e) {
-                \Log::error('Error uploading fotoPerLayanan: ' . $e->getMessage());
+                \Log::error('Error uploading fotoPerLayanan: '.$e->getMessage());
                 // Don't fail submission if photo upload fails - photos can be re-uploaded later
             }
 
@@ -575,7 +663,7 @@ class OrderDetail extends Component
                     $filePath = $file->store('order-photos', 'public');
 
                     // Create OrderPhoto record
-                    \App\Models\OrderPhoto::create([
+                    OrderPhoto::create([
                         'order_id' => $this->order->id,
                         'type' => $type,
                         'unit_number' => $unitNum,
@@ -686,10 +774,11 @@ class OrderDetail extends Component
     public function isGame2Expired(): bool
     {
         try {
-            $setting = \App\Models\Game2Setting::first();
+            $setting = Game2Setting::first();
             $deadlineTime = $setting?->deadline_time ?? '08:30:00';
-            $deadline = \Carbon\Carbon::now()->setTimeFromTimeString($deadlineTime);
-            return \Carbon\Carbon::now()->greaterThanOrEqualTo($deadline);
+            $deadline = Carbon::now()->setTimeFromTimeString($deadlineTime);
+
+            return Carbon::now()->greaterThanOrEqualTo($deadline);
         } catch (\Exception $e) {
             return false;
         }
@@ -701,7 +790,8 @@ class OrderDetail extends Component
     public function getGame2DeadlineTime(): string
     {
         try {
-            $setting = \App\Models\Game2Setting::first();
+            $setting = Game2Setting::first();
+
             return $setting?->deadline_time ?? '08:30';
         } catch (\Exception $e) {
             return '08:30';
@@ -773,6 +863,7 @@ class OrderDetail extends Component
 
     /**
      * Get progress foto per layanan
+     *
      * @return array{total: int, uploaded: int, percent: int}
      */
     public function getFotoPerLayananProgressProperty(): array
@@ -825,6 +916,7 @@ class OrderDetail extends Component
                 $uploads = array_filter($this->fotoPerLayanan[$type][1] ?? []);
                 if (count($uploads) < count($positions)) {
                     $this->addError('fotoPerLayanan', "Foto {$type} tidak lengkap");
+
                     return false;
                 }
             } else {
@@ -832,6 +924,7 @@ class OrderDetail extends Component
                     $uploads = array_filter($this->fotoPerLayanan[$type][$u] ?? []);
                     if (count($uploads) < count($positions)) {
                         $this->addError('fotoPerLayanan', "Foto {$type} unit {$u} tidak lengkap");
+
                         return false;
                     }
                 }

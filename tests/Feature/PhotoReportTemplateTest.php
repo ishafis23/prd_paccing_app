@@ -12,7 +12,9 @@ use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PhotoReportTemplate;
+use App\Models\TemporaryPhotoUpload;
 use App\Models\User;
+use App\Models\WorkReportPhoto;
 use App\Services\PhotoReportTemplateService;
 use App\Services\TeknisiService;
 use App\Support\FotoLaporanSlot;
@@ -373,6 +375,46 @@ it('OrderDetail menampilkan & memproses form Lengkapi Foto Wajib', function () {
         ->assertOk();
 
     expect(app(TeknisiService::class)->fotoWajibKurang($order->fresh('orderItems')))->toBe([]);
+});
+
+it('Lengkapi Foto Wajib ambil foto dari record temp-photo lama saat binding Livewire kosong', function () {
+    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
+    $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
+    $item = $order->orderItems->first();
+
+    app(TeknisiService::class)->submitLaporan($order, $teknisi, [
+        'catatan' => 'Sudah dicuci.',
+        'materials' => [],
+        'foto_kategori' => [
+            ['order_item_id' => $item->id, 'slot' => 'foto_tampak_depan_lokasi', 'path' => 'work-reports/a.jpg'],
+        ],
+    ]);
+
+    $sisa = FotoLaporanSlot::wajibUntuk(ServiceType::CuciAc);
+    $kodeSlot = array_key_first($sisa);
+    $path = UploadedFile::fake()->image('cadangan.jpg')->store('temporary-photos', 'public');
+
+    TemporaryPhotoUpload::create([
+        'user_id' => $teknisi->id,
+        'order_id' => $order->id,
+        'field_name' => "fotoLengkapi.{$item->id}.{$kodeSlot}",
+        'file_path' => $path,
+        'file_name' => 'cadangan.jpg',
+        'file_size' => 100,
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->call('lengkapiFotoWajib')
+        ->assertOk();
+
+    expect(WorkReportPhoto::query()
+        ->where('order_item_id', $item->id)
+        ->where('slot', $kodeSlot)
+        ->exists())->toBeTrue();
+
+    expect(TemporaryPhotoUpload::count())->toBe(0);
 });
 
 it('notifikasi sukses submitLaporan menyebutkan persis foto wajib yang masih kurang', function () {
