@@ -216,6 +216,71 @@ class OrderDetail extends Component
     }
 
     /**
+     * Foto per layanan (fase 03) yang masih kurang utk order ini — dipakai
+     * blok "Lengkapi Foto per Layanan" setelah laporan tersubmit. Foto boleh
+     * diisi belakangan, tapi tetap menahan keberangkatan sampai lengkap.
+     *
+     * @return array<int, array{type: string, unit: int, position: string, label: string}>
+     */
+    public function getFotoPerLayananKurangProperty(): array
+    {
+        if (! in_array($this->order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
+            return [];
+        }
+
+        return app(TeknisiService::class)->fotoPerLayananKurang($this->order);
+    }
+
+    /**
+     * Foto per layanan yang sudah tersimpan di `order_photos`, dipetakan per
+     * "type|unit|position" => path supaya blok lengkapi bisa menampilkan
+     * foto lama (dan tombol ganti).
+     *
+     * @return array<string, string>
+     */
+    public function getFotoPerLayananTersimpanProperty(): array
+    {
+        return OrderPhoto::query()
+            ->where('order_id', $this->orderId)
+            ->get()
+            ->mapWithKeys(fn (OrderPhoto $p): array => [
+                $p->type.'|'.$p->unit_number.'|'.$p->photo_position => $p->file_path,
+            ])
+            ->all();
+    }
+
+    /**
+     * Daftar slot foto per layanan yang diwajibkan (fase 03) beserta foto
+     * yang sudah tersimpan (kalau ada) — dipakai blok "Lengkapi Foto per
+     * Layanan" pasca-submit.
+     *
+     * @return array<int, array{type: string, unit: int, position: string, label: string, path: ?string}>
+     */
+    public function getFotoPerLayananLengkapiProperty(): array
+    {
+        if (! in_array($this->order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
+            return [];
+        }
+
+        $tersimpan = $this->fotoPerLayananTersimpan;
+        $baris = [];
+
+        foreach (app(TeknisiService::class)->tipeFotoPerLayananWajib($this->order) as $type) {
+            foreach (PhotoLayananStructure::positions($type) as $posisi => $meta) {
+                $baris[] = [
+                    'type' => $type,
+                    'unit' => 1,
+                    'position' => $posisi,
+                    'label' => $meta['label'],
+                    'path' => $tersimpan[$type.'|1|'.$posisi] ?? null,
+                ];
+            }
+        }
+
+        return $baris;
+    }
+
+    /**
      * Laporan TERAKHIR order ini — target timpa foto sebelum/sesudah utk
      * blok "Perbarui Foto Laporan" setelah laporan disubmit.
      */
@@ -520,11 +585,6 @@ class OrderDetail extends Component
 
     public function submitLaporan(): void
     {
-        // Validate foto per layanan first
-        if (! $this->validateFotoPerLayanan()) {
-            return;
-        }
-
         $this->validate([
             'catatan' => ['required', 'string', 'min:3'],
             'materials.*.stock_item_id' => ['nullable', 'exists:stock_items,id'],
@@ -601,29 +661,34 @@ class OrderDetail extends Component
             $teknisiService->submitLaporan($this->order, auth()->user(), $payload);
             StorageQuotaService::lupakanCache();
 
-            // dev-plan/17, B63 (revisi): kasih tahu langsung di notifikasi
-            // sukses foto wajib mana yang masih kurang, jangan cuma
-            // mengandalkan teknisi ngeh sendiri dari blok "Lengkapi Foto
-            // Wajib" di bawah — supaya mereka tidak kaget baru pas mau
-            // berangkat ke order berikutnya.
-            $kurang = $teknisiService->fotoWajibKurang(Order::with('orderItems')->findOrFail($this->orderId));
+            // Upload fotoPerLayanan (Phase 03) setelah laporan tersimpan.
+            // Foto per layanan TIDAK memblokir submit (boleh diisi
+            // belakangan), tapi tetap menahan keberangkatan ke order
+            // berikutnya sampai dilengkapi (lihat TeknisiService::berangkat).
+            try {
+                $this->simpanFotoPerLayanan();
+            } catch (\Exception $e) {
+                \Log::error('Error uploading fotoPerLayanan: '.$e->getMessage());
+                // Don't fail submission if photo upload fails - photos can be re-uploaded later
+            }
 
-            if ($kurang === []) {
-                session()->flash('status', 'Laporan berhasil disubmit. Semua foto wajib sudah lengkap.');
+            // dev-plan/17, B63 (revisi): kasih tahu langsung di notifikasi
+            // foto mana yang masih kurang (wajib per kategori + foto per
+            // layanan) supaya teknisi tidak kaget baru pas mau berangkat.
+            $orderFresh = Order::with('orderItems')->findOrFail($this->orderId);
+            $kurang = collect(array_merge(
+                $teknisiService->fotoWajibKurang($orderFresh),
+                $teknisiService->fotoPerLayananKurang($orderFresh),
+            ));
+
+            if ($kurang->isEmpty()) {
+                session()->flash('status', 'Laporan berhasil disubmit. Semua foto sudah lengkap.');
             } else {
-                $daftar = collect($kurang)->pluck('label')->implode(', ');
+                $daftar = $kurang->pluck('label')->implode(', ');
                 session()->flash(
                     'status',
                     "Laporan berhasil disubmit. Masih ada {$daftar} yang belum diisi — lengkapi dulu di bawah sebelum bisa berangkat ke order berikutnya."
                 );
-            }
-
-            // Upload fotoPerLayanan (Phase 03) after laporan submitted
-            try {
-                $this->uploadFotoPerLayanan();
-            } catch (\Exception $e) {
-                \Log::error('Error uploading fotoPerLayanan: '.$e->getMessage());
-                // Don't fail submission if photo upload fails - photos can be re-uploaded later
             }
 
             // Cleanup temporary photos dari database setelah submit sukses
@@ -641,39 +706,59 @@ class OrderDetail extends Component
     }
 
     /**
-     * Upload fotoPerLayanan ke order_photos table via direct storage save
-     * Called after submitLaporan succeeds (Phase 03)
+     * Simpan fotoPerLayanan ke `order_photos` (Phase 03) — upsert per
+     * (order, type, unit_number, photo_position) supaya bisa dipanggil saat
+     * submit maupun saat melengkapi/mengganti foto belakangan tanpa
+     * menghasilkan baris ganda. Balikin jumlah foto yang tersimpan.
      */
-    private function uploadFotoPerLayanan(): void
+    public function simpanFotoPerLayanan(): int
     {
         $uploadedCount = 0;
 
         foreach ($this->fotoPerLayanan as $type => $units) {
-            if ($this->isSectionSkipped($type)) {
+            if ($this->isSectionSkipped($type) || ! is_array($units)) {
                 continue;
             }
 
             foreach ($units as $unitNum => $slots) {
+                if (! is_array($slots)) {
+                    continue;
+                }
+
                 foreach ($slots as $position => $file) {
-                    if ($file === null) {
+                    if (! $file instanceof UploadedFile) {
                         continue;
                     }
 
-                    // Store file to storage
                     $filePath = $file->store('order-photos', 'public');
 
-                    // Create OrderPhoto record
-                    OrderPhoto::create([
-                        'order_id' => $this->order->id,
-                        'type' => $type,
-                        'unit_number' => $unitNum,
-                        'photo_position' => $position,
+                    $existing = OrderPhoto::query()
+                        ->where('order_id', $this->order->id)
+                        ->where('type', $type)
+                        ->where('unit_number', (int) $unitNum)
+                        ->where('photo_position', $position)
+                        ->first();
+
+                    $atribut = [
                         'file_path' => $filePath,
                         'file_name' => $file->getClientOriginalName(),
                         'file_size' => $file->getSize(),
                         'mime_type' => $file->getMimeType(),
                         'status' => 'pending',
-                    ]);
+                        'rejection_reason' => null,
+                    ];
+
+                    if ($existing !== null) {
+                        Storage::disk('public')->delete($existing->file_path);
+                        $existing->update($atribut);
+                    } else {
+                        OrderPhoto::create(array_merge($atribut, [
+                            'order_id' => $this->order->id,
+                            'type' => $type,
+                            'unit_number' => (int) $unitNum,
+                            'photo_position' => $position,
+                        ]));
+                    }
 
                     $uploadedCount++;
                 }
@@ -683,6 +768,36 @@ class OrderDetail extends Component
         if ($uploadedCount > 0) {
             StorageQuotaService::lupakanCache();
         }
+
+        return $uploadedCount;
+    }
+
+    /**
+     * Tombol "Simpan Foto" pada blok lengkapi foto per layanan pasca-submit.
+     */
+    public function simpanLengkapiFotoPerLayanan(): void
+    {
+        try {
+            $jumlah = $this->simpanFotoPerLayanan();
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        if ($jumlah === 0) {
+            $this->addError('fotoPerLayanan', 'Tidak ada foto yang terkirim. Pilih ulang foto, tunggu sampai selesai mengunggah, lalu tekan Simpan Foto lagi.');
+
+            return;
+        }
+
+        $sisa = app(TeknisiService::class)->fotoPerLayananKurang($this->order->fresh('orderItems'));
+
+        session()->flash('status', $sisa === []
+            ? 'Foto per layanan sudah lengkap — Anda sekarang bisa berangkat ke order berikutnya.'
+            : 'Foto tersimpan. Masih ada '.collect($sisa)->pluck('label')->implode(', ').' yang belum diisi.');
+
+        $this->resetFotoPerLayanan();
     }
 
     /**
@@ -897,41 +1012,6 @@ class OrderDetail extends Component
             'uploaded' => $uploaded,
             'percent' => $percent,
         ];
-    }
-
-    /**
-     * Validate foto per layanan sebelum submit
-     */
-    public function validateFotoPerLayanan(): bool
-    {
-        foreach (PhotoLayananStructure::types() as $type) {
-            if ($this->isSectionSkipped($type)) {
-                continue;
-            }
-
-            $positions = PhotoLayananStructure::positions($type);
-            $units = $this->unitCounts[$type] ?? 1;
-
-            if ($type === PhotoLayananStructure::TYPE_LOKASI) {
-                $uploads = array_filter($this->fotoPerLayanan[$type][1] ?? []);
-                if (count($uploads) < count($positions)) {
-                    $this->addError('fotoPerLayanan', "Foto {$type} tidak lengkap");
-
-                    return false;
-                }
-            } else {
-                for ($u = 1; $u <= $units; $u++) {
-                    $uploads = array_filter($this->fotoPerLayanan[$type][$u] ?? []);
-                    if (count($uploads) < count($positions)) {
-                        $this->addError('fotoPerLayanan', "Foto {$type} unit {$u} tidak lengkap");
-
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return true;
     }
 
     /**

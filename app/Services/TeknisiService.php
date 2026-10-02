@@ -8,16 +8,19 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderPhoto;
 use App\Models\StockItem;
 use App\Models\User;
 use App\Models\WorkReport;
 use App\Models\WorkReportMaterial;
 use App\Models\WorkReportPhoto;
 use App\Support\FotoLaporanSlot;
+use App\Support\PhotoLayananStructure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -41,14 +44,19 @@ class TeknisiService
             throw new BusinessRuleException('Order harus berstatus terjadwal sebelum berangkat.');
         }
 
-        // dev-plan/17, B63 (revisi 18 Sep): tidak boleh berangkat ke order
-        // berikutnya selama masih ada order lain (belum ditutup) yang
-        // laporannya kurang foto wajib — dorong teknisi melengkapi dulu.
+        // dev-plan/17, B63 + revisi foto per layanan: tidak boleh berangkat
+        // ke order berikutnya selama masih ada order lain (belum ditutup)
+        // yang fotonya belum lengkap — foto boleh diisi belakangan, tapi
+        // tetap menahan keberangkatan sampai dilengkapi.
         $tertunda = $this->orderDenganFotoBelumLengkap($teknisi);
         if ($tertunda !== null) {
-            $daftar = collect($this->fotoWajibKurang($tertunda))->pluck('label')->implode(', ');
+            $daftar = collect(array_merge(
+                $this->fotoWajibKurang($tertunda),
+                $this->fotoPerLayananKurang($tertunda),
+            ))->pluck('label')->implode(', ');
+
             throw new BusinessRuleException(
-                "Lengkapi dulu foto wajib pada laporan order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya: {$daftar}."
+                "Lengkapi dulu foto pada order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya: {$daftar}."
             );
         }
 
@@ -60,7 +68,8 @@ class TeknisiService
 
     /**
      * Order lain milik teknisi ini (belum ditutup — B32) yang laporannya
-     * sudah disubmit tapi masih kurang foto wajib (dev-plan/17, B63).
+     * sudah disubmit tapi masih kurang foto (dev-plan/17, B63) — baik foto
+     * wajib per kategori maupun foto per layanan (fase 03).
      */
     private function orderDenganFotoBelumLengkap(User $teknisi): ?Order
     {
@@ -72,12 +81,68 @@ class TeknisiService
             ->get();
 
         foreach ($orders as $order) {
-            if ($this->fotoWajibKurang($order) !== []) {
+            if ($this->fotoWajibKurang($order) !== [] || $this->fotoPerLayananKurang($order) !== []) {
                 return $order;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Tipe foto per layanan (fase 03) yang diwajibkan utk sebuah order,
+     * ditentukan dari kategori order_item: lokasi selalu, cuci bila ada
+     * item cuci_ac, service bila ada item service_ac.
+     *
+     * @return array<int, string>
+     */
+    public function tipeFotoPerLayananWajib(Order $order): array
+    {
+        $order->loadMissing('orderItems');
+        $kategori = $order->orderItems->pluck('kategori');
+
+        $tipe = [PhotoLayananStructure::TYPE_LOKASI];
+        if ($kategori->contains(ServiceType::CuciAc)) {
+            $tipe[] = PhotoLayananStructure::TYPE_CUCI;
+        }
+        if ($kategori->contains(ServiceType::ServiceAc)) {
+            $tipe[] = PhotoLayananStructure::TYPE_SERVICE;
+        }
+
+        return $tipe;
+    }
+
+    /**
+     * Foto per layanan (fase 03: lokasi/cuci/service) yang belum diunggah
+     * ke `order_photos` (1 unit per tipe).
+     *
+     * @return array<int, array{type: string, unit: int, position: string, label: string}>
+     */
+    public function fotoPerLayananKurang(Order $order): array
+    {
+        $tipeWajib = $this->tipeFotoPerLayananWajib($order);
+
+        $terisi = OrderPhoto::query()
+            ->where('order_id', $order->id)
+            ->get()
+            ->map(fn (OrderPhoto $p): string => $p->type.'|'.$p->unit_number.'|'.$p->photo_position)
+            ->flip();
+
+        $kurang = [];
+        foreach ($tipeWajib as $type) {
+            foreach (PhotoLayananStructure::positions($type) as $posisi => $meta) {
+                if (! $terisi->has($type.'|1|'.$posisi)) {
+                    $kurang[] = [
+                        'type' => $type,
+                        'unit' => 1,
+                        'position' => $posisi,
+                        'label' => $meta['label'],
+                    ];
+                }
+            }
+        }
+
+        return $kurang;
     }
 
     /**
