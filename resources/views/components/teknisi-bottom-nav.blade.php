@@ -14,7 +14,7 @@
     <div class="grid h-[68px] grid-cols-6">
         @foreach ($tabs as $tab)
             @php $active = request()->routeIs($tab['route']); @endphp
-            <a href="{{ route($tab['route']) }}" wire:navigate
+            <a href="{{ \App\Support\Url::absolute($tab['route']) }}" wire:navigate
                 class="flex flex-col items-center justify-center gap-0.5 {{ $active ? 'text-blue-600' : 'text-gray-400 transition hover:text-gray-600' }}">
                 <span class="flex h-8 w-14 items-center justify-center rounded-full {{ $active ? 'bg-blue-100' : '' }}">
                     <x-dynamic-component :component="'heroicon-' . ($active ? 's' : 'o') . '-' . $tab['icon']" class="h-6 w-6" />

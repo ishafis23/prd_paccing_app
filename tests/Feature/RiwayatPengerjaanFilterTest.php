@@ -89,3 +89,16 @@ it('resetFilter mengosongkan semua filter & tombolnya cuma tampil kalau ada filt
         ->assertDontSee('Reset Filter')
         ->assertSee('Customer Reset');
 });
+
+it('link order di riwayat memakai URL deterministik dari APP_URL (hosting subfolder)', function () {
+    config(['app.url' => 'https://mycompany.web.id/paccing/public']);
+
+    $order = Order::factory()->create([
+        'teknisi_id' => $this->teknisi->id,
+        'status' => OrderStatus::Selesai,
+    ]);
+
+    Livewire::actingAs($this->teknisi)
+        ->test(RiwayatPengerjaan::class)
+        ->assertSee('https://mycompany.web.id/paccing/public/teknisi/order/'.$order->id);
+});

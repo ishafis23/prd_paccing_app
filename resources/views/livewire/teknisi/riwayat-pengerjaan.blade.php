@@ -27,7 +27,7 @@
             // pengerjaan) — fotonya dilihat lewat halaman detail order.
             $total = number_format((float) $order->total(), 0, ',', '.');
         @endphp
-        <a href="{{ url('/teknisi/order/'.$order->id) }}" wire:navigate
+        <a href="{{ \App\Support\Url::absolute('teknisi.order', ['order' => $order->id]) }}" wire:navigate
             class="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 transition active:scale-[0.99] active:bg-gray-50">
             <div class="flex items-start gap-3">
                 <x-initials-avatar :name="$order->customer->nama" size="h-16 w-16 text-sm" />

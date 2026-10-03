@@ -1,7 +1,7 @@
 <div class="space-y-4 px-4 pb-2 pt-3">
 
     {{-- Kembali --}}
-    <a href="{{ url('/teknisi') }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-semibold text-gray-500">
+    <a href="{{ \App\Support\Url::absolute('teknisi.jadwal') }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-semibold text-gray-500">
         <x-heroicon-o-chevron-left class="h-4 w-4" /> Jadwal Saya
     </a>
 
@@ -769,7 +769,7 @@
             <p class="mt-1 text-sm text-emerald-100">
                 Metode pembayaran terkunci{{ $metodeLabel ? ' ('.$metodeLabel.')' : '' }} — order tercatat ditutup.
             </p>
-            <a href="{{ url('/teknisi') }}" wire:navigate
+            <a href="{{ \App\Support\Url::absolute('teknisi.jadwal') }}" wire:navigate
                 class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 active:bg-emerald-50">
                 <x-heroicon-o-chevron-left class="h-4 w-4" /> Kembali ke Jadwal Saya
             </a>
