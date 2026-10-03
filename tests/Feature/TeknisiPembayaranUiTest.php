@@ -153,6 +153,30 @@ it('order lunas hanya menampilkan badge Lunas, tanpa pilihan metode/channel/tuna
         ->assertDontSee('Bayar langsung ke teknisi yang bertugas.');
 });
 
+it('order LUNAS tetap menampilkan Bagikan Resi (bug: resi hilang setelah lunas)', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $admin = ($this->mkAdmin)();
+    $order = ($this->mkOrder)($teknisi, OrderStatus::Selesai, [
+        'resi_token' => 'tokenlunasabc123',
+    ]);
+
+    Payment::create([
+        'order_id' => $order->id,
+        'metode' => PaymentMethod::Qris->value,
+        'status' => PaymentStatus::Lunas->value,
+        'total_tagihan' => $order->total(),
+        'jumlah_dibayar' => $order->total(),
+        'tanggal_bayar' => now()->toDateString(),
+        'dicatat_oleh' => $admin->id,
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->assertSee('Lunas')
+        ->assertSee('Bagikan Resi')
+        ->assertSee(route('resi.show', [$order->id, $order->resi_token]));
+});
+
 it('order selesai dengan resi token menampilkan blok Bagikan Resi beserta link publik', function () {
     $teknisi = ($this->mkTeknisi)();
     $order = ($this->mkOrder)($teknisi, OrderStatus::Selesai, [

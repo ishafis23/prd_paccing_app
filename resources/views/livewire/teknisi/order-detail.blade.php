@@ -971,8 +971,10 @@
                         </div>
                     </div>
 
-                    {{-- (4) Bagikan Resi --}}
-                    @if ($resiUrl)
+                @endif
+
+                {{-- (4) Bagikan Resi — selalu tampil (juga setelah lunas), selama token resi ada. --}}
+                @if ($resiUrl)
                         <div class="rounded-xl bg-blue-50/70 p-3 ring-1 ring-blue-100">
                             <p class="flex items-center gap-1.5 text-sm font-bold text-gray-800">
                                 <x-heroicon-o-link class="h-4 w-4 text-blue-600" /> Bagikan Resi
@@ -994,7 +996,6 @@
                             </a>
                         </div>
                     @endif
-                @endif
             </div>
         </div>
 
