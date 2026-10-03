@@ -54,8 +54,8 @@
     @livewireScripts
     <script>
         window.photoUploadConfig = {
-            store: @json(route('teknisi.temp-photo.store', ['order' => '__ORDER__'])),
-            destroy: @json(route('teknisi.temp-photo.destroy', ['tempPhoto' => '__ID__'])),
+            store: @json(\App\Support\Url::absolute('teknisi.temp-photo.store', ['order' => '__ORDER__'])),
+            destroy: @json(\App\Support\Url::absolute('teknisi.temp-photo.destroy', ['tempPhoto' => '__ID__'])),
         };
     </script>
     <script src="{{ asset('js/camera-upload.js') }}?v={{ @filemtime(public_path('js/camera-upload.js')) }}"></script>

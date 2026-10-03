@@ -15,6 +15,7 @@ use App\Models\StockItem;
 use App\Models\TemporaryPhotoUpload;
 use App\Models\WorkReport;
 use App\Services\AttendanceService;
+use App\Services\OrderService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
@@ -416,7 +417,7 @@ class OrderDetail extends Component
 
     /**
      * Ambil foto wajib dari record temp-photo lama (endpoint
-     * `teknisi.temp-photo.store`). File dipindah ke `work-reports` supaya
+     * `teknisi.temp-photo.store`). File disalin ke `work-reports` supaya
      * tidak ikut terhapus saat record temp dibersihkan.
      *
      * @return array<int, array{order_item_id: int, slot: string, path: string, record: TemporaryPhotoUpload}>
@@ -425,35 +426,82 @@ class OrderDetail extends Component
     {
         $hasil = [];
 
-        $records = TemporaryPhotoUpload::query()
-            ->where('user_id', auth()->id())
-            ->where('order_id', $this->orderId)
-            ->where('field_name', 'like', 'fotoLengkapi.%')
-            ->get();
+        foreach ($this->fotoTempTersedia() as $fieldName => $photo) {
+            if (! str_starts_with($fieldName, 'fotoLengkapi.')) {
+                continue;
+            }
 
-        foreach ($records as $photo) {
-            $bagian = explode('.', $photo->field_name);
+            $bagian = explode('.', $fieldName);
             if (count($bagian) !== 3) {
                 continue;
             }
 
-            $path = $photo->file_path;
-            if (blank($path) || ! Storage::disk('public')->exists($path)) {
-                continue;
-            }
-
-            $tujuan = 'work-reports/'.basename($path);
-            Storage::disk('public')->copy($path, $tujuan);
-
             $hasil[] = [
                 'order_item_id' => (int) $bagian[1],
                 'slot' => (string) $bagian[2],
-                'path' => $tujuan,
+                'path' => $this->salinFotoTemp($photo->file_path, 'work-reports'),
                 'record' => $photo,
             ];
         }
 
         return $hasil;
+    }
+
+    /**
+     * Foto yang telanjur masuk ke `temporary_photo_uploads` lewat jalur
+     * cadangan lama (endpoint `teknisi.temp-photo.store`, dipakai saat
+     * upload Livewire gagal) — dipetakan field_name => record, hanya yang
+     * filenya masih ada di disk. Ini yang dulu bikin foto "tidak terbaca":
+     * `submitLaporan()` cuma membaca property Livewire, padahal file-nya
+     * tersimpan di tabel temp ini.
+     *
+     * @return array<string, TemporaryPhotoUpload>
+     */
+    private function fotoTempTersedia(): array
+    {
+        return TemporaryPhotoUpload::query()
+            ->where('user_id', auth()->id())
+            ->where('order_id', $this->orderId)
+            ->get()
+            ->filter(fn (TemporaryPhotoUpload $p): bool => filled($p->file_path) && Storage::disk('public')->exists($p->file_path))
+            ->keyBy('field_name')
+            ->all();
+    }
+
+    /**
+     * Salin file temp-photo ke folder tujuan (`work-reports`/`order-photos`)
+     * agar tidak ikut terhapus saat record temp dibersihkan. Balikin path
+     * tujuan.
+     */
+    private function salinFotoTemp(string $sumber, string $folder): string
+    {
+        $tujuan = $folder.'/'.basename($sumber);
+        Storage::disk('public')->copy($sumber, $tujuan);
+
+        return $tujuan;
+    }
+
+    /**
+     * Hapus record temp-photo (beserta filenya) yang `field_name`-nya
+     * diawali salah satu prefix.
+     *
+     * @param  array<int, string>  $prefixes
+     */
+    private function bersihkanFotoTemp(array $prefixes): void
+    {
+        TemporaryPhotoUpload::query()
+            ->where('user_id', auth()->id())
+            ->where('order_id', $this->orderId)
+            ->where(function ($query) use ($prefixes): void {
+                foreach ($prefixes as $prefix) {
+                    $query->orWhere('field_name', 'like', $prefix.'%');
+                }
+            })
+            ->get()
+            ->each(function (TemporaryPhotoUpload $photo): void {
+                $photo->deleteFile();
+                $photo->delete();
+            });
     }
 
     public function tambahMaterial(): void
@@ -482,6 +530,38 @@ class OrderDetail extends Component
         try {
             app(TeknisiService::class)->berangkat($this->order, auth()->user());
             session()->flash('status', 'Status diperbarui: menuju lokasi.');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Tandai/aktifkan kembali satu baris layanan (unit) sebagai "tidak
+     * jadi/batal" (revisi customer). Total tagihan & kewajiban foto otomatis
+     * menyesuaikan — baris batal tidak dihitung & tidak perlu difoto.
+     */
+    public function toggleItemBatal(int $itemId): void
+    {
+        $item = $this->order->orderItems->firstWhere('id', $itemId);
+
+        if ($item === null) {
+            session()->flash('error', 'Baris layanan tidak ditemukan.');
+
+            return;
+        }
+
+        try {
+            $orderService = app(OrderService::class);
+
+            if ($item->dibatalkan()) {
+                $orderService->aktifkanItem($item, auth()->user());
+                session()->flash('status', "{$item->nama_layanan} diaktifkan kembali.");
+            } else {
+                $orderService->batalkanItem($item, auth()->user());
+                session()->flash('status', "{$item->nama_layanan} ditandai tidak jadi/batal.");
+            }
+
+            $this->order->unsetRelation('orderItems');
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -630,16 +710,61 @@ class OrderDetail extends Component
         $fotoKategori = [];
         foreach ($this->fotoKategori as $orderItemId => $slots) {
             foreach ($slots as $slot => $file) {
-                if ($file === null) {
+                if (! $file instanceof UploadedFile) {
                     continue;
                 }
 
                 $fotoKategori[] = [
                     'order_item_id' => (int) $orderItemId,
-                    'slot' => $slot,
+                    'slot' => (string) $slot,
                     'path' => $file->store('work-reports', 'public'),
                 ];
             }
+        }
+
+        $fotoSebelum = $this->fotoSebelum?->store('work-reports', 'public');
+        $fotoSesudah = $this->fotoSesudah?->store('work-reports', 'public');
+
+        // Jalur cadangan: kalau binding file Livewire tidak sampai (mis. JS
+        // lama ter-cache di HP teknisi sehingga upload dikirim ke endpoint
+        // temp-photo lama), ambil foto dari record `temporary_photo_uploads`.
+        // Sebelum ini, foto fallback diabaikan lalu ikut terhapus — teknisi
+        // jadi harus memfoto/double kerja.
+        $temp = $this->fotoTempTersedia();
+
+        if ($fotoSebelum === null && isset($temp['fotoSebelum'])) {
+            $fotoSebelum = $this->salinFotoTemp($temp['fotoSebelum']->file_path, 'work-reports');
+        }
+
+        if ($fotoSesudah === null && isset($temp['fotoSesudah'])) {
+            $fotoSesudah = $this->salinFotoTemp($temp['fotoSesudah']->file_path, 'work-reports');
+        }
+
+        $sudahKategori = collect($fotoKategori)
+            ->mapWithKeys(fn (array $r): array => [$r['order_item_id'].'|'.$r['slot'] => true])
+            ->all();
+
+        foreach ($temp as $fieldName => $photo) {
+            if (! str_starts_with($fieldName, 'fotoKategori.')) {
+                continue;
+            }
+
+            $bagian = explode('.', $fieldName);
+            if (count($bagian) !== 3) {
+                continue;
+            }
+
+            $kunci = ((int) $bagian[1]).'|'.$bagian[2];
+            if (isset($sudahKategori[$kunci])) {
+                continue;
+            }
+
+            $fotoKategori[] = [
+                'order_item_id' => (int) $bagian[1],
+                'slot' => (string) $bagian[2],
+                'path' => $this->salinFotoTemp($photo->file_path, 'work-reports'),
+            ];
+            $sudahKategori[$kunci] = true;
         }
 
         $payload = [
@@ -651,8 +776,8 @@ class OrderDetail extends Component
                 ->all(),
             'butuh_followup' => $this->butuhFollowup,
             'is_klaim' => $this->isKlaim,
-            'foto_sebelum' => $this->fotoSebelum?->store('work-reports', 'public'),
-            'foto_sesudah' => $this->fotoSesudah?->store('work-reports', 'public'),
+            'foto_sebelum' => $fotoSebelum,
+            'foto_sesudah' => $fotoSesudah,
             'foto_kategori' => $fotoKategori,
         ];
 
@@ -691,11 +816,11 @@ class OrderDetail extends Component
                 );
             }
 
-            // Cleanup temporary photos dari database setelah submit sukses
-            TemporaryPhotoUpload::query()
-                ->where('user_id', auth()->id())
-                ->where('order_id', $this->orderId)
-                ->delete();
+            // Cleanup temp-photo yang sudah dikonsumsi jalur laporan
+            // (fotoSebelum/Sesudah/fotoKategori). Foto per layanan
+            // dibersihkan di simpanFotoPerLayanan(); sisa temp yang belum
+            // terpakai sengaja dibiarkan agar bisa dilengkapi belakangan.
+            $this->bersihkanFotoTemp(['fotoSebelum', 'fotoSesudah', 'fotoKategori.']);
 
             $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
             $this->tempPhotos = [];
@@ -714,6 +839,7 @@ class OrderDetail extends Component
     public function simpanFotoPerLayanan(): int
     {
         $uploadedCount = 0;
+        $dariLivewire = [];
 
         foreach ($this->fotoPerLayanan as $type => $units) {
             if ($this->isSectionSkipped($type) || ! is_array($units)) {
@@ -730,46 +856,103 @@ class OrderDetail extends Component
                         continue;
                     }
 
-                    $filePath = $file->store('order-photos', 'public');
+                    $this->simpanFotoPerLayananKeDb(
+                        (string) $type,
+                        (int) $unitNum,
+                        (string) $position,
+                        $file->store('order-photos', 'public'),
+                        $file->getClientOriginalName(),
+                        (int) $file->getSize(),
+                        (string) $file->getMimeType(),
+                    );
 
-                    $existing = OrderPhoto::query()
-                        ->where('order_id', $this->order->id)
-                        ->where('type', $type)
-                        ->where('unit_number', (int) $unitNum)
-                        ->where('photo_position', $position)
-                        ->first();
-
-                    $atribut = [
-                        'file_path' => $filePath,
-                        'file_name' => $file->getClientOriginalName(),
-                        'file_size' => $file->getSize(),
-                        'mime_type' => $file->getMimeType(),
-                        'status' => 'pending',
-                        'rejection_reason' => null,
-                    ];
-
-                    if ($existing !== null) {
-                        Storage::disk('public')->delete($existing->file_path);
-                        $existing->update($atribut);
-                    } else {
-                        OrderPhoto::create(array_merge($atribut, [
-                            'order_id' => $this->order->id,
-                            'type' => $type,
-                            'unit_number' => (int) $unitNum,
-                            'photo_position' => $position,
-                        ]));
-                    }
-
+                    $dariLivewire[$type.'|'.$unitNum.'|'.$position] = true;
                     $uploadedCount++;
                 }
             }
         }
+
+        // Jalur cadangan: foto yang telanjur masuk ke temporary_photo_uploads
+        // (upload Livewire gagal) tetap disimpan, jangan sampai hilang lalu
+        // teknisi harus memfoto ulang.
+        foreach ($this->fotoTempTersedia() as $fieldName => $photo) {
+            if (! str_starts_with($fieldName, 'fotoPerLayanan.')) {
+                continue;
+            }
+
+            $bagian = explode('.', $fieldName);
+            if (count($bagian) !== 4) {
+                continue;
+            }
+
+            [, $type, $unitNum, $position] = $bagian;
+            if (isset($dariLivewire[$type.'|'.$unitNum.'|'.$position])) {
+                continue;
+            }
+
+            $this->simpanFotoPerLayananKeDb(
+                (string) $type,
+                (int) $unitNum,
+                (string) $position,
+                $this->salinFotoTemp($photo->file_path, 'order-photos'),
+                (string) $photo->file_name,
+                (int) $photo->file_size,
+                (string) $photo->mime_type,
+            );
+
+            $uploadedCount++;
+        }
+
+        // Record temp foto per layanan sudah disalin — bersihkan.
+        $this->bersihkanFotoTemp(['fotoPerLayanan.']);
 
         if ($uploadedCount > 0) {
             StorageQuotaService::lupakanCache();
         }
 
         return $uploadedCount;
+    }
+
+    /**
+     * Upsert satu baris `order_photos` per (order, type, unit_number,
+     * photo_position) — dipakai jalur Livewire maupun temp-photo.
+     */
+    private function simpanFotoPerLayananKeDb(
+        string $type,
+        int $unitNum,
+        string $position,
+        string $filePath,
+        string $fileName,
+        int $fileSize,
+        string $mime,
+    ): void {
+        $existing = OrderPhoto::query()
+            ->where('order_id', $this->order->id)
+            ->where('type', $type)
+            ->where('unit_number', $unitNum)
+            ->where('photo_position', $position)
+            ->first();
+
+        $atribut = [
+            'file_path' => $filePath,
+            'file_name' => $fileName,
+            'file_size' => $fileSize,
+            'mime_type' => $mime,
+            'status' => 'pending',
+            'rejection_reason' => null,
+        ];
+
+        if ($existing !== null) {
+            Storage::disk('public')->delete($existing->file_path);
+            $existing->update($atribut);
+        } else {
+            OrderPhoto::create(array_merge($atribut, [
+                'order_id' => $this->order->id,
+                'type' => $type,
+                'unit_number' => $unitNum,
+                'photo_position' => $position,
+            ]));
+        }
     }
 
     /**

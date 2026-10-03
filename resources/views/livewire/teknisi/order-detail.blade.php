@@ -280,6 +280,49 @@
         </div>
     @endif
 
+    {{-- Rincian Layanan: tandai unit/layanan yang tidak jadi/batal (revisi
+         customer — minta 2 unit, ternyata 1 batal). Total tagihan otomatis
+         menyesuaikan dan unit batal tidak perlu difoto. --}}
+    @if ($order->orderItems->isNotEmpty()
+        && ! $order->sudahDitutup()
+        && in_array($order->status, [$orderStatus::Terjadwal, $orderStatus::MenujuLokasi, $orderStatus::Dikerjakan, $orderStatus::ButuhFollowup]))
+        <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <h2 class="flex items-center gap-2 font-bold text-gray-900">
+                <x-heroicon-o-clipboard-document-list class="h-5 w-5 text-blue-600" /> Rincian Layanan
+            </h2>
+            <p class="mt-1 text-xs text-gray-500">
+                Centang "Tidak jadi/batal" kalau customer membatalkan unit/layanan ini. Total tagihan otomatis
+                menyesuaikan dan unit yang batal tidak perlu difoto.
+            </p>
+
+            <div class="mt-3 space-y-2">
+                @foreach ($order->orderItems as $item)
+                    <label
+                        class="flex items-start gap-3 rounded-xl p-3 ring-1 {{ $item->dibatalkan() ? 'bg-rose-50 ring-rose-200' : 'bg-gray-50 ring-gray-100' }}">
+                        <input type="checkbox" wire:click="toggleItemBatal({{ $item->id }})"
+                            @checked($item->dibatalkan()) wire:loading.attr="disabled"
+                            class="mt-0.5 rounded border-gray-300 text-rose-600">
+                        <span class="min-w-0 flex-1">
+                            <span
+                                class="block text-sm font-semibold {{ $item->dibatalkan() ? 'text-rose-700 line-through' : 'text-gray-800' }}">
+                                {{ $item->nama_layanan }}
+                                @if ($item->acUnit)
+                                    <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
+                                @endif
+                            </span>
+                            <span class="text-xs text-gray-500">
+                                {{ $item->jumlah }} unit · Rp{{ number_format((float) $item->harga * $item->jumlah, 0, ',', '.') }}
+                                @if ($item->dibatalkan())
+                                    · <span class="font-semibold text-rose-600">Tidak jadi/batal</span>
+                                @endif
+                            </span>
+                        </span>
+                    </label>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     @if (in_array($order->status, [$orderStatus::Dikerjakan, $orderStatus::ButuhFollowup]))
         <form wire:submit="submitLaporan" class="space-y-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
             <h2 class="flex items-center gap-2 font-bold text-gray-900">
@@ -334,6 +377,7 @@
                     <label class="mb-2 block text-sm font-semibold text-gray-700">Foto per Layanan <span class="font-normal text-gray-400">(yang ditandai "Wajib" harus dilengkapi sebelum order berikutnya, JPG/PNG maks 5 MB)</span></label>
                     <div class="space-y-2">
                         @foreach ($order->orderItems as $item)
+                            @continue($item->dibatalkan())
                             @php
                                 $isExpanded = $expandedItems[$item->id] ?? true;
                                 $status = $itemPhotoStatus[$item->id] ?? ['isLengkap' => true, 'uploadedCount' => 0, 'totalSlots' => 0];

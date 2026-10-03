@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
 use App\Models\OrderItem;
+use App\Services\OrderService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 
 class OrderItemController extends Controller
@@ -11,17 +14,37 @@ class OrderItemController extends Controller
     public function update(Request $request, $id)
     {
         $orderItem = OrderItem::find($id);
-        if (!$orderItem) {
+        if (! $orderItem) {
             return response()->json(['message' => 'Item not found'], 404);
         }
 
         $validated = $request->validate([
-            'jumlah' => 'required|numeric|min:1',
-            'harga' => 'required|numeric|min:0',
+            'jumlah' => 'sometimes|required|numeric|min:1',
+            'harga' => 'sometimes|required|numeric|min:0',
             'catatan' => 'nullable|string|max:500',
+            'dibatalkan' => 'sometimes|boolean',
         ]);
 
-        $orderItem->update($validated);
+        // Tandai/aktifkan kembali unit "tidak jadi/batal" (revisi customer).
+        if (array_key_exists('dibatalkan', $validated)) {
+            try {
+                $service = app(OrderService::class);
+                if ($validated['dibatalkan']) {
+                    $service->batalkanItem($orderItem, $request->user());
+                } else {
+                    $service->aktifkanItem($orderItem, $request->user());
+                }
+            } catch (BusinessRuleException|AuthorizationException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            $orderItem->refresh();
+        }
+
+        $isi = array_intersect_key($validated, array_flip(['jumlah', 'harga', 'catatan']));
+        if ($isi !== []) {
+            $orderItem->update($isi);
+        }
 
         return response()->json(['message' => 'Item updated successfully', 'data' => $orderItem]);
     }
@@ -29,7 +52,7 @@ class OrderItemController extends Controller
     public function destroy($id)
     {
         $orderItem = OrderItem::find($id);
-        if (!$orderItem) {
+        if (! $orderItem) {
             return response()->json(['message' => 'Item not found'], 404);
         }
 

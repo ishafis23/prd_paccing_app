@@ -18,6 +18,7 @@ use App\Models\Team;
 use App\Models\Titik;
 use App\Models\User;
 use App\Models\WorkReport;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
 class OrderService
@@ -557,6 +558,53 @@ class OrderService
         }
 
         return $this->buatOrderItem($order, $data, $actor);
+    }
+
+    /**
+     * Tandai satu baris layanan/unit "tidak jadi / batal" (revisi customer:
+     * minta cuci 2 unit, ternyata 1 unit batal). Baris batal otomatis keluar
+     * dari total tagihan (Order::total()) & tidak menuntut foto/dokumentasi
+     * teknisi, tapi tetap tersimpan sebagai jejak. Admin/Owner atau teknisi
+     * yang ditugaskan boleh melakukannya.
+     */
+    public function batalkanItem(OrderItem $item, User $actor, ?string $alasan = null): OrderItem
+    {
+        return $this->ubahStatusBatal($item, $actor, true, $alasan);
+    }
+
+    /**
+     * Aktifkan kembali baris layanan yang sebelumnya ditandai batal.
+     */
+    public function aktifkanItem(OrderItem $item, User $actor): OrderItem
+    {
+        return $this->ubahStatusBatal($item, $actor, false, null);
+    }
+
+    private function ubahStatusBatal(OrderItem $item, User $actor, bool $batal, ?string $alasan): OrderItem
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner, RoleName::Teknisi]);
+
+        $order = $item->order ?? $item->order()->first();
+        if ($order === null) {
+            throw new BusinessRuleException('Baris layanan tidak terhubung ke order.');
+        }
+
+        if ($actor->hasRole(RoleName::Teknisi->value) && ! $order->diassignkanKe($actor)) {
+            throw new AuthorizationException('Order ini bukan tugas teknisi Anda.');
+        }
+
+        if ($order->status === OrderStatus::Batal) {
+            throw new BusinessRuleException('Order yang sudah dibatalkan tidak bisa diubah.');
+        }
+
+        $alasan = $alasan !== null ? trim($alasan) : null;
+
+        $item->dibatalkan = $batal;
+        $item->dibatalkan_pada = $batal ? now() : null;
+        $item->alasan_batal = $batal && $alasan !== '' ? $alasan : null;
+        $item->save();
+
+        return $item->fresh();
     }
 
     private function buatOrderItem(Order $order, array $data, User $actor): OrderItem

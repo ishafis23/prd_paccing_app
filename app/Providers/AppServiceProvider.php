@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Http\Responses\LoginResponse;
+use App\Http\Responses\LogoutResponse;
 use Filament\Http\Responses\Auth\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Http\Responses\Auth\Contracts\LogoutResponse as LogoutResponseContract;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Features\SupportFileUploads\GenerateSignedUploadUrl;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -41,6 +44,34 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
+        // Akar insiden "foto harus diupload 2x": Livewire membangun URL
+        // endpoint upload (`livewire.upload-file`) lewat `URL::to()` yang
+        // mengandalkan deteksi base path dari request (SCRIPT_NAME). Di
+        // hosting subfolder (domain.com/paccing/public) deteksi itu kadang
+        // gagal tergantung cara domain diakses → URL upload kehilangan
+        // prefix subfolder → 404 → kamera jatuh ke jalur cadangan
+        // temp-photo. Kita override generator Livewire-nya: pakai base path
+        // request kalau terdeteksi, kalau tidak fallback deterministik ke
+        // APP_URL (pola sama `App\Support\Url::absolute`). Tanda tangan
+        // Livewire divalidasi relatif (`hasValidRelativeSignature`), jadi
+        // prefix path tidak mempengaruhi validitas.
+        \Facades\Livewire\Features\SupportFileUploads\GenerateSignedUploadUrl::swap(
+            new class extends GenerateSignedUploadUrl
+            {
+                public function signedRoute($name, $expiration, $parameters = [])
+                {
+                    $relative = URL::temporarySignedRoute($name, $expiration, $parameters, false);
+                    $base = request()->getBaseUrl();
+
+                    if ($base !== '') {
+                        return request()->getSchemeAndHttpHost().$base.'/'.ltrim($relative, '/');
+                    }
+
+                    return rtrim((string) config('app.url'), '/').'/'.ltrim($relative, '/');
+                }
+            }
+        );
+
         // Redirect login/logout panel admin memakai APP_URL eksplisit
         // (App\Support\Url::panel), bukan Filament::getUrl()/getLoginUrl()
         // yang dibangun dari root request ambient — di hosting subfolder
@@ -48,7 +79,7 @@ class AppServiceProvider extends ServiceProvider
         // admin nyasar ke /admin tanpa /public (kasus sama dgn insiden
         // 18 Sep untuk teknisi). Daftar ulang kontrak di sini (boot, bukan
         // register) supaya menimpa binding bawaan FilamentServiceProvider.
-        $this->app->bind(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
-        $this->app->bind(LogoutResponseContract::class, \App\Http\Responses\LogoutResponse::class);
+        $this->app->bind(LoginResponseContract::class, LoginResponse::class);
+        $this->app->bind(LogoutResponseContract::class, LogoutResponse::class);
     }
 }

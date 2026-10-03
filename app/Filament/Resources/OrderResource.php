@@ -237,11 +237,11 @@ class OrderResource extends BaseResource
                                     ->label('⚠️ Peringatan Discrepancy')
                                     ->columnSpanFull()
                                     ->visible(function (Order $record): bool {
-                                        $calculated = $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+                                        $calculated = $record->orderItems->reject(fn (OrderItem $i) => $i->dibatalkan())->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
                                         return $calculated != $record->total();
                                     })
                                     ->state(function (Order $record): string {
-                                        $calculated = $record->orderItems->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+                                        $calculated = $record->orderItems->reject(fn (OrderItem $i) => $i->dibatalkan())->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
                                         $actual = $record->total();
                                         $diff = abs($actual - $calculated);
                                         return "Total yang dihitung dari item (Rp".number_format($calculated, 0, ',', '.')

@@ -580,3 +580,54 @@ it('EditAction mengubah label tapi tidak bisa mengubah kode_slot', function () {
     expect($row->fresh()->label)->toBe('Label Diubah')
         ->and($row->fresh()->kode_slot)->toBe($kodeAsli);
 });
+
+// --- submitLaporan: fallback temp-photo (upload Livewire gagal) -------------
+
+it('submitLaporan menyimpan foto dari record temp-photo lama, bukan mengabaikannya', function () {
+    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
+    $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
+    $item = $order->orderItems->first();
+    $slot = array_key_first(FotoLaporanSlot::untuk(ServiceType::CuciAc));
+
+    // Foto kategori masuk lewat jalur cadangan (bukan property Livewire).
+    TemporaryPhotoUpload::create([
+        'user_id' => $teknisi->id,
+        'order_id' => $order->id,
+        'field_name' => "fotoKategori.{$item->id}.{$slot}",
+        'file_path' => UploadedFile::fake()->image('kategori.jpg')->store('temporary-photos', 'public'),
+        'file_name' => 'kategori.jpg',
+        'file_size' => 100,
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    // Foto per layanan (fase 03) juga lewat jalur cadangan.
+    TemporaryPhotoUpload::create([
+        'user_id' => $teknisi->id,
+        'order_id' => $order->id,
+        'field_name' => 'fotoPerLayanan.lokasi.1.lokasi',
+        'file_path' => UploadedFile::fake()->image('layanan.jpg')->store('temporary-photos', 'public'),
+        'file_name' => 'layanan.jpg',
+        'file_size' => 100,
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->set('catatan', 'Sudah dicuci.')
+        ->call('submitLaporan')
+        ->assertOk();
+
+    expect(WorkReportPhoto::query()
+        ->where('order_item_id', $item->id)
+        ->where('slot', $slot)
+        ->exists())->toBeTrue();
+
+    expect(OrderPhoto::query()
+        ->where('order_id', $order->id)
+        ->where('type', PhotoLayananStructure::TYPE_LOKASI)
+        ->where('unit_number', 1)
+        ->where('photo_position', 'lokasi')
+        ->exists())->toBeTrue();
+
+    expect(TemporaryPhotoUpload::count())->toBe(0);
+});

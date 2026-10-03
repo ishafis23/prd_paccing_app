@@ -5,11 +5,13 @@ use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\OrderResource\Pages\ListOrders;
+use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\User;
 use App\Services\OrderService;
+use App\Services\TeknisiService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Livewire\Livewire;
@@ -181,4 +183,68 @@ it('halaman view order menampilkan rincian layanan', function () {
         ->assertOk()
         ->assertSee('Rincian Layanan')
         ->assertSee('Ganti Kapasitor');
+});
+
+// --- Unit "tidak jadi/batal" (revisi customer) ------------------------------
+
+it('batalkanItem mengeluarkan unit dari total, aktifkanItem mengembalikannya', function () {
+    $admin = ($this->mkAdmin)();
+    $order = Order::factory()->create(['status' => OrderStatus::Dikerjakan]);
+    $item = $order->orderItems()->first();
+    $item->update(['harga' => 100000, 'jumlah' => 2]);
+
+    expect($order->fresh()->total())->toBe(200000.0);
+
+    app(OrderService::class)->batalkanItem($item, $admin, 'Customer batal 1 unit');
+
+    $item->refresh();
+    expect($item->dibatalkan())->toBeTrue()
+        ->and($item->dibatalkan_pada)->not->toBeNull()
+        ->and($item->alasan_batal)->toBe('Customer batal 1 unit')
+        ->and($order->fresh()->total())->toBe(0.0);
+
+    app(OrderService::class)->aktifkanItem($item, $admin);
+
+    expect($item->fresh()->dibatalkan())->toBeFalse()
+        ->and($order->fresh()->total())->toBe(200000.0);
+});
+
+it('unit yang dibatalkan tidak menuntut foto wajib & tidak masuk tipe foto per layanan', function () {
+    $admin = ($this->mkAdmin)();
+    $order = Order::factory()->create(['status' => OrderStatus::Selesai]);
+    $item = $order->orderItems()->first();
+    $item->update(['kategori' => ServiceType::CuciAc, 'nama_layanan' => 'Cuci AC']);
+
+    $service = app(TeknisiService::class);
+    expect($service->tipeFotoPerLayananWajib($order->fresh('orderItems')))->toContain('cuci')
+        ->and($service->fotoWajibKurang($order->fresh('orderItems')))->not->toBe([]);
+
+    app(OrderService::class)->batalkanItem($item, $admin);
+
+    $orderFresh = $order->fresh('orderItems');
+    expect($service->fotoWajibKurang($orderFresh))->toBe([])
+        ->and($service->tipeFotoPerLayananWajib($orderFresh))->toBe([]);
+});
+
+it('batalkanItem menolak teknisi yang bukan anggota order', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['status' => OrderStatus::Dikerjakan]);
+    $item = $order->orderItems()->first();
+
+    app(OrderService::class)->batalkanItem($item, $teknisi);
+})->throws(AuthorizationException::class);
+
+it('teknisi bisa menandai unit tidak jadi lewat OrderDetail', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    $item = $order->orderItems()->first();
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->call('toggleItemBatal', $item->id)
+        ->assertOk();
+
+    expect($item->fresh()->dibatalkan())->toBeTrue();
 });

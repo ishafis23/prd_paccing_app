@@ -241,7 +241,9 @@ class Order extends Model
         $items = $this->orderItems;
 
         if ($items->isNotEmpty()) {
-            return (float) $items->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+            return (float) $items
+                ->reject(fn (OrderItem $i) => $i->dibatalkan())
+                ->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
         }
 
         $price = $this->serviceCatalog?->harga ?? 0;

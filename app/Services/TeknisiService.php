@@ -99,7 +99,13 @@ class TeknisiService
     public function tipeFotoPerLayananWajib(Order $order): array
     {
         $order->loadMissing('orderItems');
-        $kategori = $order->orderItems->pluck('kategori');
+        $aktif = $order->orderItems->reject(fn (OrderItem $i): bool => $i->dibatalkan());
+
+        if ($aktif->isEmpty()) {
+            return [];
+        }
+
+        $kategori = $aktif->pluck('kategori');
 
         $tipe = [PhotoLayananStructure::TYPE_LOKASI];
         if ($kategori->contains(ServiceType::CuciAc)) {
@@ -386,14 +392,16 @@ class TeknisiService
      */
     public function fotoWajibKurang(Order $order): array
     {
+        $itemsAktif = $order->orderItems->reject(fn (OrderItem $i): bool => $i->dibatalkan());
+
         $terisi = WorkReportPhoto::query()
-            ->whereIn('order_item_id', $order->orderItems->pluck('id'))
+            ->whereIn('order_item_id', $itemsAktif->pluck('id'))
             ->get()
             ->map(fn (WorkReportPhoto $p): string => $p->order_item_id.'|'.$p->slot)
             ->flip();
 
         $kurang = [];
-        foreach ($order->orderItems as $item) {
+        foreach ($itemsAktif as $item) {
             foreach (FotoLaporanSlot::wajibUntuk($item->kategori) as $kodeSlot => $label) {
                 if (! $terisi->has($item->id.'|'.$kodeSlot)) {
                     $kurang[] = ['order_item' => $item, 'kode_slot' => $kodeSlot, 'label' => $label];

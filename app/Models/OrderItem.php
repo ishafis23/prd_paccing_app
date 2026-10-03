@@ -26,6 +26,9 @@ class OrderItem extends Model
         'kategori',
         'harga',
         'jumlah',
+        'dibatalkan',
+        'dibatalkan_pada',
+        'alasan_batal',
         'catatan',
         'ditambahkan_oleh',
     ];
@@ -36,7 +39,18 @@ class OrderItem extends Model
             'kategori' => ServiceType::class,
             'harga' => 'decimal:2',
             'jumlah' => 'integer',
+            'dibatalkan' => 'boolean',
+            'dibatalkan_pada' => 'datetime',
         ];
+    }
+
+    /**
+     * Baris layanan/unit yang dibatalkan (revisi customer: 1 unit tidak jadi).
+     * Tidak dihitung ke total tagihan & tidak menuntut foto.
+     */
+    public function dibatalkan(): bool
+    {
+        return (bool) $this->dibatalkan;
     }
 
     public function order(): BelongsTo

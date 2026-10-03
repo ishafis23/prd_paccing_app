@@ -50,6 +50,7 @@
     <table class="w-full border-collapse">
         <thead>
             <tr class="bg-slate-100 dark:bg-slate-700">
+                <th class="border border-slate-300 dark:border-slate-600 px-3 py-3 text-center text-xs font-semibold text-slate-900 dark:text-white w-14">Tidak jadi</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-sm font-semibold text-slate-900 dark:text-white w-12">Aksi</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Layanan</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Kategori</th>
@@ -60,7 +61,13 @@
         </thead>
         <tbody>
             @forelse ($getState() as $index => $item)
-                <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 {{ $item->dibatalkan ? 'bg-rose-50 dark:bg-rose-900/20' : '' }}">
+                    <td class="border border-slate-300 dark:border-slate-600 px-3 py-3 text-center">
+                        <input type="checkbox" {{ $item->dibatalkan ? 'checked' : '' }}
+                            onchange="toggleBatalItem({{ $item->id }}, this)"
+                            title="Tandai unit ini tidak jadi/batal (tidak dihitung ke total tagihan)"
+                            class="rounded border-slate-300 text-rose-600 cursor-pointer">
+                    </td>
                     @if ($index > 0)
                     <td class="border border-slate-300 dark:border-slate-600 px-2 py-3 text-center w-12">
                         <div class="relative inline-block">
@@ -89,7 +96,10 @@
                     <td class="border border-slate-300 dark:border-slate-600 px-2 py-3 w-12"></td>
                     @endif
                     <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-slate-900 dark:text-white">
-                        <div class="font-medium">{{ $item->nama_layanan }}</div>
+                        <div class="font-medium {{ $item->dibatalkan ? 'line-through text-slate-400' : '' }}">{{ $item->nama_layanan }}</div>
+                        @if ($item->dibatalkan)
+                            <div class="mt-1 inline-block px-2 py-0.5 text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 rounded">Tidak jadi/batal</div>
+                        @endif
                         @if ($item->acUnit)
                             <div class="text-xs text-slate-500 dark:text-slate-400">{{ $item->acUnit->labelTampil() }}</div>
                         @endif
@@ -112,13 +122,13 @@
                     <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white">
                         Rp{{ number_format($item->harga, 0, ',', '.') }}
                     </td>
-                    <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white font-bold">
+                    <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white font-bold {{ $item->dibatalkan ? 'line-through text-slate-400' : '' }}">
                         Rp{{ number_format($item->harga * $item->jumlah, 0, ',', '.') }}
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-slate-500 dark:text-slate-400">
+                    <td colspan="7" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-slate-500 dark:text-slate-400">
                         Tidak ada layanan
                     </td>
                 </tr>
@@ -126,12 +136,12 @@
         </tbody>
         <tfoot>
             <tr class="bg-green-50 dark:bg-green-900/20 font-bold">
-                <td colspan="5" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white">
+                <td colspan="6" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white">
                     Total Keseluruhan:
                 </td>
                 <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-lg text-green-600 dark:text-green-400">
                     Rp{{ number_format(
-                        collect($getState())->sum(fn ($item) => $item->harga * $item->jumlah),
+                        collect($getState())->reject(fn ($item) => $item->dibatalkan)->sum(fn ($item) => $item->harga * $item->jumlah),
                         0,
                         ',',
                         '.'
@@ -244,6 +254,39 @@
 
             // Close dropdown
             document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.add('hidden'));
+        }
+
+        async function toggleBatalItem(id, el) {
+            const batal = el.checked;
+
+            if (batal && !confirm('Tandai layanan/unit ini tidak jadi/batal? Total tagihan akan berkurang dan unit ini tidak perlu difoto teknisi.')) {
+                el.checked = false;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${orderItemBaseUrl}/order-items/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ dibatalkan: batal })
+                });
+
+                if (response.ok) {
+                    location.reload();
+                    return;
+                }
+
+                const err = await response.json().catch(() => ({}));
+                alert('Gagal: ' + (err.message || ('Status ' + response.status)));
+                el.checked = !batal;
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+                el.checked = !batal;
+            }
         }
 
         // Close dropdowns when clicking outside
