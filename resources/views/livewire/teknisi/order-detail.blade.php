@@ -324,7 +324,12 @@
     @endif
 
     @if (in_array($order->status, [$orderStatus::Dikerjakan, $orderStatus::ButuhFollowup]))
-        <form wire:submit="submitLaporan" class="space-y-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        {{-- @submit dicek SAAT tombol ditekan: kalau masih ada foto yang
+             diunggah, submit dibatalkan supaya foto yang belum selesai
+             tidak hilang (akar "foto tidak tersimpan"). --}}
+        <form x-data
+            @submit.prevent="($store.fotoUpload?.inFlight ?? 0) > 0 ? null : $wire.submitLaporan()"
+            class="space-y-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
             <h2 class="flex items-center gap-2 font-bold text-gray-900">
                 <x-heroicon-o-clipboard-document-check class="h-5 w-5 text-blue-600" />
                 Detail Pelaksanaan Order
@@ -605,7 +610,8 @@
                     @error('fotoSesudahBaru') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
             </div>
-            <button type="button" wire:click="simpanPerbaikanFoto" wire:loading.attr="disabled" x-data
+            <button type="button" wire:loading.attr="disabled" x-data
+                @click="($store.fotoUpload?.inFlight ?? 0) > 0 ? null : $wire.simpanPerbaikanFoto()"
                 x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
                 x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="w-full rounded-full bg-blue-600 py-3 font-bold text-white shadow-md shadow-blue-200 active:bg-blue-700">
@@ -631,7 +637,12 @@
          belum lengkap (supaya pembayaran tidak tertahan) — tapi teknisi
          tidak bisa berangkat ke order berikutnya sebelum ini dilengkapi. --}}
     @if (! empty($this->fotoWajibKurang))
-        <form wire:submit="lengkapiFotoWajib" class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+        {{-- @submit dicek SAAT tombol ditekan: kalau masih ada foto yang
+             diunggah, submit dibatalkan supaya foto yang belum selesai
+             tidak hilang. --}}
+        <form x-data
+            @submit.prevent="($store.fotoUpload?.inFlight ?? 0) > 0 ? null : $wire.lengkapiFotoWajib()"
+            class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
             <p class="flex items-center gap-2 text-sm font-bold text-amber-800">
                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" /> Lengkapi Foto Wajib
             </p>
