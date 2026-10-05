@@ -1001,16 +1001,35 @@
                                     <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">{{ $foto['label'] }}</figcaption>
 
                                     @if (! empty($foto['id']))
-                                        <div class="mt-1.5">
-                                            <x-photo-upload-dialog
-                                                :fieldName="'fotoGanti.'.$foto['id']"
-                                                label="Ganti foto ini"
-                                                :orderId="$order->id"
-                                                :showRemoveBtn="false"
-                                                height="h-16"
-                                                afterUploadMethod="gantiFotoKategori"
-                                                :afterUploadId="$foto['id']"
-                                            />
+                                        <div class="mt-1.5 space-y-1.5" x-data="{ ganti: false }">
+                                            <div class="flex gap-1.5">
+                                                <button type="button" @click="ganti = ! ganti"
+                                                    class="flex-1 rounded-lg bg-gray-100 py-1.5 text-[11px] font-bold text-gray-600 active:bg-gray-200">
+                                                    <span x-show="! ganti">Ganti</span>
+                                                    <span x-show="ganti" x-cloak>Tutup</span>
+                                                </button>
+                                                <button type="button" wire:click="hapusFotoKategori({{ $foto['id'] }})"
+                                                    wire:confirm="Hapus foto ini? Anda harus foto ulang untuk melengkapinya."
+                                                    wire:loading.attr="disabled"
+                                                    class="rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-600 ring-1 ring-red-200 active:bg-red-100">
+                                                    Hapus
+                                                </button>
+                                            </div>
+
+                                            <div x-show="ganti" x-cloak class="space-y-1.5">
+                                                <x-photo-upload-dialog
+                                                    :fieldName="'fotoGanti.'.$foto['id']"
+                                                    label="Pilih foto pengganti"
+                                                    :orderId="$order->id"
+                                                    :showRemoveBtn="false"
+                                                    height="h-20"
+                                                />
+                                                <button type="button" wire:click="gantiFotoKategori({{ $foto['id'] }})"
+                                                    wire:loading.attr="disabled"
+                                                    class="w-full rounded-lg bg-blue-600 py-1.5 text-[11px] font-bold text-white active:bg-blue-700">
+                                                    Simpan Foto
+                                                </button>
+                                            </div>
                                         </div>
                                     @endif
                                 </figure>

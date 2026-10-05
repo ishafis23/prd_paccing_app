@@ -232,6 +232,7 @@ class OrderDetail extends Component
 
             $foto->update(['path' => $pathBaru]);
             StorageQuotaService::lupakanCache();
+            $this->order->unsetRelation('workReports');
 
             session()->flash('status', 'Foto berhasil diganti.');
         } catch (BusinessRuleException $e) {
@@ -239,6 +240,34 @@ class OrderDetail extends Component
         } finally {
             unset($this->fotoGanti[$photoId]);
         }
+    }
+
+    /**
+     * Hapus satu foto pengerjaan (per baris layanan) yang salah. Setelah
+     * dihapus, slot itu otomatis muncul lagi di blok "Lengkapi Foto Wajib"
+     * sehingga wajib difoto ulang sebelum bisa berangkat ke order berikutnya.
+     */
+    public function hapusFotoKategori(int $photoId): void
+    {
+        $foto = WorkReportPhoto::query()
+            ->whereHas('workReport', fn ($q) => $q->where('order_id', $this->orderId))
+            ->find($photoId);
+
+        if ($foto === null) {
+            session()->flash('error', 'Foto tidak ditemukan pada order ini.');
+
+            return;
+        }
+
+        if (filled($foto->path)) {
+            Storage::disk('public')->delete($foto->path);
+        }
+
+        $foto->delete();
+        StorageQuotaService::lupakanCache();
+        $this->order->unsetRelation('workReports');
+
+        session()->flash('status', 'Foto dihapus. Lengkapi foto itu lagi sebelum berangkat ke order berikutnya.');
     }
 
     public function lengkapiFotoWajib(): void

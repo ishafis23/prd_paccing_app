@@ -262,3 +262,63 @@ it('gantiFotoKategori menolak foto milik order lain', function () {
 
     expect($fotoLain->refresh()->path)->toBe('work-reports/lain.jpg');
 });
+
+it('hapusFotoKategori menghapus baris foto + file & slot kembali kurang', function () {
+    Storage::fake('public');
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Selesai]);
+    $item = $order->orderItems->first();
+
+    $report = $order->workReports()->create([
+        'teknisi_id' => $teknisi->id,
+        'catatan_pengerjaan' => 'x',
+        'waktu_mulai' => now(),
+        'waktu_selesai' => now(),
+    ]);
+    Storage::disk('public')->put('work-reports/hapus.jpg', 'x');
+    $foto = WorkReportPhoto::create([
+        'work_report_id' => $report->id,
+        'order_item_id' => $item->id,
+        'slot' => 'foto_tampak_depan_lokasi',
+        'path' => 'work-reports/hapus.jpg',
+        'urutan' => 0,
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->call('hapusFotoKategori', $foto->id)
+        ->assertOk();
+
+    expect(WorkReportPhoto::find($foto->id))->toBeNull();
+    Storage::disk('public')->assertMissing('work-reports/hapus.jpg');
+    expect(app(TeknisiService::class)->fotoWajibKurang($order->fresh('orderItems')))->not->toBe([]);
+});
+
+it('hapusFotoKategori tidak menghapus foto milik order lain', function () {
+    Storage::fake('public');
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Selesai]);
+
+    $orderLain = Order::factory()->create(['status' => OrderStatus::Selesai]);
+    $itemLain = $orderLain->orderItems->first();
+    $reportLain = $orderLain->workReports()->create([
+        'teknisi_id' => $teknisi->id,
+        'catatan_pengerjaan' => 'x',
+        'waktu_mulai' => now(),
+        'waktu_selesai' => now(),
+    ]);
+    $fotoLain = WorkReportPhoto::create([
+        'work_report_id' => $reportLain->id,
+        'order_item_id' => $itemLain->id,
+        'slot' => 'foto_tampak_depan_lokasi',
+        'path' => 'work-reports/lain.jpg',
+        'urutan' => 0,
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->call('hapusFotoKategori', $fotoLain->id)
+        ->assertOk();
+
+    expect(WorkReportPhoto::find($fotoLain->id))->not->toBeNull();
+});
