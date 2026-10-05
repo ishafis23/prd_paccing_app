@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ServiceCatalog;
 use App\Models\User;
+use App\Models\WorkReportPhoto;
 use App\Services\OrderService;
 use App\Services\TeknisiService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -248,3 +249,91 @@ it('teknisi bisa menandai unit tidak jadi lewat OrderDetail', function () {
 
     expect($item->fresh()->dibatalkan())->toBeTrue();
 });
+
+it('teknisi dapat menambah layanan saat order dikerjakan (baris + grup foto)', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    $sebelum = $order->orderItems()->count();
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->set('layananBaruNama', 'Tambah Cuci AC')
+        ->set('layananBaruKategori', ServiceType::CuciAc->value)
+        ->set('layananBaruHarga', '75000')
+        ->set('layananBaruJumlah', 1)
+        ->call('tambahLayanan')
+        ->assertRedirect();
+
+    $order->refresh();
+    expect($order->orderItems()->count())->toBe($sebelum + 1);
+
+    $baru = $order->orderItems()->latest('id')->first();
+    expect($baru->nama_layanan)->toBe('Tambah Cuci AC')
+        ->and($baru->kategori)->toBe(ServiceType::CuciAc)
+        ->and((float) $baru->harga)->toBe(75000.0)
+        ->and($baru->ditambahkan_oleh)->toBe($teknisi->id);
+});
+
+it('teknisi tidak bisa menambah layanan sebelum berangkat (terjadwal)', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Terjadwal]);
+
+    app(OrderService::class)->tambahLayananOlehTeknisi($order, $teknisi, [
+        'nama_layanan' => 'Cuci tambahan',
+        'kategori' => ServiceType::CuciAc->value,
+        'harga' => 50000,
+    ]);
+})->throws(BusinessRuleException::class, 'menuju lokasi');
+
+it('teknisi bukan anggota tidak bisa menambah layanan', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $lain = User::factory()->create();
+    $lain->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+
+    app(OrderService::class)->tambahLayananOlehTeknisi($order, $lain, [
+        'nama_layanan' => 'Cuci tambahan',
+        'kategori' => ServiceType::CuciAc->value,
+        'harga' => 50000,
+    ]);
+})->throws(AuthorizationException::class);
+
+it('teknisi dapat menghapus baris layanan yang belum difoto', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    $item = $order->orderItems()->first();
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->call('hapusLayanan', $item->id)
+        ->assertRedirect();
+
+    expect($order->orderItems()->whereKey($item->id)->exists())->toBeFalse();
+});
+
+it('teknisi tidak bisa menghapus baris layanan yang sudah punya foto', function () {
+    $teknisi = User::factory()->create();
+    $teknisi->assignRole(RoleName::Teknisi->value);
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+    $item = $order->orderItems()->first();
+
+    $report = $order->workReports()->create([
+        'teknisi_id' => $teknisi->id,
+        'catatan_pengerjaan' => 'x',
+        'waktu_mulai' => now(),
+        'waktu_selesai' => now(),
+    ]);
+    WorkReportPhoto::create([
+        'work_report_id' => $report->id,
+        'order_item_id' => $item->id,
+        'slot' => 'foto_tampak_depan_lokasi',
+        'path' => 'work-reports/x.jpg',
+        'urutan' => 0,
+    ]);
+
+    app(OrderService::class)->hapusLayananOlehTeknisi($item, $teknisi);
+})->throws(BusinessRuleException::class, 'sudah punya foto');

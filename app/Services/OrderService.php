@@ -18,6 +18,7 @@ use App\Models\Team;
 use App\Models\Titik;
 use App\Models\User;
 use App\Models\WorkReport;
+use App\Models\WorkReportPhoto;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
@@ -558,6 +559,65 @@ class OrderService
         }
 
         return $this->buatOrderItem($order, $data, $actor);
+    }
+
+    /**
+     * Teknisi menambah satu baris layanan saat order sedang berjalan
+     * (menuju lokasi/dikerjakan) — mis. customer minta tambah cuci unit lain
+     * ketika teknisi sudah di lokasi. Isian manual (hasil kesepakatan).
+     * Grup foto untuk kategori ini otomatis muncul di form laporan.
+     */
+    public function tambahLayananOlehTeknisi(Order $order, User $teknisi, array $data): OrderItem
+    {
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (! $order->diassignkanKe($teknisi)) {
+            throw new AuthorizationException('Order ini bukan tugas teknisi Anda.');
+        }
+
+        if (! in_array($order->status, [OrderStatus::MenujuLokasi, OrderStatus::Dikerjakan], true)) {
+            throw new BusinessRuleException('Layanan hanya bisa ditambah saat menuju lokasi atau sedang dikerjakan.');
+        }
+
+        if ($order->sudahDitutup()) {
+            throw new BusinessRuleException('Order sudah ditutup — minta admin menambah layanan.');
+        }
+
+        return $this->buatOrderItem($order, $data, $teknisi);
+    }
+
+    /**
+     * Teknisi menghapus satu baris layanan saat order berjalan. Hanya baris
+     * yang BELUM punya foto tersimpan yang boleh dihapus — kalau sudah
+     * difoto, pakai tandai "tidak jadi/batal" supaya laporan/jejak tidak
+     * rusak.
+     */
+    public function hapusLayananOlehTeknisi(OrderItem $item, User $teknisi): void
+    {
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        $order = $item->order ?? $item->order()->first();
+        if ($order === null) {
+            throw new BusinessRuleException('Baris layanan tidak terhubung ke order.');
+        }
+
+        if (! $order->diassignkanKe($teknisi)) {
+            throw new AuthorizationException('Order ini bukan tugas teknisi Anda.');
+        }
+
+        if (! in_array($order->status, [OrderStatus::MenujuLokasi, OrderStatus::Dikerjakan], true)) {
+            throw new BusinessRuleException('Layanan hanya bisa dihapus saat menuju lokasi atau sedang dikerjakan.');
+        }
+
+        if ($order->sudahDitutup()) {
+            throw new BusinessRuleException('Order sudah ditutup — minta admin menghapus layanan.');
+        }
+
+        if (WorkReportPhoto::query()->where('order_item_id', $item->id)->exists()) {
+            throw new BusinessRuleException('Baris ini sudah punya foto tersimpan — tandai "tidak jadi/batal" saja, tidak bisa dihapus.');
+        }
+
+        $item->delete();
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Livewire\Teknisi;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Order;
@@ -22,6 +23,7 @@ use App\Support\FotoLaporanSlot;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -66,6 +68,19 @@ class OrderDetail extends Component
 
     /** @var array<int, UploadedFile> [work_report_photo_id => UploadedFile] — ganti foto pengerjaan yang sudah tersimpan (salah/blur). */
     public array $fotoGanti = [];
+
+    /** Form tambah layanan oleh teknisi saat order berjalan. */
+    public bool $tambahLayananTerbuka = false;
+
+    public string $layananBaruNama = '';
+
+    public string $layananBaruKategori = '';
+
+    public string $layananBaruHarga = '';
+
+    public int $layananBaruJumlah = 1;
+
+    public string $layananBaruCatatan = '';
 
     public $buktiPembayaran;
 
@@ -117,6 +132,37 @@ class OrderDetail extends Component
     {
         return $this->order->orderItems
             ->mapWithKeys(fn ($item) => [$item->id => array_keys(FotoLaporanSlot::wajibUntuk($item->kategori))])
+            ->all();
+    }
+
+    /**
+     * Opsi kategori layanan (sama dgn kategori katalog/ServiceType) — dipakai
+     * dropdown "Tambah Layanan" teknisi. Kategori inilah yg menentukan
+     * template grup foto yg muncul.
+     *
+     * @return array<string, string>
+     */
+    public function getKategoriLayananProperty(): array
+    {
+        return collect(ServiceType::cases())
+            ->mapWithKeys(fn (ServiceType $c): array => [$c->value => str($c->value)->headline()->toString()])
+            ->all();
+    }
+
+    /**
+     * Baris layanan yang SUDAH punya foto tersimpan [order_item_id => id] —
+     * dipakai blade utk menyembunyikan tombol "Hapus" (baris berfoto tidak
+     * boleh dihapus; pakai "tidak jadi/batal").
+     *
+     * @return array<int, int>
+     */
+    public function getItemPunyaFotoProperty(): array
+    {
+        return WorkReportPhoto::query()
+            ->whereIn('order_item_id', $this->order->orderItems->pluck('id'))
+            ->pluck('order_item_id')
+            ->unique()
+            ->flip()
             ->all();
     }
 
@@ -498,6 +544,67 @@ class OrderDetail extends Component
             }
 
             $this->order->unsetRelation('orderItems');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function toggleTambahLayanan(): void
+    {
+        $this->tambahLayananTerbuka = ! $this->tambahLayananTerbuka;
+        $this->resetValidation();
+    }
+
+    /**
+     * Teknisi menambah baris layanan saat order berjalan (menuju
+     * lokasi/dikerjakan). Isian manual: nama + kategori (menentukan grup
+     * foto) + harga + jumlah. Grup foto baris baru otomatis muncul.
+     */
+    public function tambahLayanan(): void
+    {
+        $this->validate([
+            'layananBaruNama' => ['required', 'string', 'min:2', 'max:100'],
+            'layananBaruKategori' => ['required', Rule::in(array_keys($this->kategoriLayanan))],
+            'layananBaruHarga' => ['required', 'numeric', 'min:0'],
+            'layananBaruJumlah' => ['required', 'integer', 'min:1', 'max:1000'],
+            'layananBaruCatatan' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            app(OrderService::class)->tambahLayananOlehTeknisi($this->order, auth()->user(), [
+                'nama_layanan' => $this->layananBaruNama,
+                'kategori' => $this->layananBaruKategori,
+                'harga' => (float) $this->layananBaruHarga,
+                'jumlah' => (int) $this->layananBaruJumlah,
+                'catatan' => $this->layananBaruCatatan,
+            ]);
+
+            session()->flash('status', 'Layanan ditambahkan. Lengkapi grup fotonya.');
+            $this->redirect(\App\Support\Url::absolute('teknisi.order', ['order' => $this->orderId]));
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Teknisi menghapus baris layanan yang ditambahkan saat order berjalan.
+     * Hanya baris tanpa foto tersimpan (lihat OrderService).
+     */
+    public function hapusLayanan(int $itemId): void
+    {
+        $item = $this->order->orderItems->firstWhere('id', $itemId);
+
+        if ($item === null) {
+            session()->flash('error', 'Baris layanan tidak ditemukan.');
+
+            return;
+        }
+
+        try {
+            app(OrderService::class)->hapusLayananOlehTeknisi($item, auth()->user());
+
+            session()->flash('status', 'Layanan dihapus.');
+            $this->redirect(\App\Support\Url::absolute('teknisi.order', ['order' => $this->orderId]));
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }

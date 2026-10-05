@@ -304,44 +304,121 @@
         </div>
     @endif
 
-    {{-- Rincian Layanan: tandai unit/layanan yang tidak jadi/batal (revisi
-         customer — minta 2 unit, ternyata 1 batal). Total tagihan otomatis
-         menyesuaikan dan unit batal tidak perlu difoto. --}}
-    @if ($order->orderItems->isNotEmpty()
-        && ! $order->sudahDitutup()
+    {{-- Rincian Layanan: tandai "tidak jadi/batal", tambah/hapus layanan saat
+         order berjalan (menuju lokasi/dikerjakan). Baris batal tidak dihitung
+         & tidak perlu difoto. --}}
+    @if (! $order->sudahDitutup()
         && in_array($order->status, [$orderStatus::Terjadwal, $orderStatus::MenujuLokasi, $orderStatus::Dikerjakan, $orderStatus::ButuhFollowup]))
+        @php
+            $bolehKelolaLayanan = in_array($order->status, [$orderStatus::MenujuLokasi, $orderStatus::Dikerjakan], true);
+            $itemPunyaFoto = $this->itemPunyaFoto;
+        @endphp
         <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-            <h2 class="flex items-center gap-2 font-bold text-gray-900">
-                <x-heroicon-o-clipboard-document-list class="h-5 w-5 text-blue-600" /> Rincian Layanan
-            </h2>
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="flex items-center gap-2 font-bold text-gray-900">
+                    <x-heroicon-o-clipboard-document-list class="h-5 w-5 text-blue-600" /> Rincian Layanan
+                </h2>
+                @if ($bolehKelolaLayanan)
+                    <button type="button" wire:click="toggleTambahLayanan"
+                        class="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 ring-1 ring-blue-200 active:bg-blue-100">
+                        <x-heroicon-o-plus class="h-4 w-4" /> Tambah Layanan
+                    </button>
+                @endif
+            </div>
             <p class="mt-1 text-xs text-gray-500">
-                Centang "Tidak jadi/batal" kalau customer membatalkan unit/layanan ini. Total tagihan otomatis
-                menyesuaikan dan unit yang batal tidak perlu difoto.
+                Centang "Tidak jadi/batal" kalau customer membatalkan unit/layanan ini (tidak perlu difoto).
+                @if ($bolehKelolaLayanan) Tombol Hapus hanya untuk baris yang belum difoto. @endif
             </p>
+
+            @if ($bolehKelolaLayanan && $tambahLayananTerbuka)
+                <form wire:submit="tambahLayanan" class="mt-3 space-y-2.5 rounded-xl bg-blue-50 p-3 ring-1 ring-blue-200">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-blue-900">Nama layanan</label>
+                        <input type="text" wire:model="layananBaruNama" placeholder="mis. Cuci AC tambahan"
+                            class="w-full rounded-lg border border-blue-200 bg-white text-sm">
+                        @error('layananBaruNama') <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-blue-900">Kategori</label>
+                            <select wire:model="layananBaruKategori" class="w-full rounded-lg border border-blue-200 bg-white text-sm">
+                                <option value="">— pilih —</option>
+                                @foreach ($this->kategoriLayanan as $nilai => $label)
+                                    <option value="{{ $nilai }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('layananBaruKategori') <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-blue-900">Harga (Rp)</label>
+                            <input type="number" min="0" wire:model="layananBaruHarga" placeholder="0"
+                                class="w-full rounded-lg border border-blue-200 bg-white text-sm">
+                            @error('layananBaruHarga') <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-blue-900">Jumlah unit</label>
+                            <input type="number" min="1" wire:model="layananBaruJumlah"
+                                class="w-full rounded-lg border border-blue-200 bg-white text-sm">
+                            @error('layananBaruJumlah') <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-blue-900">Catatan (opsional)</label>
+                            <input type="text" wire:model="layananBaruCatatan"
+                                class="w-full rounded-lg border border-blue-200 bg-white text-sm">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-blue-700">Grup foto otomatis mengikuti kategori yang dipilih.</p>
+                    <div class="flex gap-2">
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="flex-1 rounded-full bg-blue-600 py-2 text-sm font-bold text-white active:bg-blue-700">
+                            <span wire:loading.remove>Simpan Layanan</span>
+                            <span wire:loading class="inline-flex items-center justify-center gap-1.5">
+                                <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> Menyimpan…
+                            </span>
+                        </button>
+                        <button type="button" wire:click="toggleTambahLayanan"
+                            class="rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-600 ring-1 ring-gray-200">
+                            Batal
+                        </button>
+                    </div>
+                </form>
+            @endif
 
             <div class="mt-3 space-y-2">
                 @foreach ($order->orderItems as $item)
-                    <label
-                        class="flex items-start gap-3 rounded-xl p-3 ring-1 {{ $item->dibatalkan() ? 'bg-rose-50 ring-rose-200' : 'bg-gray-50 ring-gray-100' }}">
-                        <input type="checkbox" wire:click="toggleItemBatal({{ $item->id }})"
-                            @checked($item->dibatalkan()) wire:loading.attr="disabled"
-                            class="mt-0.5 rounded border-gray-300 text-rose-600">
-                        <span class="min-w-0 flex-1">
-                            <span
-                                class="block text-sm font-semibold {{ $item->dibatalkan() ? 'text-rose-700 line-through' : 'text-gray-800' }}">
-                                {{ $item->nama_layanan }}
-                                @if ($item->acUnit)
-                                    <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
-                                @endif
+                    <div class="flex items-start gap-2 rounded-xl p-3 ring-1 {{ $item->dibatalkan() ? 'bg-rose-50 ring-rose-200' : 'bg-gray-50 ring-gray-100' }}">
+                        <label class="flex min-w-0 flex-1 items-start gap-3">
+                            <input type="checkbox" wire:click="toggleItemBatal({{ $item->id }})"
+                                @checked($item->dibatalkan()) wire:loading.attr="disabled"
+                                class="mt-0.5 rounded border-gray-300 text-rose-600">
+                            <span class="min-w-0 flex-1">
+                                <span
+                                    class="block text-sm font-semibold {{ $item->dibatalkan() ? 'text-rose-700 line-through' : 'text-gray-800' }}">
+                                    {{ $item->nama_layanan }}
+                                    @if ($item->acUnit)
+                                        <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
+                                    @endif
+                                </span>
+                                <span class="text-xs text-gray-500">
+                                    {{ $item->jumlah }} unit · Rp{{ number_format((float) $item->harga * $item->jumlah, 0, ',', '.') }}
+                                    @if ($item->dibatalkan())
+                                        · <span class="font-semibold text-rose-600">Tidak jadi/batal</span>
+                                    @endif
+                                </span>
                             </span>
-                            <span class="text-xs text-gray-500">
-                                {{ $item->jumlah }} unit · Rp{{ number_format((float) $item->harga * $item->jumlah, 0, ',', '.') }}
-                                @if ($item->dibatalkan())
-                                    · <span class="font-semibold text-rose-600">Tidak jadi/batal</span>
-                                @endif
-                            </span>
-                        </span>
-                    </label>
+                        </label>
+
+                        @if ($bolehKelolaLayanan && ! $item->dibatalkan() && ! isset($itemPunyaFoto[$item->id]))
+                            <button type="button" wire:click="hapusLayanan({{ $item->id }})"
+                                wire:confirm="Hapus layanan ini? Tindakan ini permanen."
+                                wire:loading.attr="disabled"
+                                class="shrink-0 rounded-lg bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-600 ring-1 ring-red-200 active:bg-red-100">
+                                Hapus
+                            </button>
+                        @endif
+                    </div>
                 @endforeach
             </div>
         </div>
