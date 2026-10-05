@@ -5,11 +5,33 @@
         <x-heroicon-o-chevron-left class="h-4 w-4" /> Jadwal Saya
     </a>
 
+    {{-- Toast melayang: pesan sukses/gagal tampil sekilas lalu hilang, biar
+         teknisi tahu aksi (simpan/hapus) benar-benar jalan tanpa nutup layar. --}}
     @if (session('status'))
-        <div class="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('status') }}</div>
+        <div x-data="{ tampil: true }" x-init="setTimeout(() => tampil = false, 3500)"
+            x-show="tampil" x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-x-3 top-3 z-[70] mx-auto max-w-[440px] rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20">
+            {{ session('status') }}
+        </div>
     @endif
     @if (session('error'))
-        <div class="rounded-2xl bg-red-100 px-4 py-3 text-sm font-medium text-red-800">{{ session('error') }}</div>
+        <div x-data="{ tampil: true }" x-init="setTimeout(() => tampil = false, 5000)"
+            x-show="tampil" x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-x-3 top-3 z-[70] mx-auto max-w-[440px] rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-900/20">
+            {{ session('error') }}
+        </div>
     @endif
 
     @php
@@ -1001,36 +1023,14 @@
                                     <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">{{ $foto['label'] }}</figcaption>
 
                                     @if (! empty($foto['id']))
-                                        <div class="mt-1.5 space-y-1.5" x-data="{ ganti: false }">
-                                            <div class="flex gap-1.5">
-                                                <button type="button" @click="ganti = ! ganti"
-                                                    class="flex-1 rounded-lg bg-gray-100 py-1.5 text-[11px] font-bold text-gray-600 active:bg-gray-200">
-                                                    <span x-show="! ganti">Ganti</span>
-                                                    <span x-show="ganti" x-cloak>Tutup</span>
-                                                </button>
-                                                <button type="button" wire:click="hapusFotoKategori({{ $foto['id'] }})"
-                                                    wire:confirm="Hapus foto ini? Anda harus foto ulang untuk melengkapinya."
-                                                    wire:loading.attr="disabled"
-                                                    class="rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-600 ring-1 ring-red-200 active:bg-red-100">
-                                                    Hapus
-                                                </button>
-                                            </div>
-
-                                            <div x-show="ganti" x-cloak class="space-y-1.5">
-                                                <x-photo-upload-dialog
-                                                    :fieldName="'fotoGanti.'.$foto['id']"
-                                                    label="Pilih foto pengganti"
-                                                    :orderId="$order->id"
-                                                    :showRemoveBtn="false"
-                                                    height="h-20"
-                                                />
-                                                <button type="button" wire:click="gantiFotoKategori({{ $foto['id'] }})"
-                                                    wire:loading.attr="disabled"
-                                                    class="w-full rounded-lg bg-blue-600 py-1.5 text-[11px] font-bold text-white active:bg-blue-700">
-                                                    Simpan Foto
-                                                </button>
-                                            </div>
-                                        </div>
+                                        {{-- Cukup hapus; foto pengganti diupload ulang lewat
+                                             blok "Lengkapi Foto Wajib" di atas. --}}
+                                        <button type="button" wire:click="hapusFotoKategori({{ $foto['id'] }})"
+                                            wire:confirm="Hapus foto ini? Anda harus foto ulang untuk melengkapinya."
+                                            wire:loading.attr="disabled"
+                                            class="mt-1.5 w-full rounded-lg bg-red-50 py-1.5 text-[11px] font-bold text-red-600 ring-1 ring-red-200 active:bg-red-100">
+                                            Hapus
+                                        </button>
                                     @endif
                                 </figure>
                             @endforeach

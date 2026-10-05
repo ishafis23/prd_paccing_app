@@ -12,6 +12,7 @@
     <title>{{ $title ?? 'Teknisi' }} — {{ $namaUsaha }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
+    <style>[x-cloak]{display:none !important;}</style>
 </head>
 <body class="min-h-screen bg-gray-200/80 text-gray-900 antialiased">
     <div class="relative mx-auto min-h-screen w-full max-w-[480px] bg-gray-100 shadow-2xl shadow-gray-400/30">
