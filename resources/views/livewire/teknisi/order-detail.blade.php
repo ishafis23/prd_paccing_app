@@ -580,8 +580,13 @@
                 x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
                 x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="w-full rounded-full bg-blue-600 py-3 font-bold text-white shadow-md shadow-blue-200 active:bg-blue-700">
-                <span x-show="($store.fotoUpload?.inFlight ?? 0) === 0">Konfirmasi Selesai</span>
-                <span x-show="($store.fotoUpload?.inFlight ?? 0) > 0" x-cloak>Menunggu foto selesai diunggah…</span>
+                <span wire:loading.remove class="inline-flex items-center justify-center gap-1.5">
+                    <span x-show="($store.fotoUpload?.inFlight ?? 0) === 0">Konfirmasi Selesai</span>
+                    <span x-show="($store.fotoUpload?.inFlight ?? 0) > 0" x-cloak>Menunggu foto selesai diunggah…</span>
+                </span>
+                <span wire:loading class="inline-flex items-center justify-center gap-2">
+                    <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin" /> Menyimpan…
+                </span>
             </button>
         </form>
     @endif
@@ -639,7 +644,10 @@
                 x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
                 x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="w-full rounded-full bg-blue-600 py-3 font-bold text-white shadow-md shadow-blue-200 active:bg-blue-700">
-                Simpan Foto
+                <span wire:loading.remove>Simpan Foto</span>
+                <span wire:loading class="inline-flex items-center justify-center gap-2">
+                    <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin" /> Menyimpan…
+                </span>
             </button>
         </div>
     @endif
@@ -747,7 +755,10 @@
                 x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
                 x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="mt-3 w-full rounded-full bg-amber-600 py-2.5 text-sm font-bold text-white active:bg-amber-700">
-                Simpan Foto
+                <span wire:loading.remove>Simpan Foto</span>
+                <span wire:loading class="inline-flex items-center justify-center gap-1.5">
+                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> Menyimpan…
+                </span>
             </button>
         </form>
     @endif
