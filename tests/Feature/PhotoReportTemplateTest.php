@@ -372,7 +372,7 @@ it('OrderDetail menampilkan & memproses form Lengkapi Foto Wajib', function () {
         ->set("fotoLengkapi.{$item->id}.foto_area_unit_outdoor", UploadedFile::fake()->image('d.jpg'))
         ->set("fotoLengkapi.{$item->id}.foto_cek_suhu_indoor", UploadedFile::fake()->image('e.jpg'))
         ->call('lengkapiFotoWajib')
-        ->assertOk();
+        ->assertRedirect();
 
     expect(app(TeknisiService::class)->fotoWajibKurang($order->fresh('orderItems')))->toBe([]);
 });
@@ -407,7 +407,7 @@ it('Lengkapi Foto Wajib ambil foto dari record temp-photo lama saat binding Live
     Livewire::actingAs($teknisi)
         ->test(OrderDetail::class, ['order' => $order->fresh()])
         ->call('lengkapiFotoWajib')
-        ->assertOk();
+        ->assertRedirect();
 
     expect(WorkReportPhoto::query()
         ->where('order_item_id', $item->id)

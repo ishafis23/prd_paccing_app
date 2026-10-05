@@ -151,7 +151,7 @@ it('form teknisi bisa mengunggah foto pengganti sebelum setelah laporan disubmit
         ->test(OrderDetail::class, ['order' => $order])
         ->set('fotoSebelumBaru', UploadedFile::fake()->image('sebelum-baru.jpg'))
         ->call('simpanPerbaikanFoto')
-        ->assertOk();
+        ->assertRedirect();
 
     $laporan = $order->workReports()->latest('id')->first();
     expect($laporan->foto_sebelum)->not->toBe('work-reports/sebelum.jpg');

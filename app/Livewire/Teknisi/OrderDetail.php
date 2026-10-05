@@ -192,6 +192,10 @@ class OrderDetail extends Component
 
             session()->flash('status', 'Foto laporan diperbarui.');
             $this->reset(['fotoSebelumBaru', 'fotoSesudahBaru']);
+
+            // Reload penuh supaya galeri & status di halaman segar, lalu toast
+            // sukses tampil di paling atas.
+            $this->redirect(\App\Support\Url::absolute('teknisi.order', ['order' => $this->orderId]));
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -338,6 +342,10 @@ class OrderDetail extends Component
                 : 'Foto tersimpan. Masih ada '.collect($sisaKurang)->pluck('label')->implode(', ').' yang belum diisi.');
 
             $this->reset('fotoLengkapi');
+
+            // Reload penuh supaya halaman & galeri segar, lalu toast sukses
+            // tampil di paling atas.
+            $this->redirect(\App\Support\Url::absolute('teknisi.order', ['order' => $this->orderId]));
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
