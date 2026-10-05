@@ -44,16 +44,15 @@ class TeknisiService
             throw new BusinessRuleException('Order harus berstatus terjadwal sebelum berangkat.');
         }
 
-        // dev-plan/17, B63 + revisi foto per layanan: tidak boleh berangkat
-        // ke order berikutnya selama masih ada order lain (belum ditutup)
-        // yang fotonya belum lengkap — foto boleh diisi belakangan, tapi
-        // tetap menahan keberangkatan sampai dilengkapi.
+        // dev-plan/17, B63: tidak boleh berangkat ke order berikutnya selama
+        // masih ada order lain (belum ditutup) yang foto wajibnya belum
+        // lengkap — foto boleh diisi belakangan, tapi tetap menahan
+        // keberangkatan sampai dilengkapi. Satu-satunya dokumentasi foto
+        // adalah per baris layanan (work_report_photos); sistem lama
+        // "Foto per Layanan" (order_photos) sudah dihapus agar tidak dobel.
         $tertunda = $this->orderDenganFotoBelumLengkap($teknisi);
         if ($tertunda !== null) {
-            $daftar = collect(array_merge(
-                $this->fotoWajibKurang($tertunda),
-                $this->fotoPerLayananKurang($tertunda),
-            ))->pluck('label')->implode(', ');
+            $daftar = collect($this->fotoWajibKurang($tertunda))->pluck('label')->implode(', ');
 
             throw new BusinessRuleException(
                 "Lengkapi dulu foto pada order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya: {$daftar}."
@@ -68,8 +67,8 @@ class TeknisiService
 
     /**
      * Order lain milik teknisi ini (belum ditutup — B32) yang laporannya
-     * sudah disubmit tapi masih kurang foto (dev-plan/17, B63) — baik foto
-     * wajib per kategori maupun foto per layanan (fase 03).
+     * sudah disubmit tapi masih kurang foto wajib per baris layanan
+     * (dev-plan/17, B63).
      */
     private function orderDenganFotoBelumLengkap(User $teknisi): ?Order
     {
@@ -81,7 +80,7 @@ class TeknisiService
             ->get();
 
         foreach ($orders as $order) {
-            if ($this->fotoWajibKurang($order) !== [] || $this->fotoPerLayananKurang($order) !== []) {
+            if ($this->fotoWajibKurang($order) !== []) {
                 return $order;
             }
         }

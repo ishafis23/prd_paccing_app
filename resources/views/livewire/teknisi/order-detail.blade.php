@@ -367,11 +367,12 @@
                 </button>
             </div>
 
-            {{-- Foto Per Layanan (Phase 03 - NEW) --}}
-            @include('livewire.teknisi.partials.foto-per-layanan')
-
-            {{-- Foto per kategori order_item (dev-plan/13 §3): tiap baris
-                 layanan punya slot fotonya sendiri sesuai kategori. --}}
+            {{-- Foto per baris layanan (dev-plan/13 §3): tiap baris
+                 layanan punya slot fotonya sendiri sesuai kategori — satu
+                 grup foto per baris (1 AC = 1 grup). Ini SATU-SATUNYA
+                 dokumentasi foto yang dipakai (tampil di resi). Sistem lama
+                 "Foto per Layanan" (order_photos) sudah dihapus agar tidak
+                 dobel isi. --}}
             @if ($order->orderItems->isNotEmpty())
                 <div>
                     <label class="mb-2 block text-sm font-semibold text-gray-700">Foto per Layanan <span class="font-normal text-gray-400">(yang ditandai "Wajib" harus dilengkapi sebelum order berikutnya, JPG/PNG maks 5 MB)</span></label>
@@ -711,58 +712,6 @@
                 x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
                 x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="mt-3 w-full rounded-full bg-amber-600 py-2.5 text-sm font-bold text-white active:bg-amber-700">
-                Simpan Foto
-            </button>
-        </form>
-    @endif
-
-    {{-- Foto per Layanan (fase 03): boleh diisi belakangan, tapi tetap
-         menahan keberangkatan ke order berikutnya sampai lengkap. --}}
-    @if (! empty($this->fotoPerLayananKurang))
-        <form wire:submit="simpanLengkapiFotoPerLayanan" class="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-200">
-            <p class="flex items-center gap-2 text-sm font-bold text-sky-800">
-                <x-heroicon-o-camera class="h-5 w-5" /> Lengkapi Foto per Layanan
-            </p>
-            <p class="mt-1 text-xs text-sky-700">
-                Foto per layanan boleh diisi belakangan. Anda tidak bisa berangkat ke order berikutnya sampai
-                semua foto ini lengkap.
-            </p>
-
-            <div class="mt-3 grid grid-cols-2 gap-3">
-                @foreach ($this->fotoPerLayananLengkapi as $slot)
-                    <div>
-                        <p class="mb-1 text-[11px] font-semibold text-sky-800">
-                            {{ $slot['label'] }}
-                            @if ($slot['path'])
-                                <span class="font-normal text-emerald-600">· terisi</span>
-                            @else
-                                <span class="font-normal text-rose-500">· belum</span>
-                            @endif
-                        </p>
-
-                        @if ($slot['path'])
-                            <img src="{{ asset('storage/'.ltrim($slot['path'], '/')) }}" alt="{{ $slot['label'] }}"
-                                class="mb-2 h-28 w-full rounded-lg object-cover ring-1 ring-sky-100">
-                        @endif
-
-                        <x-photo-upload-dialog
-                            :fieldName="'fotoPerLayanan.'.$slot['type'].'.'.$slot['unit'].'.'.$slot['position']"
-                            :label="$slot['path'] ? 'Ganti Foto' : $slot['label']"
-                            :orderId="$order->id"
-                            height="h-28"
-                        />
-                    </div>
-                @endforeach
-            </div>
-
-            @error('fotoPerLayanan')
-                <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
-            @enderror
-
-            <button type="submit" wire:loading.attr="disabled" x-data
-                x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
-                x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
-                class="mt-3 w-full rounded-full bg-sky-600 py-2.5 text-sm font-bold text-white active:bg-sky-700">
                 Simpan Foto
             </button>
         </form>

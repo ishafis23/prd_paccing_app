@@ -11,7 +11,6 @@ use App\Filament\Resources\PhotoReportTemplateResource\Pages\ListPhotoReportTemp
 use App\Livewire\Teknisi\OrderDetail;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\OrderPhoto;
 use App\Models\PhotoReportTemplate;
 use App\Models\TemporaryPhotoUpload;
 use App\Models\User;
@@ -19,7 +18,6 @@ use App\Models\WorkReportPhoto;
 use App\Services\PhotoReportTemplateService;
 use App\Services\TeknisiService;
 use App\Support\FotoLaporanSlot;
-use App\Support\PhotoLayananStructure;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
@@ -189,25 +187,6 @@ function buatOrderDenganKategori(User $teknisi, ServiceType $kategori): Order
     return $order->fresh('orderItems');
 }
 
-function lengkapiFotoPerLayanan(Order $order): void
-{
-    foreach (app(TeknisiService::class)->tipeFotoPerLayananWajib($order) as $type) {
-        foreach (PhotoLayananStructure::positions($type) as $pos => $meta) {
-            OrderPhoto::create([
-                'order_id' => $order->id,
-                'type' => $type,
-                'unit_number' => 1,
-                'photo_position' => $pos,
-                'file_path' => "order-photos/{$type}_{$pos}.jpg",
-                'file_name' => "{$pos}.jpg",
-                'file_size' => 100,
-                'mime_type' => 'image/jpeg',
-                'status' => 'pending',
-            ]);
-        }
-    }
-}
-
 it('submitLaporan TETAP berhasil meski foto wajib (Cuci AC) belum lengkap — direvisi 18 Sep', function () {
     $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
     $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
@@ -306,9 +285,6 @@ it('berangkat BOLEH setelah foto wajib order sebelumnya dilengkapi', function ()
         'materials' => [],
         'foto_kategori' => $fotoKategori,
     ]);
-
-    // Foto per layanan (fase 03) juga harus lengkap agar boleh berangkat.
-    lengkapiFotoPerLayanan($ordersLama->fresh());
 
     $orderBaru = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Terjadwal]);
 
@@ -441,52 +417,6 @@ it('Lengkapi Foto Wajib ambil foto dari record temp-photo lama saat binding Live
     expect(TemporaryPhotoUpload::count())->toBe(0);
 });
 
-it('OrderDetail bisa melengkapi foto per layanan (fase 03) pasca-submit', function () {
-    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
-    $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
-
-    app(TeknisiService::class)->submitLaporan($order, $teknisi, [
-        'catatan' => 'Sudah dicuci.',
-        'materials' => [],
-        'foto_kategori' => [],
-    ]);
-
-    expect(app(TeknisiService::class)->fotoPerLayananKurang($order->fresh('orderItems')))->not->toBe([]);
-
-    $component = Livewire::actingAs($teknisi)->test(OrderDetail::class, ['order' => $order->fresh()]);
-
-    foreach (app(TeknisiService::class)->tipeFotoPerLayananWajib($order->fresh()) as $type) {
-        foreach (PhotoLayananStructure::positions($type) as $pos => $meta) {
-            $component->set("fotoPerLayanan.{$type}.1.{$pos}", UploadedFile::fake()->image("{$type}_{$pos}.jpg"));
-        }
-    }
-
-    $component->call('simpanLengkapiFotoPerLayanan')->assertOk();
-
-    expect(app(TeknisiService::class)->fotoPerLayananKurang($order->fresh('orderItems')))->toBe([]);
-});
-
-it('berangkat DITOLAK kalau foto per layanan (fase 03) belum lengkap walau foto wajib lengkap', function () {
-    $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
-    $ordersLama = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
-    $itemLama = $ordersLama->orderItems->first();
-
-    $fotoKategori = collect(FotoLaporanSlot::untuk(ServiceType::CuciAc))
-        ->keys()
-        ->map(fn ($slot) => ['order_item_id' => $itemLama->id, 'slot' => $slot, 'path' => "work-reports/{$slot}.jpg"])
-        ->all();
-
-    app(TeknisiService::class)->submitLaporan($ordersLama, $teknisi, [
-        'catatan' => 'Sudah dicuci lengkap.',
-        'materials' => [],
-        'foto_kategori' => $fotoKategori,
-    ]);
-
-    $orderBaru = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Terjadwal]);
-
-    app(TeknisiService::class)->berangkat($orderBaru, $teknisi);
-})->throws(BusinessRuleException::class, 'Tampak Depan Rumah/Kantor');
-
 it('notifikasi sukses submitLaporan menyebutkan persis foto wajib yang masih kurang', function () {
     $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
     $order = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
@@ -510,11 +440,6 @@ it('notifikasi sukses submitLaporan tidak sebut kekurangan kalau semua foto waji
     $component->set('catatan', 'Sudah dicuci lengkap.');
     foreach (array_keys(FotoLaporanSlot::untuk(ServiceType::CuciAc)) as $slot) {
         $component->set("fotoKategori.{$item->id}.{$slot}", UploadedFile::fake()->image("{$slot}.jpg"));
-    }
-    foreach (app(TeknisiService::class)->tipeFotoPerLayananWajib($order) as $type) {
-        foreach (PhotoLayananStructure::positions($type) as $pos => $meta) {
-            $component->set("fotoPerLayanan.{$type}.1.{$pos}", UploadedFile::fake()->image("{$type}_{$pos}.jpg"));
-        }
     }
     $component->call('submitLaporan')
         ->assertSee('Laporan berhasil disubmit. Semua foto sudah lengkap.');
@@ -600,17 +525,6 @@ it('submitLaporan menyimpan foto dari record temp-photo lama, bukan mengabaikann
         'mime_type' => 'image/jpeg',
     ]);
 
-    // Foto per layanan (fase 03) juga lewat jalur cadangan.
-    TemporaryPhotoUpload::create([
-        'user_id' => $teknisi->id,
-        'order_id' => $order->id,
-        'field_name' => 'fotoPerLayanan.lokasi.1.lokasi',
-        'file_path' => UploadedFile::fake()->image('layanan.jpg')->store('temporary-photos', 'public'),
-        'file_name' => 'layanan.jpg',
-        'file_size' => 100,
-        'mime_type' => 'image/jpeg',
-    ]);
-
     Livewire::actingAs($teknisi)
         ->test(OrderDetail::class, ['order' => $order])
         ->set('catatan', 'Sudah dicuci.')
@@ -620,13 +534,6 @@ it('submitLaporan menyimpan foto dari record temp-photo lama, bukan mengabaikann
     expect(WorkReportPhoto::query()
         ->where('order_item_id', $item->id)
         ->where('slot', $slot)
-        ->exists())->toBeTrue();
-
-    expect(OrderPhoto::query()
-        ->where('order_id', $order->id)
-        ->where('type', PhotoLayananStructure::TYPE_LOKASI)
-        ->where('unit_number', 1)
-        ->where('photo_position', 'lokasi')
         ->exists())->toBeTrue();
 
     expect(TemporaryPhotoUpload::count())->toBe(0);

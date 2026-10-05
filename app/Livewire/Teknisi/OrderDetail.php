@@ -7,10 +7,8 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
-use App\Models\Game2Setting;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\OrderPhoto;
 use App\Models\StockItem;
 use App\Models\TemporaryPhotoUpload;
 use App\Models\WorkReport;
@@ -20,8 +18,6 @@ use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
 use App\Support\FotoLaporanSlot;
-use App\Support\PhotoLayananStructure;
-use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -69,16 +65,6 @@ class OrderDetail extends Component
 
     public $buktiPembayaran;
 
-    // Photo per Layanan (Phase 03 - Foto terstruktur)
-    /** @var array<string, array<int, array<string, mixed>>> [type => [unit => [position => file]]] */
-    public array $fotoPerLayanan = [];
-
-    /** @var array<string, bool> [type => skipSection] */
-    public array $skipSections = [];
-
-    /** @var array<string, int> [type => unitCount] */
-    public array $unitCounts = [];
-
     /** @var array<int, bool> Track which order items are expanded [order_item_id => isExpanded] */
     public array $expandedItems = [];
 
@@ -91,81 +77,11 @@ class OrderDetail extends Component
 
         $this->orderId = $order->id;
 
-        // Initialize photo per layanan structure
-        $this->initializeFotoPerLayanan();
-
         // Initialize expanded items (all expanded by default)
         foreach ($order->orderItems as $item) {
             $this->expandedItems[$item->id] = true;
         }
 
-    }
-
-    /**
-     * Set Livewire property dari file path (untuk fotoSebelum, fotoSesudah, dll)
-     * Ini memungkinkan property menyimpan path file yang sudah tersimpan
-     */
-    private function setPropertyFromPath(string $fieldName, string $filePath): void
-    {
-        // Parse field name untuk nested properties
-        if (str_contains($fieldName, '.')) {
-            $parts = explode('.', $fieldName);
-
-            // Contoh: fotoKategori.1.slot1 -> $this->fotoKategori[1]['slot1']
-            // TODO: Handle nested properties if needed
-            return;
-        }
-
-        // Simple property (fotoSebelum, fotoSesudah, buktiPembayaran, dll)
-        if (property_exists($this, $fieldName)) {
-            $this->$fieldName = $filePath; // Store the file path
-        }
-    }
-
-    /**
-     * Reset Livewire property
-     */
-    private function resetProperty(string $fieldName): void
-    {
-        if (str_contains($fieldName, '.')) {
-            $parts = explode('.', $fieldName);
-
-            // Handle nested reset if needed
-            return;
-        }
-
-        if (property_exists($this, $fieldName)) {
-            $this->$fieldName = null;
-        }
-    }
-
-    /**
-     * Initialize foto per layanan dengan struktur default
-     */
-    private function initializeFotoPerLayanan(): void
-    {
-        foreach (PhotoLayananStructure::types() as $type) {
-            $this->skipSections[$type] = false;
-            $this->unitCounts[$type] = PhotoLayananStructure::isRepeatable($type) ? 1 : 0;
-
-            // Initialize unit slots
-            if (! isset($this->fotoPerLayanan[$type])) {
-                $this->fotoPerLayanan[$type] = [];
-            }
-
-            if ($this->unitCounts[$type] > 0) {
-                for ($unit = 1; $unit <= $this->unitCounts[$type]; $unit++) {
-                    if (! isset($this->fotoPerLayanan[$type][$unit])) {
-                        $this->fotoPerLayanan[$type][$unit] = [];
-                    }
-                }
-            } else {
-                // Lokasi type - no units
-                if (! isset($this->fotoPerLayanan[$type][1])) {
-                    $this->fotoPerLayanan[$type][1] = [];
-                }
-            }
-        }
     }
 
     public function getOrderProperty(): Order
@@ -214,71 +130,6 @@ class OrderDetail extends Component
         }
 
         return app(TeknisiService::class)->fotoWajibKurang($this->order);
-    }
-
-    /**
-     * Foto per layanan (fase 03) yang masih kurang utk order ini — dipakai
-     * blok "Lengkapi Foto per Layanan" setelah laporan tersubmit. Foto boleh
-     * diisi belakangan, tapi tetap menahan keberangkatan sampai lengkap.
-     *
-     * @return array<int, array{type: string, unit: int, position: string, label: string}>
-     */
-    public function getFotoPerLayananKurangProperty(): array
-    {
-        if (! in_array($this->order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
-            return [];
-        }
-
-        return app(TeknisiService::class)->fotoPerLayananKurang($this->order);
-    }
-
-    /**
-     * Foto per layanan yang sudah tersimpan di `order_photos`, dipetakan per
-     * "type|unit|position" => path supaya blok lengkapi bisa menampilkan
-     * foto lama (dan tombol ganti).
-     *
-     * @return array<string, string>
-     */
-    public function getFotoPerLayananTersimpanProperty(): array
-    {
-        return OrderPhoto::query()
-            ->where('order_id', $this->orderId)
-            ->get()
-            ->mapWithKeys(fn (OrderPhoto $p): array => [
-                $p->type.'|'.$p->unit_number.'|'.$p->photo_position => $p->file_path,
-            ])
-            ->all();
-    }
-
-    /**
-     * Daftar slot foto per layanan yang diwajibkan (fase 03) beserta foto
-     * yang sudah tersimpan (kalau ada) — dipakai blok "Lengkapi Foto per
-     * Layanan" pasca-submit.
-     *
-     * @return array<int, array{type: string, unit: int, position: string, label: string, path: ?string}>
-     */
-    public function getFotoPerLayananLengkapiProperty(): array
-    {
-        if (! in_array($this->order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
-            return [];
-        }
-
-        $tersimpan = $this->fotoPerLayananTersimpan;
-        $baris = [];
-
-        foreach (app(TeknisiService::class)->tipeFotoPerLayananWajib($this->order) as $type) {
-            foreach (PhotoLayananStructure::positions($type) as $posisi => $meta) {
-                $baris[] = [
-                    'type' => $type,
-                    'unit' => 1,
-                    'position' => $posisi,
-                    'label' => $meta['label'],
-                    'path' => $tersimpan[$type.'|1|'.$posisi] ?? null,
-                ];
-            }
-        }
-
-        return $baris;
     }
 
     /**
@@ -686,18 +537,6 @@ class OrderDetail extends Component
                 }
             }
 
-            // Add storage quota untuk fotoPerLayanan (Phase 03)
-            foreach ($this->fotoPerLayanan as $type => $units) {
-                if ($this->isSectionSkipped($type)) {
-                    continue;
-                }
-                foreach ($units as $slots) {
-                    foreach ($slots as $file) {
-                        $tambahBytes += (int) ($file?->getSize() ?? 0);
-                    }
-                }
-            }
-
             if ($tambahBytes > 0) {
                 $quota->pastikanCukup($tambahBytes);
             }
@@ -786,25 +625,12 @@ class OrderDetail extends Component
             $teknisiService->submitLaporan($this->order, auth()->user(), $payload);
             StorageQuotaService::lupakanCache();
 
-            // Upload fotoPerLayanan (Phase 03) setelah laporan tersimpan.
-            // Foto per layanan TIDAK memblokir submit (boleh diisi
-            // belakangan), tapi tetap menahan keberangkatan ke order
-            // berikutnya sampai dilengkapi (lihat TeknisiService::berangkat).
-            try {
-                $this->simpanFotoPerLayanan();
-            } catch (\Exception $e) {
-                \Log::error('Error uploading fotoPerLayanan: '.$e->getMessage());
-                // Don't fail submission if photo upload fails - photos can be re-uploaded later
-            }
-
             // dev-plan/17, B63 (revisi): kasih tahu langsung di notifikasi
-            // foto mana yang masih kurang (wajib per kategori + foto per
-            // layanan) supaya teknisi tidak kaget baru pas mau berangkat.
+            // foto wajib mana yang masih kurang supaya teknisi tidak kaget
+            // baru pas mau berangkat. Foto per baris layanan boleh diisi
+            // belakangan lewat blok "Lengkapi Foto Wajib".
             $orderFresh = Order::with('orderItems')->findOrFail($this->orderId);
-            $kurang = collect(array_merge(
-                $teknisiService->fotoWajibKurang($orderFresh),
-                $teknisiService->fotoPerLayananKurang($orderFresh),
-            ));
+            $kurang = collect($teknisiService->fotoWajibKurang($orderFresh));
 
             if ($kurang->isEmpty()) {
                 session()->flash('status', 'Laporan berhasil disubmit. Semua foto sudah lengkap.');
@@ -817,181 +643,15 @@ class OrderDetail extends Component
             }
 
             // Cleanup temp-photo yang sudah dikonsumsi jalur laporan
-            // (fotoSebelum/Sesudah/fotoKategori). Foto per layanan
-            // dibersihkan di simpanFotoPerLayanan(); sisa temp yang belum
+            // (fotoSebelum/Sesudah/fotoKategori). Sisa temp yang belum
             // terpakai sengaja dibiarkan agar bisa dilengkapi belakangan.
             $this->bersihkanFotoTemp(['fotoSebelum', 'fotoSesudah', 'fotoKategori.']);
 
             $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
             $this->tempPhotos = [];
-            $this->resetFotoPerLayanan();
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
-    }
-
-    /**
-     * Simpan fotoPerLayanan ke `order_photos` (Phase 03) — upsert per
-     * (order, type, unit_number, photo_position) supaya bisa dipanggil saat
-     * submit maupun saat melengkapi/mengganti foto belakangan tanpa
-     * menghasilkan baris ganda. Balikin jumlah foto yang tersimpan.
-     */
-    public function simpanFotoPerLayanan(): int
-    {
-        $uploadedCount = 0;
-        $dariLivewire = [];
-
-        foreach ($this->fotoPerLayanan as $type => $units) {
-            if ($this->isSectionSkipped($type) || ! is_array($units)) {
-                continue;
-            }
-
-            foreach ($units as $unitNum => $slots) {
-                if (! is_array($slots)) {
-                    continue;
-                }
-
-                foreach ($slots as $position => $file) {
-                    if (! $file instanceof UploadedFile) {
-                        continue;
-                    }
-
-                    $this->simpanFotoPerLayananKeDb(
-                        (string) $type,
-                        (int) $unitNum,
-                        (string) $position,
-                        $file->store('order-photos', 'public'),
-                        $file->getClientOriginalName(),
-                        (int) $file->getSize(),
-                        (string) $file->getMimeType(),
-                    );
-
-                    $dariLivewire[$type.'|'.$unitNum.'|'.$position] = true;
-                    $uploadedCount++;
-                }
-            }
-        }
-
-        // Jalur cadangan: foto yang telanjur masuk ke temporary_photo_uploads
-        // (upload Livewire gagal) tetap disimpan, jangan sampai hilang lalu
-        // teknisi harus memfoto ulang.
-        foreach ($this->fotoTempTersedia() as $fieldName => $photo) {
-            if (! str_starts_with($fieldName, 'fotoPerLayanan.')) {
-                continue;
-            }
-
-            $bagian = explode('.', $fieldName);
-            if (count($bagian) !== 4) {
-                continue;
-            }
-
-            [, $type, $unitNum, $position] = $bagian;
-            if (isset($dariLivewire[$type.'|'.$unitNum.'|'.$position])) {
-                continue;
-            }
-
-            $this->simpanFotoPerLayananKeDb(
-                (string) $type,
-                (int) $unitNum,
-                (string) $position,
-                $this->salinFotoTemp($photo->file_path, 'order-photos'),
-                (string) $photo->file_name,
-                (int) $photo->file_size,
-                (string) $photo->mime_type,
-            );
-
-            $uploadedCount++;
-        }
-
-        // Record temp foto per layanan sudah disalin — bersihkan.
-        $this->bersihkanFotoTemp(['fotoPerLayanan.']);
-
-        if ($uploadedCount > 0) {
-            StorageQuotaService::lupakanCache();
-        }
-
-        return $uploadedCount;
-    }
-
-    /**
-     * Upsert satu baris `order_photos` per (order, type, unit_number,
-     * photo_position) — dipakai jalur Livewire maupun temp-photo.
-     */
-    private function simpanFotoPerLayananKeDb(
-        string $type,
-        int $unitNum,
-        string $position,
-        string $filePath,
-        string $fileName,
-        int $fileSize,
-        string $mime,
-    ): void {
-        $existing = OrderPhoto::query()
-            ->where('order_id', $this->order->id)
-            ->where('type', $type)
-            ->where('unit_number', $unitNum)
-            ->where('photo_position', $position)
-            ->first();
-
-        $atribut = [
-            'file_path' => $filePath,
-            'file_name' => $fileName,
-            'file_size' => $fileSize,
-            'mime_type' => $mime,
-            'status' => 'pending',
-            'rejection_reason' => null,
-        ];
-
-        if ($existing !== null) {
-            Storage::disk('public')->delete($existing->file_path);
-            $existing->update($atribut);
-        } else {
-            OrderPhoto::create(array_merge($atribut, [
-                'order_id' => $this->order->id,
-                'type' => $type,
-                'unit_number' => $unitNum,
-                'photo_position' => $position,
-            ]));
-        }
-    }
-
-    /**
-     * Tombol "Simpan Foto" pada blok lengkapi foto per layanan pasca-submit.
-     */
-    public function simpanLengkapiFotoPerLayanan(): void
-    {
-        try {
-            $jumlah = $this->simpanFotoPerLayanan();
-        } catch (BusinessRuleException|AuthorizationException $e) {
-            session()->flash('error', $e->getMessage());
-
-            return;
-        }
-
-        if ($jumlah === 0) {
-            $this->addError('fotoPerLayanan', 'Tidak ada foto yang terkirim. Pilih ulang foto, tunggu sampai selesai mengunggah, lalu tekan Simpan Foto lagi.');
-
-            return;
-        }
-
-        $sisa = app(TeknisiService::class)->fotoPerLayananKurang($this->order->fresh('orderItems'));
-
-        session()->flash('status', $sisa === []
-            ? 'Foto per layanan sudah lengkap — Anda sekarang bisa berangkat ke order berikutnya.'
-            : 'Foto tersimpan. Masih ada '.collect($sisa)->pluck('label')->implode(', ').' yang belum diisi.');
-
-        $this->resetFotoPerLayanan();
-    }
-
-    /**
-     * Reset fotoPerLayanan structure after successful submission
-     */
-    private function resetFotoPerLayanan(): void
-    {
-        $this->fotoPerLayanan = [];
-        $this->skipSections = [];
-        $this->unitCounts = [];
-        $this->initializeFotoPerLayanan();
     }
 
     /**
@@ -1062,139 +722,6 @@ class OrderDetail extends Component
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
-    }
-
-    // Photo Per Layanan methods (Phase 03)
-
-    /**
-     * Check apakah Game 2 deadline sudah lewat (Phase 03 - Task 2.3)
-     */
-    public function isGame2Expired(): bool
-    {
-        try {
-            $setting = Game2Setting::first();
-            $deadlineTime = $setting?->deadline_time ?? '08:30:00';
-            $deadline = Carbon::now()->setTimeFromTimeString($deadlineTime);
-
-            return Carbon::now()->greaterThanOrEqualTo($deadline);
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * Get Game 2 deadline time
-     */
-    public function getGame2DeadlineTime(): string
-    {
-        try {
-            $setting = Game2Setting::first();
-
-            return $setting?->deadline_time ?? '08:30';
-        } catch (\Exception $e) {
-            return '08:30';
-        }
-    }
-
-    /**
-     * Get struktur foto per layanan untuk display
-     */
-    public function getFotoPerLayananStructureProperty(): array
-    {
-        return PhotoLayananStructure::struktur();
-    }
-
-    /**
-     * Add unit untuk repeatable type (Cuci/Service)
-     */
-    public function addUnit(string $type): void
-    {
-        if (! PhotoLayananStructure::isRepeatable($type)) {
-            return;
-        }
-
-        $newUnit = ($this->unitCounts[$type] ?? 1) + 1;
-        $this->unitCounts[$type] = $newUnit;
-
-        if (! isset($this->fotoPerLayanan[$type][$newUnit])) {
-            $this->fotoPerLayanan[$type][$newUnit] = [];
-        }
-
-        $this->dispatch('unit-added', type: $type, unit: $newUnit);
-    }
-
-    /**
-     * Remove unit (tidak bisa remove unit 1, minimum 1)
-     */
-    public function removeUnit(string $type, int $unit): void
-    {
-        if (! PhotoLayananStructure::isRepeatable($type) || $unit <= 1) {
-            return;
-        }
-
-        if ($unit === $this->unitCounts[$type]) {
-            $this->unitCounts[$type]--;
-            unset($this->fotoPerLayanan[$type][$unit]);
-        }
-    }
-
-    /**
-     * Toggle skip section checkbox
-     */
-    public function toggleSkipSection(string $type): void
-    {
-        $this->skipSections[$type] = ! ($this->skipSections[$type] ?? false);
-
-        // Clear photos jika skip
-        if ($this->skipSections[$type]) {
-            $this->fotoPerLayanan[$type] = [];
-        }
-    }
-
-    /**
-     * Check apakah section di-skip
-     */
-    public function isSectionSkipped(string $type): bool
-    {
-        return $this->skipSections[$type] ?? false;
-    }
-
-    /**
-     * Get progress foto per layanan
-     *
-     * @return array{total: int, uploaded: int, percent: int}
-     */
-    public function getFotoPerLayananProgressProperty(): array
-    {
-        $total = 0;
-        $uploaded = 0;
-
-        foreach (PhotoLayananStructure::types() as $type) {
-            if ($this->isSectionSkipped($type)) {
-                continue;
-            }
-
-            $positions = PhotoLayananStructure::positions($type);
-            $units = $this->unitCounts[$type] ?? 1;
-
-            if ($type === PhotoLayananStructure::TYPE_LOKASI) {
-                $total += count($positions);
-                $uploaded += count(array_filter($this->fotoPerLayanan[$type][1] ?? [], fn ($f) => $f !== null));
-            } else {
-                $total += count($positions) * $units;
-                for ($u = 1; $u <= $units; $u++) {
-                    $uploaded += count(array_filter($this->fotoPerLayanan[$type][$u] ?? [], fn ($f) => $f !== null));
-                }
-            }
-        }
-
-        $percent = $total > 0 ? round(($uploaded / $total) * 100) : 0;
-
-        return [
-            'total' => $total,
-            'uploaded' => $uploaded,
-            'percent' => $percent,
-        ];
     }
 
     /**
