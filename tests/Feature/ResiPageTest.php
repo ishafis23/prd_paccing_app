@@ -132,3 +132,31 @@ it('resi order tanpa token -> 404', function () {
     $this->get(route('resi.show', [$order->id, Str::random(40)]))
         ->assertNotFound();
 });
+
+it('resi menampilkan layanan tambahan teknisi beserta fotonya', function () {
+    $teknisi = ($this->buatUser)(RoleName::Teknisi->value);
+    $order = ($this->orderSelesai)($teknisi);
+
+    $item = $order->orderItems()->create([
+        'nama_layanan' => 'Tambah Cuci AC',
+        'kategori' => \App\Enums\ServiceType::CuciAc->value,
+        'harga' => 75000,
+        'jumlah' => 1,
+    ]);
+
+    $laporan = $order->workReports()->latest('id')->first();
+    \App\Models\WorkReportPhoto::create([
+        'work_report_id' => $laporan->id,
+        'order_item_id' => $item->id,
+        'slot' => 'foto_tampak_depan_lokasi',
+        'path' => 'work-reports/tambahan.jpg',
+        'urutan' => 0,
+    ]);
+
+    $this->get(route('resi.show', [$order->id, $order->resi_token]))
+        ->assertOk()
+        ->assertSee('Rincian Layanan')
+        ->assertSee('Tambah Cuci AC')
+        ->assertSee('storage/work-reports/tambahan.jpg')
+        ->assertSee('Foto Tampak Depan Lokasi');
+});

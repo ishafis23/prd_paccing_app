@@ -36,6 +36,15 @@
     $unitNama = $katalog?->jenis_unit?->value
         ? \Illuminate\Support\Str::headline($katalog->jenis_unit->value)
         : null;
+
+    // Rincian semua baris layanan (termasuk yg ditambahkan teknisi saat order
+    // berjalan) + foto dokumentasi per baris (lintas seluruh laporan).
+    $itemsAktifResi = $order->orderItems->reject(fn ($i) => $i->dibatalkan())->values();
+    $fotoPerItemResi = \App\Models\WorkReportPhoto::query()
+        ->whereIn('order_item_id', $itemsAktifResi->pluck('id'))
+        ->orderBy('urutan')
+        ->get()
+        ->groupBy('order_item_id');
 @endphp
 
 <main class="mx-auto max-w-md bg-white p-6 shadow-sm min-h-screen">
@@ -88,11 +97,31 @@
             <dt class="text-gray-500 shrink-0">Selesai</dt>
             <dd class="text-right">{{ $laporan?->waktu_selesai?->format('d M Y H:i') ?? '—' }}</dd>
         </div>
-        <div class="flex justify-between gap-4 border-t border-gray-200 pt-2">
-            <dt class="font-semibold">Total Tagihan</dt>
-            <dd class="font-bold">Rp{{ number_format($order->total(), 0, ',', '.') }}</dd>
-        </div>
     </dl>
+
+    {{-- Rincian semua baris layanan (termasuk yang ditambahkan teknisi) --}}
+    @if ($itemsAktifResi->isNotEmpty())
+        <div class="mt-4">
+            <h3 class="text-sm font-bold text-gray-700">Rincian Layanan</h3>
+            <div class="mt-2 space-y-1.5">
+                @foreach ($itemsAktifResi as $item)
+                    <div class="flex items-start justify-between gap-3 text-sm">
+                        <span class="text-gray-700">
+                            {{ $item->nama_layanan }}
+                            @if ($item->jumlah > 1)
+                                <span class="text-gray-400">× {{ $item->jumlah }}</span>
+                            @endif
+                        </span>
+                        <span class="shrink-0 font-semibold">Rp{{ number_format((float) $item->harga * $item->jumlah, 0, ',', '.') }}</span>
+                    </div>
+                @endforeach
+                <div class="flex items-center justify-between gap-3 border-t border-gray-200 pt-2 text-sm">
+                    <span class="font-semibold">Total Tagihan</span>
+                    <span class="font-bold">Rp{{ number_format($order->total(), 0, ',', '.') }}</span>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Status pembayaran --}}
     @php
@@ -162,37 +191,50 @@
         </div>
     @endunless
 
-    {{-- Dokumentasi pengerjaan (semua foto bukti dari laporan teknisi) --}}
+    {{-- Dokumentasi pengerjaan: Sebelum/Sesudah umum + foto per layanan
+         (termasuk layanan yang ditambahkan teknisi). --}}
     @php
-        $fotoDokumentasi = collect();
+        $fotoUmum = collect();
         if ($laporan) {
-            $fotoDokumentasi = collect()
+            $fotoUmum = collect()
                 ->concat(filled($laporan->foto_sebelum) ? [['path' => $laporan->foto_sebelum, 'label' => 'Sebelum']] : [])
-                ->concat(filled($laporan->foto_sesudah) ? [['path' => $laporan->foto_sesudah, 'label' => 'Sesudah']] : [])
-                ->concat(
-                    $laporan->photos
-                        ->sortBy('urutan')
-                        ->map(function ($p) {
-                            $label = \App\Support\FotoLaporanSlot::untuk($p->orderItem?->kategori)[$p->slot] ?? $p->slot;
-
-                            return ['path' => $p->path, 'label' => $label];
-                        })
-                )
-                ->values();
+                ->concat(filled($laporan->foto_sesudah) ? [['path' => $laporan->foto_sesudah, 'label' => 'Sesudah']] : []);
         }
     @endphp
-    @if ($fotoDokumentasi->isNotEmpty())
+    @if ($fotoUmum->isNotEmpty() || $fotoPerItemResi->isNotEmpty())
         <div class="mt-5">
             <h3 class="text-sm font-bold text-gray-700">Dokumentasi Pengerjaan</h3>
-            <div class="mt-2 grid grid-cols-2 gap-3">
-                @foreach ($fotoDokumentasi as $foto)
-                    <figure>
-                        <img src="{{ asset('storage/'.ltrim($foto['path'], '/')) }}"
-                             alt="{{ $foto['label'] }} pengerjaan {{ $customer?->nama ?? '' }}" class="w-full rounded-lg border border-gray-200 object-cover">
-                        <figcaption class="mt-1 text-center text-xs text-gray-500">{{ $foto['label'] }}</figcaption>
-                    </figure>
-                @endforeach
-            </div>
+
+            @if ($fotoUmum->isNotEmpty())
+                <div class="mt-2 grid grid-cols-2 gap-3">
+                    @foreach ($fotoUmum as $foto)
+                        <figure>
+                            <img src="{{ asset('storage/'.ltrim($foto['path'], '/')) }}"
+                                 alt="{{ $foto['label'] }} pengerjaan {{ $customer?->nama ?? '' }}" class="w-full rounded-lg border border-gray-200 object-cover">
+                            <figcaption class="mt-1 text-center text-xs text-gray-500">{{ $foto['label'] }}</figcaption>
+                        </figure>
+                    @endforeach
+                </div>
+            @endif
+
+            @foreach ($itemsAktifResi as $item)
+                @php $fotosItem = $fotoPerItemResi[$item->id] ?? collect(); @endphp
+                @if ($fotosItem->isNotEmpty())
+                    <div class="mt-4">
+                        <p class="text-xs font-semibold text-gray-600">{{ $item->nama_layanan }}</p>
+                        <div class="mt-2 grid grid-cols-2 gap-3">
+                            @foreach ($fotosItem->sortBy('urutan') as $p)
+                                @php $label = \App\Support\FotoLaporanSlot::untuk($item->kategori)[$p->slot] ?? $p->slot; @endphp
+                                <figure>
+                                    <img src="{{ asset('storage/'.ltrim($p->path, '/')) }}"
+                                         alt="{{ $label }} pengerjaan {{ $customer?->nama ?? '' }}" class="w-full rounded-lg border border-gray-200 object-cover">
+                                    <figcaption class="mt-1 text-center text-xs text-gray-500">{{ $label }}</figcaption>
+                                </figure>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            @endforeach
         </div>
     @endif
 
