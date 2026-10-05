@@ -12,6 +12,7 @@ use App\Models\OrderItem;
 use App\Models\StockItem;
 use App\Models\TemporaryPhotoUpload;
 use App\Models\WorkReport;
+use App\Models\WorkReportPhoto;
 use App\Services\AttendanceService;
 use App\Services\OrderService;
 use App\Services\PaymentChannelService;
@@ -62,6 +63,9 @@ class OrderDetail extends Component
 
     /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] — dev-plan/17, B63 (revisi): lengkapi foto wajib setelah laporan tersubmit. */
     public array $fotoLengkapi = [];
+
+    /** @var array<int, UploadedFile> [work_report_photo_id => UploadedFile] — ganti foto pengerjaan yang sudah tersimpan (salah/blur). */
+    public array $fotoGanti = [];
 
     public $buktiPembayaran;
 
@@ -190,6 +194,50 @@ class OrderDetail extends Component
             $this->reset(['fotoSebelumBaru', 'fotoSesudahBaru']);
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Ganti satu foto pengerjaan (per baris layanan) yang sudah tersimpan di
+     * `work_report_photos` — dipakai tombol "Ganti" di galeri bila foto salah
+     * (blur/salah sudut). File lama dihapus, file baru disimpan ke disk.
+     * Dipanggil otomatis oleh JS setelah upload selesai.
+     */
+    public function gantiFotoKategori(int $photoId): void
+    {
+        $file = $this->fotoGanti[$photoId] ?? null;
+
+        if (! $file instanceof UploadedFile) {
+            return;
+        }
+
+        $foto = WorkReportPhoto::query()
+            ->whereHas('workReport', fn ($q) => $q->where('order_id', $this->orderId))
+            ->find($photoId);
+
+        if ($foto === null) {
+            session()->flash('error', 'Foto tidak ditemukan pada order ini.');
+
+            return;
+        }
+
+        try {
+            app(StorageQuotaService::class)->pastikanCukup((int) $file->getSize());
+
+            $pathBaru = $file->store('work-reports', 'public');
+
+            if (filled($foto->path)) {
+                Storage::disk('public')->delete($foto->path);
+            }
+
+            $foto->update(['path' => $pathBaru]);
+            StorageQuotaService::lupakanCache();
+
+            session()->flash('status', 'Foto berhasil diganti.');
+        } catch (BusinessRuleException $e) {
+            session()->flash('error', $e->getMessage());
+        } finally {
+            unset($this->fotoGanti[$photoId]);
         }
     }
 

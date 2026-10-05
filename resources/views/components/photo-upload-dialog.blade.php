@@ -4,9 +4,11 @@
     'orderId',       // Order ID untuk upload
     'showRemoveBtn' => true, // Tampilkan tombol remove
     'height' => 'h-44', // Tinggi box
+    'afterUploadMethod' => null, // Method Livewire yg dipanggil otomatis setelah upload (mis. ganti foto tersimpan)
+    'afterUploadId' => null,     // Argumen id utk afterUploadMethod
 ])
 
-<div x-data="photoUpload('{{ $fieldName }}', {{ $orderId }})">
+<div x-data="photoUpload('{{ $fieldName }}', {{ $orderId }}, {{ $afterUploadMethod ? "'".e($afterUploadMethod)."'" : 'null' }}, {{ $afterUploadId !== null ? (int) $afterUploadId : 'null' }})">
     {{-- Tombol membuka dialog --}}
     <button
         type="button"

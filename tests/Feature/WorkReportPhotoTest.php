@@ -197,3 +197,68 @@ it('halaman view order admin menampilkan foto per kategori', function () {
         ->assertSee('Foto per Kategori')
         ->assertSee('Foto Tampak Depan Lokasi');
 });
+
+it('gantiFotoKategori mengganti foto tersimpan & menghapus file lama', function () {
+    Storage::fake('public');
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Selesai]);
+    $item = $order->orderItems->first();
+
+    $report = $order->workReports()->create([
+        'teknisi_id' => $teknisi->id,
+        'catatan_pengerjaan' => 'Cuci selesai.',
+        'waktu_mulai' => now(),
+        'waktu_selesai' => now(),
+    ]);
+
+    Storage::disk('public')->put('work-reports/lama.jpg', 'lama');
+    $foto = WorkReportPhoto::create([
+        'work_report_id' => $report->id,
+        'order_item_id' => $item->id,
+        'slot' => 'foto_tampak_depan_lokasi',
+        'path' => 'work-reports/lama.jpg',
+        'urutan' => 0,
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->set("fotoGanti.{$foto->id}", UploadedFile::fake()->image('baru.jpg'))
+        ->call('gantiFotoKategori', $foto->id)
+        ->assertOk();
+
+    $foto->refresh();
+    expect($foto->path)->not->toBe('work-reports/lama.jpg');
+    Storage::disk('public')->assertExists($foto->path);
+    Storage::disk('public')->assertMissing('work-reports/lama.jpg');
+});
+
+it('gantiFotoKategori menolak foto milik order lain', function () {
+    Storage::fake('public');
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Selesai]);
+
+    $orderLain = Order::factory()->create(['status' => OrderStatus::Selesai]);
+    $itemLain = $orderLain->orderItems->first();
+    $reportLain = $orderLain->workReports()->create([
+        'teknisi_id' => $teknisi->id,
+        'catatan_pengerjaan' => 'x',
+        'waktu_mulai' => now(),
+        'waktu_selesai' => now(),
+    ]);
+    Storage::disk('public')->put('work-reports/lain.jpg', 'lain');
+    $fotoLain = WorkReportPhoto::create([
+        'work_report_id' => $reportLain->id,
+        'order_item_id' => $itemLain->id,
+        'slot' => 'foto_tampak_depan_lokasi',
+        'path' => 'work-reports/lain.jpg',
+        'urutan' => 0,
+    ]);
+
+    Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->set("fotoGanti.{$fotoLain->id}", UploadedFile::fake()->image('baru.jpg'))
+        ->call('gantiFotoKategori', $fotoLain->id)
+        ->assertOk();
+
+    expect($fotoLain->refresh()->path)->toBe('work-reports/lain.jpg');
+});

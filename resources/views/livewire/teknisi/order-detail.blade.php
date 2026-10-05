@@ -46,7 +46,9 @@
                             ->map(function ($p) {
                                 $label = \App\Support\FotoLaporanSlot::untuk($p->orderItem?->kategori)[$p->slot] ?? $p->slot;
 
-                                return ['path' => $p->path, 'label' => $label];
+                                // 'id' dipakai tombol "Ganti" di galeri (foto
+                                // per baris layanan yang sudah tersimpan).
+                                return ['id' => $p->id, 'path' => $p->path, 'label' => $label];
                             })
                     )
                     ->values(),
@@ -997,6 +999,20 @@
                                     <img src="{{ asset('storage/'.ltrim($foto['path'], '/')) }}" alt="{{ $foto['label'] }} {{ $order->customer->nama }}"
                                         class="h-56 w-full rounded-xl object-cover ring-1 ring-gray-100" loading="lazy">
                                     <figcaption class="mt-1 text-center text-xs font-medium text-gray-400">{{ $foto['label'] }}</figcaption>
+
+                                    @if (! empty($foto['id']))
+                                        <div class="mt-1.5">
+                                            <x-photo-upload-dialog
+                                                :fieldName="'fotoGanti.'.$foto['id']"
+                                                label="Ganti foto ini"
+                                                :orderId="$order->id"
+                                                :showRemoveBtn="false"
+                                                height="h-16"
+                                                afterUploadMethod="gantiFotoKategori"
+                                                :afterUploadId="$foto['id']"
+                                            />
+                                        </div>
+                                    @endif
                                 </figure>
                             @endforeach
                         </div>

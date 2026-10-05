@@ -84,10 +84,12 @@ function fotoUploadSelesai(store) {
     }
 }
 
-function photoUpload(fieldName, orderId) {
+function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId = null) {
     return {
         fieldName,
         orderId,
+        afterUploadMethod,
+        afterUploadId,
         showDialog: false,
         preview: null,
         nama: '',
@@ -244,6 +246,17 @@ function photoUpload(fieldName, orderId) {
                     () => {
                         fotoUploadSelesai(store);
                         this.uploading = false;
+
+                        // Opsional: setelah upload selesai, panggil method
+                        // Livewire otomatis (mis. ganti foto yang sudah
+                        // tersimpan). Dipakai tombol "Ganti" di galeri.
+                        if (this.afterUploadMethod) {
+                            try {
+                                this.$wire.call(this.afterUploadMethod, this.afterUploadId);
+                            } catch (err) {
+                                this.error = 'Gagal menyimpan foto: ' + (err?.message ?? err);
+                            }
+                        }
                     },
                     (message) => {
                         // Cadangan: kalau upload lewat Livewire gagal (mis. route
