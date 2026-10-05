@@ -52,6 +52,38 @@ function compressImageFile(file, maxDimension = 1200, quality = 0.7) {
     });
 }
 
+/**
+ * Store Alpine global utk melacak berapa upload foto yang masih berjalan.
+ * Dipakai tombol submit ("Konfirmasi Selesai"/"Simpan Foto") supaya tidak
+ * bisa ditekan selagi masih ada file yang belum selesai diunggah — akar
+ * kasus "foto sudah diupload tapi tidak terbaca" (upload yang belum kelar
+ * ikut hilang saat form disubmit).
+ */
+function pastikanStoreFotoUpload() {
+    if (window.Alpine && !window.Alpine.store('fotoUpload')) {
+        window.Alpine.store('fotoUpload', { inFlight: 0 });
+    }
+}
+
+document.addEventListener('alpine:init', pastikanStoreFotoUpload);
+
+function fotoUploadMulai() {
+    pastikanStoreFotoUpload();
+
+    const store = window.Alpine?.store('fotoUpload');
+    if (store) {
+        store.inFlight++;
+    }
+
+    return store;
+}
+
+function fotoUploadSelesai(store) {
+    if (store) {
+        store.inFlight = Math.max(0, store.inFlight - 1);
+    }
+}
+
 function photoUpload(fieldName, orderId) {
     return {
         fieldName,
@@ -163,11 +195,18 @@ function photoUpload(fieldName, orderId) {
             this.preview = URL.createObjectURL(file);
             this.nama = file.name;
 
+            // Hitung dari sini (termasuk saat kompres di browser) supaya
+            // tombol submit tidak bisa ditekan sebelum file benar-benar
+            // terkirim — kalau tidak, foto yang masih diproses/upload ikut
+            // hilang saat form disubmit.
+            const store = fotoUploadMulai();
+
             // Kompres dulu supaya tidak kena limit 5 MB & upload cepat
             let compressed = file;
             try {
                 compressed = await compressImageFile(file);
             } catch (err) {
+                fotoUploadSelesai(store);
                 this.error = 'Gagal memproses foto: ' + (err?.message ?? err);
                 this.preview = null;
                 this.nama = '';
@@ -175,18 +214,19 @@ function photoUpload(fieldName, orderId) {
             }
 
             if (compressed.size > 5 * 1024 * 1024) {
+                fotoUploadSelesai(store);
                 this.error = 'Ukuran file maksimal 5 MB';
                 return;
             }
 
             // Upload real-time ke server
-            await this.uploadToServer(compressed);
+            await this.uploadToServer(compressed, store);
         },
 
         /**
          * Upload file ke server (real-time, bukan saat submit form)
          */
-        async uploadToServer(file) {
+        async uploadToServer(file, store = null) {
             this.uploading = true;
             this.error = null;
             this.progress = 0;
@@ -197,34 +237,42 @@ function photoUpload(fieldName, orderId) {
             // custom tidak dipakai lagi karena dulu mengubah property
             // menjadi string path sehingga submit error
             // "Call to a member function getSize() on string".
-            this.$wire.upload(
-                this.fieldName,
-                file,
-                () => {
-                    this.uploading = false;
-                },
-                (message) => {
-                    // Cadangan: kalau upload lewat Livewire gagal (mis. route
-                    // upload tidak terjangkau di subfolder), simpan lewat
-                    // endpoint temp-photo lama. Server akan mengambil foto dari
-                    // record `temporary_photo_uploads` saat tombol simpan ditekan.
-                    this.uploadToLegacy(file).then((ok) => {
+            try {
+                this.$wire.upload(
+                    this.fieldName,
+                    file,
+                    () => {
+                        fotoUploadSelesai(store);
                         this.uploading = false;
-                        if (ok) {
-                            this.error = null;
+                    },
+                    (message) => {
+                        // Cadangan: kalau upload lewat Livewire gagal (mis. route
+                        // upload tidak terjangkau di subfolder), simpan lewat
+                        // endpoint temp-photo lama. Server akan mengambil foto dari
+                        // record `temporary_photo_uploads` saat tombol simpan ditekan.
+                        this.uploadToLegacy(file).then((ok) => {
+                            fotoUploadSelesai(store);
+                            this.uploading = false;
+                            if (ok) {
+                                this.error = null;
 
-                            return;
-                        }
+                                return;
+                            }
 
-                        this.error = 'Gagal upload foto: ' + message;
-                        this.preview = null;
-                        this.nama = '';
-                    });
-                },
-                (event) => {
-                    this.progress = event.detail.progress;
-                }
-            );
+                            this.error = 'Gagal upload foto: ' + message;
+                            this.preview = null;
+                            this.nama = '';
+                        });
+                    },
+                    (event) => {
+                        this.progress = event.detail.progress;
+                    }
+                );
+            } catch (err) {
+                fotoUploadSelesai(store);
+                this.uploading = false;
+                this.error = 'Gagal upload foto: ' + (err?.message ?? err);
+            }
         },
 
         /**

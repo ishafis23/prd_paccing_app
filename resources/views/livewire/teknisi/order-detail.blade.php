@@ -546,9 +546,12 @@
                 Ini pekerjaan klaim/garansi (tidak ditagih)
             </label>
 
-            <button type="submit" wire:loading.attr="disabled"
+            <button type="submit" wire:loading.attr="disabled" x-data
+                x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
+                x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="w-full rounded-full bg-blue-600 py-3 font-bold text-white shadow-md shadow-blue-200 active:bg-blue-700">
-                Konfirmasi Selesai
+                <span x-show="($store.fotoUpload?.inFlight ?? 0) === 0">Konfirmasi Selesai</span>
+                <span x-show="($store.fotoUpload?.inFlight ?? 0) > 0" x-cloak>Menunggu foto selesai diunggah…</span>
             </button>
         </form>
     @endif
@@ -601,7 +604,9 @@
                     @error('fotoSesudahBaru') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
             </div>
-            <button type="button" wire:click="simpanPerbaikanFoto" wire:loading.attr="disabled"
+            <button type="button" wire:click="simpanPerbaikanFoto" wire:loading.attr="disabled" x-data
+                x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
+                x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="w-full rounded-full bg-blue-600 py-3 font-bold text-white shadow-md shadow-blue-200 active:bg-blue-700">
                 Simpan Foto
             </button>
@@ -702,7 +707,9 @@
                     @enderror
                 @endforeach
             </div>
-            <button type="submit" wire:loading.attr="disabled"
+            <button type="submit" wire:loading.attr="disabled" x-data
+                x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
+                x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="mt-3 w-full rounded-full bg-amber-600 py-2.5 text-sm font-bold text-white active:bg-amber-700">
                 Simpan Foto
             </button>
@@ -752,7 +759,9 @@
                 <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
             @enderror
 
-            <button type="submit" wire:loading.attr="disabled"
+            <button type="submit" wire:loading.attr="disabled" x-data
+                x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
+                x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
                 class="mt-3 w-full rounded-full bg-sky-600 py-2.5 text-sm font-bold text-white active:bg-sky-700">
                 Simpan Foto
             </button>

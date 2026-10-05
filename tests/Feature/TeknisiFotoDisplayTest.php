@@ -159,6 +159,21 @@ it('form teknisi bisa mengunggah foto pengganti sebelum setelah laporan disubmit
     Storage::disk('public')->assertMissing('work-reports/sebelum.jpg');
 });
 
+it('section foto lokasi tidak merender unit 0 palsu (range(1, 0)) yang bikin foto seolah tidak terbaca', function () {
+    $teknisi = ($this->mkTeknisi)();
+    $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);
+
+    $html = Livewire::actingAs($teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->html();
+
+    // unitCounts lokasi = 0 (non-repeatable); range(1, 0) = [1, 0] memunculkan
+    // slot "unit 0" yang kalau diisi tersimpan dgn unit_number=0 lalu dianggap
+    // belum diisi oleh fotoPerLayananKurang (teknisi jadi foto 2x).
+    expect($html)->not->toContain('fotoPerLayanan.lokasi.0.');
+    expect($html)->toContain('fotoPerLayanan.lokasi.1.lokasi');
+});
+
 it('slot foto per layanan menampilkan elemen preview gambar, bukan cuma teks Terpilih', function () {
     $teknisi = ($this->mkTeknisi)();
     $order = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Dikerjakan]);

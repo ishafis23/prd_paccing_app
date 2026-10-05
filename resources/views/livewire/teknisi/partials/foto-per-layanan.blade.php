@@ -77,8 +77,13 @@
                 {{-- Show units section if not skipped --}}
                 @if (!$this->isSectionSkipped($type))
                     <div class="space-y-3">
-                        {{-- Units loop --}}
-                        @foreach (range(1, $this->unitCounts[$type] ?? 1) as $unit)
+                        {{-- Units loop: non-repeatable (lokasi) unitCounts-nya 0
+                             sehingga range(1, 0) menghasilkan [1, 0] — muncul slot
+                             "unit 0" palsu yang kalau diisi tersimpan dengan
+                             unit_number=0 lalu dianggap "belum diisi" oleh
+                             fotoPerLayananKurang (foto seolah tidak terbaca).
+                             Paksa minimal 1 supaya tidak ada unit 0. --}}
+                        @foreach (range(1, max(1, $this->unitCounts[$type] ?? 1)) as $unit)
                             <div class="space-y-2 rounded-lg bg-white p-2">
                                 {{-- Unit header (hanya tampil jika repeatable) --}}
                                 @if ($struktur['repeatable'])
