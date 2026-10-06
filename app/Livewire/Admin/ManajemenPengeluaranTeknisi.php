@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Admin;
 
+use App\Enums\RoleName;
 use App\Models\TeknisiExpense;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
@@ -34,6 +36,34 @@ class ManajemenPengeluaranTeknisi extends Component
     public bool $isApproving = false;
 
     public string $approvalAction = 'approve'; // approve atau reject
+
+    private const NOMINAL_RULE = 'required|integer|min:1000|max:5000000';
+
+    /**
+     * Hanya owner/admin/finance yang boleh memproses pengeluaran.
+     */
+    private function authorizeAcc(): void
+    {
+        $user = auth()->user();
+
+        if (! $user || ! $user->hasAnyRole([RoleName::Owner->value, RoleName::Admin->value, RoleName::Finance->value])) {
+            throw new AuthorizationException('Anda tidak berwenang memproses pengeluaran.');
+        }
+    }
+
+    /**
+     * Hanya pengeluaran berstatus pending yang boleh diproses.
+     */
+    private function pastikanPending(TeknisiExpense $expense): bool
+    {
+        if ($expense->status !== 'pending') {
+            session()->flash('error', 'Hanya pengeluaran berstatus menunggu yang bisa diproses.');
+
+            return false;
+        }
+
+        return true;
+    }
 
     public function mount(): void
     {
@@ -107,6 +137,12 @@ class ManajemenPengeluaranTeknisi extends Component
      */
     public function openApproval(TeknisiExpense $expense, string $action = 'approve'): void
     {
+        $this->authorizeAcc();
+
+        if (! $this->pastikanPending($expense)) {
+            return;
+        }
+
         $this->selectedExpense = $expense;
         $this->approvalNominal = $expense->nominal;
         $this->approvalAction = $action;
@@ -129,7 +165,18 @@ class ManajemenPengeluaranTeknisi extends Component
      */
     public function submitApproval(): void
     {
+        $this->authorizeAcc();
+
         if (! $this->selectedExpense) {
+            return;
+        }
+
+        // Segarkan dari DB: status bisa berubah sejak modal dibuka.
+        $this->selectedExpense->refresh();
+
+        if (! $this->pastikanPending($this->selectedExpense)) {
+            $this->closeApproval();
+
             return;
         }
 
@@ -142,7 +189,7 @@ class ManajemenPengeluaranTeknisi extends Component
             ]);
         } else {
             $this->validate([
-                'approvalNominal' => 'required|integer|min:1000|max:5000000',
+                'approvalNominal' => self::NOMINAL_RULE,
             ]);
         }
 
@@ -183,6 +230,18 @@ class ManajemenPengeluaranTeknisi extends Component
      */
     public function quickApprove(TeknisiExpense $expense): void
     {
+        $this->authorizeAcc();
+
+        if (! $this->pastikanPending($expense)) {
+            return;
+        }
+
+        if (validator(['nominal' => $expense->nominal], ['nominal' => self::NOMINAL_RULE])->fails()) {
+            session()->flash('error', 'Nominal di luar batas 1.000–5.000.000; gunakan form persetujuan untuk mengoreksi.');
+
+            return;
+        }
+
         try {
             $expense->update([
                 'status' => 'approved',
