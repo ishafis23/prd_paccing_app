@@ -77,7 +77,7 @@
                 <select wire:model.live="filterTeknisi" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
                     <option value="">Semua</option>
                     @foreach ($this->teknisList as $tech)
-                        <option value="{{ $tech->id }}">{{ $tech->nama }}</option>
+                        <option value="{{ $tech->id }}">{{ $tech->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -146,7 +146,7 @@
                     @foreach ($this->expenses as $expense)
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-2 text-xs font-medium text-gray-900">
-                                {{ $expense->teknisi->nama ?? '-' }}
+                                {{ $expense->teknisi->name ?? '-' }}
                             </td>
                             <td class="px-4 py-2 text-xs">
                                 <span>{{ $this->getKategoriLabel($expense->kategori) }}</span>
@@ -231,7 +231,7 @@
                         <h2 class="font-bold text-gray-900">
                             {{ $approvalAction === 'approve' ? 'Setujui' : 'Tolak' }} Pengeluaran
                         </h2>
-                        <p class="text-xs text-gray-500">Teknisi: {{ $selectedExpense->teknisi->nama }}</p>
+                        <p class="text-xs text-gray-500">Teknisi: {{ $selectedExpense->teknisi->name }}</p>
                     </div>
                     <button
                         type="button"

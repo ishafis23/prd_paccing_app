@@ -224,3 +224,11 @@ it('ACC: role tanpa wewenang ditolak di semua aksi', function (string $role) {
 
     expect($e->fresh()->status)->toBe('pending');
 })->with(['teknisi', 'hr']);
+
+
+it('ACC: halaman menampilkan daftar teknisi di filter & nama pelapor', function () {
+    $e = akExpense();
+
+    Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
+        ->assertSee($e->teknisi->name);
+});

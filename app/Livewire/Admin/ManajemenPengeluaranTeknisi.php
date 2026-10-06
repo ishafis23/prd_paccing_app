@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\RoleName;
+use App\Enums\UserStatus;
 use App\Models\TeknisiExpense;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -126,10 +127,10 @@ class ManajemenPengeluaranTeknisi extends Component
     #[Computed]
     public function teknisList(): \Illuminate\Database\Eloquent\Collection
     {
-        return User::where('role', 'teknisi')
-            ->where('aktif', true)
-            ->orderBy('nama')
-            ->get(['id', 'nama']);
+        return User::role(RoleName::Teknisi->value)
+            ->where('status', UserStatus::Aktif->value)
+            ->orderBy('name')
+            ->get(['users.id', 'users.name']);
     }
 
     /**
