@@ -18,29 +18,29 @@
     @endif
 
     {{-- Summary Cards --}}
-    <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div class="flex flex-wrap gap-3">
         {{-- Pending total --}}
-        <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        <div class="min-w-[9rem] flex-1 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
             <p class="text-xs font-medium text-gray-500">Menunggu Persetujuan</p>
             <p class="mt-1 text-lg font-bold text-yellow-600">{{ $this->summaryBulan['count_pending'] ?? 0 }}</p>
             <p class="text-xs text-gray-400">{{ $this->formatRupiah($this->summaryBulan['total_pending'] ?? 0) }}</p>
         </div>
 
         {{-- Approved total --}}
-        <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        <div class="min-w-[9rem] flex-1 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
             <p class="text-xs font-medium text-gray-500">Sudah Disetujui</p>
             <p class="mt-1 text-lg font-bold text-green-600">{{ $this->summaryBulan['count_approved'] ?? 0 }}</p>
             <p class="text-xs text-gray-400">{{ $this->formatRupiah($this->summaryBulan['total_approved'] ?? 0) }}</p>
         </div>
 
         {{-- Rejected total --}}
-        <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        <div class="min-w-[9rem] flex-1 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
             <p class="text-xs font-medium text-gray-500">Ditolak</p>
             <p class="mt-1 text-lg font-bold text-red-600">{{ $this->summaryBulan['total_rejected'] ?? 0 }}</p>
         </div>
 
         {{-- Month total --}}
-        <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        <div class="min-w-[9rem] flex-1 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
             <p class="text-xs font-medium text-gray-500">Total Bulan Ini</p>
             <p class="mt-1 text-lg font-bold text-blue-600">
                 {{ $this->formatRupiah(($this->summaryBulan['total_pending'] ?? 0) + ($this->summaryBulan['total_approved'] ?? 0)) }}
