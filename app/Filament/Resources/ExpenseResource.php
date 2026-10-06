@@ -22,6 +22,12 @@ class ExpenseResource extends BaseResource
 
     protected static ?string $navigationGroup = 'Finance';
 
+    /** Disembunyikan sementara dari sidebar; halaman tetap bisa dibuka via URL. Hapus method ini untuk mengaktifkan lagi. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with('order.customer');
