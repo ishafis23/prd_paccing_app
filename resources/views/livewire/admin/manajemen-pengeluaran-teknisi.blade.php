@@ -256,9 +256,8 @@
                 {{ $this->expenses->links() }}
             </div>
         @else
-            <div class="px-4 py-8 text-center">
-                <x-heroicon-o-inbox class="mx-auto h-12 w-12 text-gray-300" />
-                <p class="mt-2 text-sm text-gray-500">Tidak ada pengeluaran</p>
+            <div class="px-4 py-6 text-center">
+                <p class="text-sm text-gray-500">Tidak ada pengeluaran</p>
             </div>
         @endif
     </div>
