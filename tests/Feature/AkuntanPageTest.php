@@ -158,39 +158,55 @@ function akExpense(string $status = 'pending', int $nominal = 20000): TeknisiExp
     ]);
 }
 
-it('ACC: pending bisa disetujui dengan nominal koreksi', function () {
+it('ACC: pending disetujui langsung tanpa modal', function () {
     $e = akExpense();
     $admin = akUser('admin');
 
     Livewire::actingAs($admin)->test(ManajemenPengeluaranTeknisi::class)
-        ->call('openApproval', $e->id, 'approve')
-        ->set('approvalNominal', 25000)
-        ->call('submitApproval');
+        ->call('quickApprove', $e->id);
 
-    expect($e->fresh())->status->toBe('approved')->nominal->toBe(25000)->approved_by->toBe($admin->id);
+    expect($e->fresh())->status->toBe('approved')->approved_by->toBe($admin->id);
 });
 
-it('ACC: pengeluaran yang sudah ditolak/disetujui tidak bisa diproses ulang', function (string $status) {
-    $e = akExpense($status);
+it('ACC: tolak lewat modal wajib alasan, lalu bisa diganti jadi setuju', function () {
+    $e = akExpense();
+    $lw = Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
+        ->call('openApproval', $e->id)
+        ->call('submitApproval')
+        ->assertHasErrors('approvalCatatan')
+        ->set('approvalCatatan', 'Nota tidak jelas')
+        ->call('submitApproval')
+        ->assertHasNoErrors();
 
-    Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
-        ->call('quickApprove', $e->id)
-        ->call('openApproval', $e->id, 'approve')
-        ->assertSet('selectedExpense', null);
+    expect($e->fresh())->status->toBe('rejected')->catatan_approval->toBe('Nota tidak jelas');
 
-    expect($e->fresh()->status)->toBe($status);
-})->with(['rejected', 'approved']);
+    $lw->call('quickApprove', $e->id);
+
+    expect($e->fresh())->status->toBe('approved')->catatan_approval->toBeNull();
+});
+
+it('ACC: yang sudah disetujui bisa ditolak (koreksi), tapi tidak bisa disetujui dua kali', function () {
+    $e = akExpense('approved');
+    $lw = Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
+        ->call('openApproval', $e->id)
+        ->set('approvalCatatan', 'Salah input nominal')
+        ->call('submitApproval');
+
+    expect($e->fresh()->status)->toBe('rejected');
+
+    $lw->call('openApproval', $e->id)->assertSet('selectedExpense', null);
+});
 
 it('ACC: status yang berubah saat modal terbuka tidak menimpa keputusan lain', function () {
     $e = akExpense();
     $lw = Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
-        ->call('openApproval', $e->id, 'approve')
-        ->set('approvalNominal', 30000);
+        ->call('openApproval', $e->id)
+        ->set('approvalCatatan', 'Tidak sesuai');
 
     $e->update(['status' => 'rejected']);
-    $lw->call('submitApproval');
+    $lw->call('submitApproval')->assertSet('selectedExpense', null);
 
-    expect($e->fresh())->status->toBe('rejected')->nominal->toBe(20000);
+    expect($e->fresh())->status->toBe('rejected')->catatan_approval->toBeNull();
 });
 
 it('ACC: quickApprove menolak nominal di luar batas', function (int $nominal) {
@@ -219,7 +235,7 @@ it('ACC: role tanpa wewenang ditolak di semua aksi', function (string $role) {
         ->assertForbidden();
 
     Livewire::actingAs(akUser($role))->test(ManajemenPengeluaranTeknisi::class)
-        ->call('openApproval', $e->id, 'approve')
+        ->call('openApproval', $e->id)
         ->assertForbidden();
 
     expect($e->fresh()->status)->toBe('pending');

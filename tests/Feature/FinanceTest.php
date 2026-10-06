@@ -1,12 +1,14 @@
 <?php
 
 use App\Enums\ExpenseCategory;
-use App\Enums\IncomeCategory;
+use App\Enums\OrderStatus;
 use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Expense;
-use App\Models\Income;
 use App\Models\Order;
+use App\Models\Payment;
+use App\Models\ServiceCatalog;
+use App\Models\TeknisiExpense;
 use App\Models\User;
 use App\Services\FinanceService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -75,33 +77,62 @@ it('teknisi tidak boleh mencatat pengeluaran', function () {
     $this->financeService->createExpense(ExpenseCategory::Material, 10000, $teknisi);
 })->throws(AuthorizationException::class);
 
-it('laba rugi bulan berjalan: pendapatan - pengeluaran + breakdown kategori', function () {
+function orderLunasUntukLaba(ServiceCatalog $katalog, string $tanggal): Order
+{
+    $order = Order::factory()->create([
+        'service_catalog_id' => $katalog->id,
+        'status' => OrderStatus::Selesai,
+    ]);
+
+    Payment::factory()->lunas()->create([
+        'order_id' => $order->id,
+        'total_tagihan' => $katalog->harga,
+        'tanggal_bayar' => $tanggal,
+    ]);
+
+    return $order;
+}
+
+it('laba rugi bulan berjalan: sumber Akuntan (order selesai + expenses + teknisi approved) + breakdown', function () {
+    $hari = now()->toDateString();
+
     // Pendapatan: jasa 100rb + material 3,5jt
-    Income::factory()->create(['kategori' => IncomeCategory::Jasa, 'nominal' => 100000, 'tanggal' => now()->toDateString()]);
-    Income::factory()->create(['kategori' => IncomeCategory::Material, 'nominal' => 3500000, 'tanggal' => now()->toDateString()]);
+    orderLunasUntukLaba(ServiceCatalog::factory()->create(['harga' => 100000]), $hari);
+    orderLunasUntukLaba(ServiceCatalog::factory()->pengadaan()->create(), $hari);
 
-    // Pengeluaran: material 500rb, perawatan 200rb, operasional 150rb
-    Expense::factory()->create(['kategori' => ExpenseCategory::Material, 'nominal' => 500000, 'tanggal' => now()->toDateString()]);
-    Expense::factory()->create(['kategori' => ExpenseCategory::Perawatan, 'nominal' => 200000, 'tanggal' => now()->toDateString()]);
-    Expense::factory()->create(['kategori' => ExpenseCategory::Operasional, 'nominal' => 150000, 'tanggal' => now()->toDateString()]);
+    // Pengeluaran admin: material 500rb, perawatan 200rb, operasional 150rb
+    Expense::factory()->create(['kategori' => ExpenseCategory::Material, 'nominal' => 500000, 'tanggal' => $hari]);
+    Expense::factory()->create(['kategori' => ExpenseCategory::Perawatan, 'nominal' => 200000, 'tanggal' => $hari]);
+    Expense::factory()->create(['kategori' => ExpenseCategory::Operasional, 'nominal' => 150000, 'tanggal' => $hari]);
 
-    // Di luar periode (bulan lalu) — tidak ikut
-    Income::factory()->create(['kategori' => IncomeCategory::Jasa, 'nominal' => 999999, 'tanggal' => now()->subMonths(2)->toDateString()]);
+    // Pengeluaran teknisi: approved ikut (bensin -> operasional, material -> material); pending/rejected tidak
+    $teknisi = userBerRole(RoleName::Teknisi);
+    $buat = fn (string $kategori, string $status, int $nominal) => TeknisiExpense::create([
+        'teknisi_id' => $teknisi->id, 'tanggal_input' => $hari, 'kategori' => $kategori,
+        'nominal' => $nominal, 'status' => $status,
+    ]);
+    $buat('bensin', 'approved', 20000);
+    $buat('material', 'approved', 30000);
+    $buat('bensin', 'pending', 99000);
+    $buat('makan', 'rejected', 88000);
+
+    // Di luar periode — tidak ikut
+    orderLunasUntukLaba(ServiceCatalog::factory()->create(['harga' => 999999]), now()->subMonths(2)->toDateString());
 
     $laporan = $this->financeService->labaRugi();
 
     expect($laporan['pendapatan'])->toBe(3600000.0)
         ->and($laporan['pendapatan_jasa'])->toBe(100000.0)
         ->and($laporan['pendapatan_material'])->toBe(3500000.0)
-        ->and($laporan['pengeluaran'])->toBe(850000.0)
-        ->and($laporan['pengeluaran_material'])->toBe(500000.0)
+        ->and($laporan['pengeluaran'])->toBe(900000.0)
+        ->and($laporan['pengeluaran_material'])->toBe(530000.0)
         ->and($laporan['pengeluaran_perawatan'])->toBe(200000.0)
-        ->and($laporan['pengeluaran_operasional'])->toBe(150000.0)
-        ->and($laporan['laba_rugi'])->toBe(2750000.0);
+        ->and($laporan['pengeluaran_operasional'])->toBe(170000.0)
+        ->and($laporan['laba_rugi'])->toBe(2700000.0);
 });
 
 it('laba rugi bisa difilter rentang tanggal custom', function () {
-    Income::factory()->create(['kategori' => IncomeCategory::Jasa, 'nominal' => 50000, 'tanggal' => '2026-08-10']);
+    orderLunasUntukLaba(ServiceCatalog::factory()->create(['harga' => 50000]), '2026-08-10');
     Expense::factory()->create(['kategori' => ExpenseCategory::Operasional, 'nominal' => 20000, 'tanggal' => '2026-08-12']);
 
     $laporan = $this->financeService->labaRugi(

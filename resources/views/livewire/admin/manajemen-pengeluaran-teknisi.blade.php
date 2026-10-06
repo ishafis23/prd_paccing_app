@@ -48,9 +48,29 @@
         </div>
     </div>
 
+    {{-- Tab status --}}
+    @php
+        $tabs = [
+            'pending' => ['Menunggu', $this->summaryBulan['count_pending'] ?? 0],
+            'approved' => ['Disetujui', $this->summaryBulan['count_approved'] ?? 0],
+            'rejected' => ['Ditolak', $this->summaryBulan['count_rejected'] ?? 0],
+            '' => ['Semua', null],
+        ];
+    @endphp
+    <div class="flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-100">
+        @foreach ($tabs as $key => [$label, $count])
+            <button
+                type="button"
+                wire:click="$set('filterStatus', '{{ $key }}')"
+                class="rounded-lg px-4 py-2 text-xs font-semibold transition {{ $filterStatus === (string) $key ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">
+                {{ $label }}@if ($count !== null) <span class="ml-1 opacity-80">({{ $count }})</span>@endif
+            </button>
+        @endforeach
+    </div>
+
     {{-- Filters --}}
     <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
-        <div class="grid grid-cols-2 gap-2 md:grid-cols-5">
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
             {{-- Month filter --}}
             <div>
                 <label class="block text-xs font-medium text-gray-600">Bulan</label>
@@ -58,17 +78,6 @@
                     type="month"
                     wire:model.live="filterBulan"
                     class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
-            </div>
-
-            {{-- Status filter --}}
-            <div>
-                <label class="block text-xs font-medium text-gray-600">Status</label>
-                <select wire:model.live="filterStatus" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
-                    <option value="pending">Menunggu</option>
-                    <option value="approved">Disetujui</option>
-                    <option value="rejected">Ditolak</option>
-                    <option value="">Semua</option>
-                </select>
             </div>
 
             {{-- Teknisi filter --}}
@@ -151,7 +160,7 @@
                             <td class="px-4 py-2 text-xs">
                                 <span>{{ $this->getKategoriLabel($expense->kategori) }}</span>
                                 @if ($expense->keterangan)
-                                    <p class="text-[11px] text-gray-500">{{ substr($expense->keterangan, 0, 40) }}...</p>
+                                    <p class="text-[11px] text-gray-500">{{ \Illuminate\Support\Str::limit($expense->keterangan, 40) }}</p>
                                 @endif
                                 @if ($expense->qty && $expense->harga)
                                     <p class="text-[11px] text-gray-400">{{ $expense->qty }} × {{ $this->formatRupiah($expense->harga) }}</p>
@@ -180,28 +189,27 @@
                                 </span>
                             </td>
                             <td class="px-4 py-2 text-xs">
-                                @if ($expense->status === 'pending')
-                                    <div class="flex gap-1">
+                                <div class="flex gap-1">
+                                    @if ($expense->status !== 'approved')
                                         <button
                                             type="button"
-                                            wire:click="openApproval({{ $expense->id }}, 'approve')"
-                                            class="rounded px-2 py-1 text-green-600 hover:bg-green-50 font-medium">
+                                            wire:click="quickApprove({{ $expense->id }})"
+                                            wire:loading.attr="disabled"
+                                            class="rounded px-2 py-1 font-medium text-green-600 hover:bg-green-50 disabled:opacity-50">
                                             Setuju
                                         </button>
+                                    @endif
+                                    @if ($expense->status !== 'rejected')
                                         <button
                                             type="button"
-                                            wire:click="openApproval({{ $expense->id }}, 'reject')"
-                                            class="rounded px-2 py-1 text-red-600 hover:bg-red-50 font-medium">
+                                            wire:click="openApproval({{ $expense->id }})"
+                                            class="rounded px-2 py-1 font-medium text-red-600 hover:bg-red-50">
                                             Tolak
                                         </button>
-                                    </div>
-                                @else
-                                    <button
-                                        type="button"
-                                        wire:click="$set('selectedExpense', $expense)"
-                                        class="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                                        Detail
-                                    </button>
+                                    @endif
+                                </div>
+                                @if ($expense->status === 'rejected' && $expense->catatan_approval)
+                                    <p class="mt-1 text-[11px] text-red-500">Alasan: {{ $expense->catatan_approval }}</p>
                                 @endif
                             </td>
                         </tr>
@@ -229,7 +237,7 @@
                 <div class="flex items-start justify-between">
                     <div>
                         <h2 class="font-bold text-gray-900">
-                            {{ $approvalAction === 'approve' ? 'Setujui' : 'Tolak' }} Pengeluaran
+                            Tolak Pengeluaran
                         </h2>
                         <p class="text-xs text-gray-500">Teknisi: {{ $selectedExpense->teknisi->name }}</p>
                     </div>
@@ -275,18 +283,6 @@
 
                 {{-- Approval Form --}}
                 <form wire:submit="submitApproval" class="space-y-3">
-                    @if ($approvalAction === 'approve')
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700">Nominal Disetujui (Rp)</label>
-                            <input
-                                type="number"
-                                wire:model="approvalNominal"
-                                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            @error('approvalNominal')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-                    @else
                         <div>
                             <label class="block text-xs font-medium text-gray-700">Alasan Penolakan</label>
                             <textarea
@@ -298,27 +294,14 @@
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
-                    @endif
-
-                    {{-- Optional notes for approve --}}
-                    @if ($approvalAction === 'approve')
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700">Catatan (Opsional)</label>
-                            <input
-                                type="text"
-                                wire:model="approvalCatatan"
-                                placeholder="Contoh: Disesuaikan karena..."
-                                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                        </div>
-                    @endif
 
                     {{-- Action buttons --}}
                     <div class="flex gap-2">
                         <button
                             type="submit"
                             wire:loading.attr="disabled"
-                            class="flex-1 rounded-lg {{ $approvalAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700' }} py-2 font-semibold text-white disabled:opacity-50">
-                            <span wire:loading.remove>{{ $approvalAction === 'approve' ? 'Setujui' : 'Tolak' }}</span>
+                            class="flex-1 rounded-lg bg-red-600 py-2 font-semibold text-white disabled:opacity-50">
+                            <span wire:loading.remove>Tolak</span>
                             <span wire:loading><x-heroicon-o-arrow-path class="inline h-4 w-4 animate-spin" /></span>
                         </button>
                         <button

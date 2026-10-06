@@ -20,6 +20,12 @@ class IncomeResource extends BaseResource
 
     protected static ?string $navigationGroup = 'Finance';
 
+    /** Disembunyikan dari sidebar: angka resmi ada di halaman Akuntan. Halaman tetap bisa dibuka via URL. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([]);

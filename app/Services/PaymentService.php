@@ -9,7 +9,6 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\ReminderStatus;
 use App\Enums\RoleName;
-use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Income;
 use App\Models\Order;
@@ -150,10 +149,7 @@ class PaymentService
 
     private function catatIncome(Order $order, Payment $payment): void
     {
-        $jenisLayanan = $order->serviceCatalog?->jenis_layanan;
-        $kategori = in_array($jenisLayanan, [ServiceType::CuciAc, ServiceType::ServiceAc], true)
-            ? IncomeCategory::Jasa
-            : IncomeCategory::Material;
+        $kategori = IncomeCategory::untukLayanan($order->serviceCatalog?->jenis_layanan);
 
         $exists = Income::where('order_id', $order->id)->where('kategori', $kategori->value)->exists();
 

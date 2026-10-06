@@ -64,20 +64,29 @@ class FinanceService
         $dari ??= now()->startOfMonth();
         $sampai ??= now()->endOfMonth();
 
-        $pendapatan = fn () => \App\Models\Income::whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()]);
-        $pengeluaran = fn () => Expense::whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()]);
+        $akuntan = app(AkuntanService::class);
+        $pendapatan = $akuntan->pendapatan($dari, $sampai);
+        $pengeluaran = $akuntan->pengeluaran($dari, $sampai)->filter(fn (array $r): bool => $r['dihitung']);
 
-        $totalPendapatan = (float) $pendapatan()->sum('nominal');
-        $totalPengeluaran = (float) $pengeluaran()->sum('nominal');
+        $pendapatanPer = fn (IncomeCategory $k): float => (float) $pendapatan->where('kategori', $k)->sum('total');
+        // Pengeluaran teknisi (bensin/makan/dll.) masuk operasional; 'material' tetap material.
+        $pengeluaranPer = fn (ExpenseCategory $k): float => (float) $pengeluaran->filter(
+            fn (array $r): bool => $r['kategori'] === $k->value
+                || ($k === ExpenseCategory::Operasional && $r['sumber'] === 'Teknisi'
+                    && ! in_array($r['kategori'], array_column(ExpenseCategory::cases(), 'value'), true))
+        )->sum('nominal');
+
+        $totalPendapatan = (float) $pendapatan->sum('total');
+        $totalPengeluaran = (float) $pengeluaran->sum('nominal');
 
         return [
             'pendapatan' => $totalPendapatan,
-            'pendapatan_jasa' => (float) (clone $pendapatan())->where('kategori', IncomeCategory::Jasa->value)->sum('nominal'),
-            'pendapatan_material' => (float) (clone $pendapatan())->where('kategori', IncomeCategory::Material->value)->sum('nominal'),
+            'pendapatan_jasa' => $pendapatanPer(IncomeCategory::Jasa),
+            'pendapatan_material' => $pendapatanPer(IncomeCategory::Material),
             'pengeluaran' => $totalPengeluaran,
-            'pengeluaran_material' => (float) (clone $pengeluaran())->where('kategori', ExpenseCategory::Material->value)->sum('nominal'),
-            'pengeluaran_perawatan' => (float) (clone $pengeluaran())->where('kategori', ExpenseCategory::Perawatan->value)->sum('nominal'),
-            'pengeluaran_operasional' => (float) (clone $pengeluaran())->where('kategori', ExpenseCategory::Operasional->value)->sum('nominal'),
+            'pengeluaran_material' => $pengeluaranPer(ExpenseCategory::Material),
+            'pengeluaran_perawatan' => $pengeluaranPer(ExpenseCategory::Perawatan),
+            'pengeluaran_operasional' => $pengeluaranPer(ExpenseCategory::Operasional),
             'laba_rugi' => round($totalPendapatan - $totalPengeluaran, 2),
         ];
     }

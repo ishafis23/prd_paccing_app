@@ -29,14 +29,8 @@ class ManajemenPengeluaranTeknisi extends Component
     // Approval form
     public ?TeknisiExpense $selectedExpense = null;
 
-    public ?int $approvalNominal = null;
-
     #[Validate('nullable|string|max:500')]
     public string $approvalCatatan = '';
-
-    public bool $isApproving = false;
-
-    public string $approvalAction = 'approve'; // approve atau reject
 
     private const NOMINAL_RULE = 'required|integer|min:1000|max:5000000';
 
@@ -53,12 +47,13 @@ class ManajemenPengeluaranTeknisi extends Component
     }
 
     /**
-     * Hanya pengeluaran berstatus pending yang boleh diproses.
+     * Keputusan bisa diubah selama status tujuan berbeda dari status sekarang
+     * (pending -> setuju/tolak, tolak -> setuju, setuju -> tolak).
      */
-    private function pastikanPending(TeknisiExpense $expense): bool
+    private function pastikanBisaDiubah(TeknisiExpense $expense, string $statusTujuan): bool
     {
-        if ($expense->status !== 'pending') {
-            session()->flash('error', 'Hanya pengeluaran berstatus menunggu yang bisa diproses.');
+        if ($expense->status === $statusTujuan) {
+            session()->flash('error', 'Pengeluaran sudah berstatus tersebut.');
 
             return false;
         }
@@ -87,6 +82,7 @@ class ManajemenPengeluaranTeknisi extends Component
             'total_rejected' => $expenses->where('status', 'rejected')->sum('nominal'),
             'count_pending' => $expenses->where('status', 'pending')->count(),
             'count_approved' => $expenses->where('status', 'approved')->count(),
+            'count_rejected' => $expenses->where('status', 'rejected')->count(),
         ];
     }
 
@@ -115,7 +111,7 @@ class ManajemenPengeluaranTeknisi extends Component
         }
 
         return $query->with('teknisi', 'approvedBy')
-            ->orderBy('status', 'asc') // pending first
+            ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END") // pending dulu
             ->orderBy('tanggal_input', 'desc')
             ->orderBy('id', 'desc')
             ->paginate(20);
@@ -134,35 +130,28 @@ class ManajemenPengeluaranTeknisi extends Component
     }
 
     /**
-     * Open approval modal
+     * Buka modal tolak (alasan wajib). Pending dan yang sudah disetujui bisa ditolak.
      */
-    public function openApproval(TeknisiExpense $expense, string $action = 'approve'): void
+    public function openApproval(TeknisiExpense $expense): void
     {
         $this->authorizeAcc();
 
-        if (! $this->pastikanPending($expense)) {
+        if (! $this->pastikanBisaDiubah($expense, 'rejected')) {
             return;
         }
 
         $this->selectedExpense = $expense;
-        $this->approvalNominal = $expense->nominal;
-        $this->approvalAction = $action;
         $this->approvalCatatan = '';
     }
 
-    /**
-     * Close approval modal
-     */
     public function closeApproval(): void
     {
         $this->selectedExpense = null;
-        $this->approvalNominal = null;
-        $this->approvalAction = 'approve';
         $this->approvalCatatan = '';
     }
 
     /**
-     * Submit approval/rejection
+     * Konfirmasi penolakan dari modal.
      */
     public function submitApproval(): void
     {
@@ -175,85 +164,56 @@ class ManajemenPengeluaranTeknisi extends Component
         // Segarkan dari DB: status bisa berubah sejak modal dibuka.
         $this->selectedExpense->refresh();
 
-        if (! $this->pastikanPending($this->selectedExpense)) {
+        if (! $this->pastikanBisaDiubah($this->selectedExpense, 'rejected')) {
             $this->closeApproval();
 
             return;
         }
 
-        if ($this->approvalAction === 'reject') {
-            $this->validate([
-                'approvalCatatan' => 'required|string|min:5',
-            ], [
-                'approvalCatatan.required' => 'Catatan penolakan wajib diisi.',
-                'approvalCatatan.min' => 'Catatan minimal 5 karakter.',
-            ]);
-        } else {
-            $this->validate([
-                'approvalNominal' => self::NOMINAL_RULE,
-            ]);
-        }
+        $this->validate([
+            'approvalCatatan' => 'required|string|min:5|max:500',
+        ], [
+            'approvalCatatan.required' => 'Catatan penolakan wajib diisi.',
+            'approvalCatatan.min' => 'Catatan minimal 5 karakter.',
+        ]);
 
-        $this->isApproving = true;
+        $this->selectedExpense->update([
+            'status' => 'rejected',
+            'approved_by' => auth()->id(),
+            'catatan_approval' => $this->approvalCatatan,
+            'tanggal_approve' => now(),
+        ]);
 
-        try {
-            if ($this->approvalAction === 'approve') {
-                $this->selectedExpense->update([
-                    'status' => 'approved',
-                    'approved_by' => auth()->id(),
-                    'nominal' => $this->approvalNominal,
-                    'catatan_approval' => $this->approvalCatatan ?: null,
-                    'tanggal_approve' => now(),
-                ]);
-
-                session()->flash('status', 'Pengeluaran disetujui.');
-            } else {
-                $this->selectedExpense->update([
-                    'status' => 'rejected',
-                    'approved_by' => auth()->id(),
-                    'catatan_approval' => $this->approvalCatatan,
-                    'tanggal_approve' => now(),
-                ]);
-
-                session()->flash('status', 'Pengeluaran ditolak.');
-            }
-
-            $this->closeApproval();
-        } catch (\Exception $e) {
-            session()->flash('error', 'Gagal memproses pengeluaran: ' . $e->getMessage());
-        } finally {
-            $this->isApproving = false;
-        }
+        session()->flash('status', 'Pengeluaran ditolak.');
+        $this->closeApproval();
     }
 
     /**
-     * Quick approve without modal
+     * Setujui langsung tanpa modal. Pending dan yang sebelumnya ditolak
+     * (salah klik) bisa disetujui.
      */
     public function quickApprove(TeknisiExpense $expense): void
     {
         $this->authorizeAcc();
 
-        if (! $this->pastikanPending($expense)) {
+        if (! $this->pastikanBisaDiubah($expense, 'approved')) {
             return;
         }
 
         if (validator(['nominal' => $expense->nominal], ['nominal' => self::NOMINAL_RULE])->fails()) {
-            session()->flash('error', 'Nominal di luar batas 1.000–5.000.000; gunakan form persetujuan untuk mengoreksi.');
+            session()->flash('error', 'Nominal di luar batas 1.000–5.000.000; tidak bisa disetujui.');
 
             return;
         }
 
-        try {
-            $expense->update([
-                'status' => 'approved',
-                'approved_by' => auth()->id(),
-                'tanggal_approve' => now(),
-            ]);
+        $expense->update([
+            'status' => 'approved',
+            'approved_by' => auth()->id(),
+            'catatan_approval' => null,
+            'tanggal_approve' => now(),
+        ]);
 
-            session()->flash('status', 'Pengeluaran disetujui.');
-        } catch (\Exception $e) {
-            session()->flash('error', 'Gagal menyetujui pengeluaran.');
-        }
+        session()->flash('status', 'Pengeluaran disetujui.');
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Enums\IncomeCategory;
 use App\Enums\PaymentStatus;
 use App\Models\Expense;
 use App\Models\Order;
@@ -25,7 +26,7 @@ use Illuminate\Support\Collection;
 class AkuntanService
 {
     /**
-     * @return Collection<int, array{order_id: int, tanggal: string, customer: string, layanan: string, total: float, items: array<int, array<string, mixed>>}>
+     * @return Collection<int, array{order_id: int, tanggal: string, customer: string, layanan: string, total: float, kategori: IncomeCategory, items: array<int, array<string, mixed>>}>
      */
     public function pendapatan(CarbonInterface $dari, CarbonInterface $sampai): Collection
     {
@@ -48,6 +49,7 @@ class AkuntanService
                     'customer' => $order->customer?->nama ?? 'Tanpa nama',
                     'layanan' => $utama?->nama_layanan ?? 'Layanan',
                     'total' => $order->total(),
+                    'kategori' => IncomeCategory::untukLayanan($order->serviceCatalog?->jenis_layanan),
                     'items' => $items->map(fn ($item, int $i) => [
                         'nama' => $item->nama_layanan,
                         'jumlah' => (int) $item->jumlah,
