@@ -12,6 +12,12 @@
             <input id="akuntan-bulan" type="month" wire:model.live="bulan"
                 class="rounded-lg border-gray-300 text-sm focus:border-primary-500 focus:ring-primary-500">
             <span class="text-sm font-semibold text-gray-600">{{ $bulanLabel }}</span>
+
+            <a href="{{ \App\Support\Url::absolute('filament.admin.pages.pengeluaran-teknisi') }}"
+                class="ml-auto inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500">
+                <x-heroicon-o-banknotes class="h-4 w-4" />
+                ACC Pengeluaran Teknisi
+            </a>
         </div>
 
         {{-- Kartu ringkasan --}}

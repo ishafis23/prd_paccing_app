@@ -4,7 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\TeknisiExpense;
 use App\Models\User;
-use Illuminate\Pagination\Paginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -63,7 +63,7 @@ class ManajemenPengeluaranTeknisi extends Component
      * Get all expenses dengan filter
      */
     #[Computed]
-    public function expenses(): Paginator
+    public function expenses(): LengthAwarePaginator
     {
         $query = TeknisiExpense::query();
 

@@ -3,6 +3,7 @@
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
 use App\Filament\Pages\Akuntan;
+use App\Filament\Pages\PengeluaranTeknisi;
 use App\Models\Customer;
 use App\Models\Expense;
 use App\Models\Order;
@@ -56,6 +57,24 @@ it('hanya owner/admin/finance yang boleh akses', function (string $role, bool $b
     ['hr', false],
     ['teknisi', false],
 ]);
+
+it('halaman Pengeluaran Teknisi: owner/admin/finance boleh ACC, lain tidak', function (string $role, bool $boleh) {
+    $this->actingAs(akUser($role))->get(PengeluaranTeknisi::getUrl())
+        ->{$boleh ? 'assertOk' : 'assertForbidden'}();
+})->with([
+    ['owner', true],
+    ['admin', true],
+    ['finance', true],
+    ['hr', false],
+    ['teknisi', false],
+]);
+
+it('halaman Akuntan menampilkan tombol menuju ACC Pengeluaran Teknisi', function () {
+    $this->actingAs(akUser(RoleName::Admin->value))->get(Akuntan::getUrl())
+        ->assertOk()
+        ->assertSee('ACC Pengeluaran Teknisi')
+        ->assertSee('/admin/pengeluaran-teknisi', false);
+});
 
 it('pendapatan menghitung order selesai termasuk item tambahan, per tanggal bayar', function () {
     $order = akOrderLunas('2026-10-02', 100000);
