@@ -44,4 +44,25 @@ class TeknisiKeuanganCapaianTest extends TestCase
             ->assertSee('Pengeluaran')
             ->assertSee('Pendapatan');
     }
+
+    /**
+     * Regresi: mengosongkan field angka (Harga/Qty) dulu meng-unset properti
+     * bertipe int sehingga updatedHarga() -> recalcNominal() melempar
+     * PropertyNotFoundException. Sekarang properti tidak diketik, jadi aman.
+     */
+    public function test_mengosongkan_field_angka_tidak_error_dan_nominal_jadi_nol(): void
+    {
+        \Livewire\Livewire::actingAs($this->teknisi)
+            ->test(\App\Livewire\Teknisi\LaporanPengeluaran::class)
+            ->set('qty', 2)
+            ->set('harga', 5000)
+            ->assertSet('nominal', 10000)
+            ->set('harga', '')
+            ->assertSet('nominal', 0)
+            ->set('qty', '')
+            ->assertSet('nominal', 0)
+            ->set('harga', 3000)
+            ->set('nominal', '')
+            ->assertOk();
+    }
 }

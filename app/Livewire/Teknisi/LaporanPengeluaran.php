@@ -20,17 +20,24 @@ class LaporanPengeluaran extends Component
     #[Validate('required|in:bensin,makan,material,transport,lainnya')]
     public string $kategori = '';
 
+    // CATATAN: properti angka di bawah sengaja TIDAK diketik (bukan `int`).
+    // Kalau diketik `int`, saat user mengosongkan field (wire:model kirim ''),
+    // Livewire menangkap TypeError lalu meng-unset properti (lihat
+    // HandleComponents::setComponentPropertyAwareOfTypes). Setelah itu hook
+    // updatedHarga/updatedQty -> recalcNominal membaca properti yg sudah unset
+    // -> PropertyNotFoundException. Tanpa type, nilai '' aman, divalidasi
+    // saat submit, dan di-cast (int) saat dipakai.
     #[Validate('nullable|exists:orders,id')]
-    public ?int $order_id = null;
+    public $order_id = null;
 
     #[Validate('required|integer|min:1|max:100000')]
-    public int $qty = 1;
+    public $qty = 1;
 
     #[Validate('required|integer|min:0|max:5000000')]
-    public int $harga = 0;
+    public $harga = 0;
 
     #[Validate('required|integer|min:1000|max:5000000')]
-    public int $nominal = 0;
+    public $nominal = 0;
 
     #[Validate('nullable|string|max:255')]
     public string $keterangan = '';
@@ -63,7 +70,9 @@ class LaporanPengeluaran extends Component
 
     private function recalcNominal(): void
     {
-        $this->nominal = (int) ($this->qty * $this->harga);
+        // Cast (int) per operand — di PHP 8 aritmetika string kosong ("")
+        // melempar TypeError, jadi jangan langsung dikalikan.
+        $this->nominal = ((int) $this->qty) * ((int) $this->harga);
     }
 
     /**
