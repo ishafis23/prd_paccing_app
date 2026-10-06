@@ -248,3 +248,23 @@ it('ACC: halaman menampilkan daftar teknisi di filter & nama pelapor', function 
     Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
         ->assertSee($e->teknisi->name);
 });
+
+it('ACC: tab Rekap Kategori menjumlah menunggu+disetujui tanpa yang ditolak, filter lewat modal', function () {
+    akExpense('pending', 20000);
+    akExpense('approved', 10000);
+    akExpense('rejected', 99000);
+
+    $lw = Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
+        ->assertSet('tampilan', 'daftar')
+        ->set('tampilan', 'rekap')
+        ->assertSee('Bensin')
+        ->assertSee('Rp 30.000')
+        ->assertDontSee('Rp 129.000');
+
+    $lw->call('$set', 'tampilFilter', true)
+        ->assertSee('Filter')
+        ->set('filterKategori', 'makan')
+        ->assertSet('filterKategori', 'makan')
+        ->call('resetFilter')
+        ->assertSet('filterKategori', '');
+});

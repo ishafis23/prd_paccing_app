@@ -48,96 +48,130 @@
         </div>
     </div>
 
-    {{-- Tab status --}}
-    @php
-        $tabs = [
-            'pending' => ['Menunggu', $this->summaryBulan['count_pending'] ?? 0],
-            'approved' => ['Disetujui', $this->summaryBulan['count_approved'] ?? 0],
-            'rejected' => ['Ditolak', $this->summaryBulan['count_rejected'] ?? 0],
-            '' => ['Semua', null],
-        ];
-    @endphp
-    <div class="flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-100">
-        @foreach ($tabs as $key => [$label, $count])
-            <button
-                type="button"
-                wire:click="$set('filterStatus', '{{ $key }}')"
-                class="rounded-lg px-4 py-2 text-xs font-semibold transition {{ $filterStatus === (string) $key ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">
-                {{ $label }}@if ($count !== null) <span class="ml-1 opacity-80">({{ $count }})</span>@endif
-            </button>
-        @endforeach
-    </div>
-
-    {{-- Filters --}}
-    <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
-        <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-            {{-- Month filter --}}
-            <div>
-                <label class="block text-xs font-medium text-gray-600">Bulan</label>
-                <input
-                    type="month"
-                    wire:model.live="filterBulan"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
-            </div>
-
-            {{-- Teknisi filter --}}
-            <div>
-                <label class="block text-xs font-medium text-gray-600">Teknisi</label>
-                <select wire:model.live="filterTeknisi" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
-                    <option value="">Semua</option>
-                    @foreach ($this->teknisList as $tech)
-                        <option value="{{ $tech->id }}">{{ $tech->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Kategori filter --}}
-            <div>
-                <label class="block text-xs font-medium text-gray-600">Kategori</label>
-                <select wire:model.live="filterKategori" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
-                    <option value="">Semua</option>
-                    <option value="bensin">⛽ Bensin</option>
-                    <option value="makan">🍜 Makan</option>
-                    <option value="material">🔧 Material</option>
-                    <option value="transport">🚗 Transport</option>
-                    <option value="lainnya">📦 Lainnya</option>
-                </select>
-            </div>
-
-            {{-- Reset button --}}
-            <div class="flex items-end">
+    {{-- Tab utama + tombol filter --}}
+    <div class="flex flex-wrap items-center gap-2">
+        <div class="flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-100">
+            @foreach (['daftar' => 'Daftar', 'rekap' => 'Rekap Kategori'] as $key => $label)
                 <button
                     type="button"
-                    wire:click="$reset(['filterBulan', 'filterTeknisi', 'filterKategori', 'filterStatus'])"
-                    class="w-full rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50">
-                    Reset
+                    wire:click="$set('tampilan', '{{ $key }}')"
+                    class="rounded-lg px-4 py-2 text-xs font-semibold transition {{ $tampilan === $key ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-50' }}">
+                    {{ $label }}
                 </button>
-            </div>
+            @endforeach
         </div>
+
+        <span class="text-xs font-semibold text-gray-600">{{ \Carbon\Carbon::createFromFormat('Y-m', $filterBulan)->translatedFormat('F Y') }}</span>
+
+        <button
+            type="button"
+            wire:click="$set('tampilFilter', true)"
+            title="Filter"
+            class="relative ml-auto rounded-lg bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 hover:bg-gray-50">
+            <x-heroicon-o-funnel class="h-5 w-5" />
+            @if ($this->jumlahFilterAktif > 0)
+                <span class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white">{{ $this->jumlahFilterAktif }}</span>
+            @endif
+        </button>
     </div>
 
-    {{-- Category Breakdown --}}
-    @if ($this->kategoriBreakdown)
-        <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-            <h2 class="mb-3 font-bold text-gray-900">Breakdown per Kategori ({{ $filterBulan }})</h2>
-            <div class="grid grid-cols-2 gap-2 md:grid-cols-5">
-                @foreach ($this->kategoriBreakdown as $kat => $data)
-                    @if ($data['count'] > 0)
-                        <div class="rounded-lg bg-gray-50 p-2">
-                            <p class="font-medium text-gray-800">{{ $this->getKategoriLabel($kat) }}</p>
-                            <p class="text-xs font-bold text-gray-900">{{ $this->formatRupiah($data['total']) }}</p>
-                            <p class="text-[11px] text-gray-500">{{ $data['count'] }} item</p>
-                            @if ($data['pending'] > 0)
-                                <p class="text-[11px] text-yellow-600">{{ $this->formatRupiah($data['pending']) }} pending</p>
-                            @endif
-                        </div>
-                    @endif
-                @endforeach
+    @if ($tampilan === 'daftar')
+        {{-- Tab status --}}
+        @php
+            $tabs = [
+                'pending' => ['Menunggu', $this->summaryBulan['count_pending'] ?? 0],
+                'approved' => ['Disetujui', $this->summaryBulan['count_approved'] ?? 0],
+                'rejected' => ['Ditolak', $this->summaryBulan['count_rejected'] ?? 0],
+                '' => ['Semua', null],
+            ];
+        @endphp
+        <div class="flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-100">
+            @foreach ($tabs as $key => [$label, $count])
+                <button
+                    type="button"
+                    wire:click="$set('filterStatus', '{{ $key }}')"
+                    class="rounded-lg px-4 py-2 text-xs font-semibold transition {{ $filterStatus === (string) $key ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">
+                    {{ $label }}@if ($count !== null) <span class="ml-1 opacity-80">({{ $count }})</span>@endif
+                </button>
+            @endforeach
+        </div>
+    @else
+        {{-- Rekap per kategori --}}
+        <div class="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
+            <p class="px-4 pt-3 text-xs text-gray-500">Ke mana uang pengeluaran teknisi bulan ini dipakai. Total = menunggu + disetujui (yang ditolak tidak dihitung).</p>
+            <table class="mt-2 w-full">
+                <thead class="border-b border-gray-100 bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Kategori</th>
+                        <th class="px-4 py-2 text-right text-xs font-semibold text-gray-600">Item</th>
+                        <th class="px-4 py-2 text-right text-xs font-semibold text-gray-600">Menunggu</th>
+                        <th class="px-4 py-2 text-right text-xs font-semibold text-gray-600">Disetujui</th>
+                        <th class="px-4 py-2 text-right text-xs font-semibold text-gray-600">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse (collect($this->kategoriBreakdown)->filter(fn ($d) => $d['count'] > 0) as $kat => $data)
+                        <tr>
+                            <td class="px-4 py-2 text-xs font-medium text-gray-800">{{ $this->getKategoriLabel($kat) }}</td>
+                            <td class="px-4 py-2 text-right text-xs text-gray-500">{{ $data['count'] }}</td>
+                            <td class="px-4 py-2 text-right text-xs text-yellow-600">{{ $this->formatRupiah($data['pending']) }}</td>
+                            <td class="px-4 py-2 text-right text-xs text-green-600">{{ $this->formatRupiah($data['approved']) }}</td>
+                            <td class="px-4 py-2 text-right text-xs font-bold text-gray-900">{{ $this->formatRupiah($data['total']) }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">Tidak ada data bulan ini</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    {{-- Modal filter --}}
+    @if ($tampilFilter)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold text-gray-900">Filter</h2>
+                    <button type="button" wire:click="$set('tampilFilter', false)" class="text-gray-400 hover:text-gray-600">
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-600">Bulan</label>
+                    <input type="month" wire:model.live="filterBulan" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600">Teknisi</label>
+                    <select wire:model.live="filterTeknisi" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm">
+                        <option value="">Semua</option>
+                        @foreach ($this->teknisList as $tech)
+                            <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600">Kategori</label>
+                    <select wire:model.live="filterKategori" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm">
+                        <option value="">Semua</option>
+                        <option value="bensin">⛽ Bensin</option>
+                        <option value="makan">🍜 Makan</option>
+                        <option value="material">🔧 Material</option>
+                        <option value="transport">🚗 Transport</option>
+                        <option value="lainnya">📦 Lainnya</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-2">
+                    <button type="button" wire:click="resetFilter" class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Reset</button>
+                    <button type="button" wire:click="$set('tampilFilter', false)" class="flex-1 rounded-lg bg-primary-600 py-2 text-sm font-semibold text-white hover:bg-primary-500">Selesai</button>
+                </div>
             </div>
         </div>
     @endif
 
     {{-- Expenses Table --}}
+    @if ($tampilan === 'daftar')
     <div class="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
         @if ($this->expenses->isNotEmpty())
             <table class="w-full">
@@ -228,6 +262,7 @@
             </div>
         @endif
     </div>
+    @endif
 
     {{-- Approval Modal --}}
     @if ($selectedExpense)

@@ -26,6 +26,11 @@ class ManajemenPengeluaranTeknisi extends Component
 
     public string $filterStatus = 'pending';
 
+    // Tampilan: 'daftar' (tabel + tab status) atau 'rekap' (rekap per kategori)
+    public string $tampilan = 'daftar';
+
+    public bool $tampilFilter = false;
+
     // Approval form
     public ?TeknisiExpense $selectedExpense = null;
 
@@ -64,6 +69,25 @@ class ManajemenPengeluaranTeknisi extends Component
     public function mount(): void
     {
         $this->filterBulan = today()->format('Y-m');
+    }
+
+    /**
+     * Jumlah filter yang menyimpang dari bawaan (untuk badge ikon filter).
+     */
+    #[Computed]
+    public function jumlahFilterAktif(): int
+    {
+        return (int) ($this->filterBulan !== today()->format('Y-m'))
+            + (int) ($this->filterTeknisi !== null)
+            + (int) ($this->filterKategori !== '');
+    }
+
+    public function resetFilter(): void
+    {
+        $this->filterBulan = today()->format('Y-m');
+        $this->filterTeknisi = null;
+        $this->filterKategori = '';
+        $this->resetPage();
     }
 
     /**
@@ -238,7 +262,8 @@ class ManajemenPengeluaranTeknisi extends Component
             $result[$kat] = [
                 'pending' => $filtered->where('status', 'pending')->sum('nominal'),
                 'approved' => $filtered->where('status', 'approved')->sum('nominal'),
-                'total' => $filtered->sum('nominal'),
+                // Ditolak tidak dihitung, konsisten dengan 'Total Bulan Ini'.
+                'total' => $filtered->whereIn('status', ['pending', 'approved'])->sum('nominal'),
                 'count' => $filtered->count(),
             ];
         }
