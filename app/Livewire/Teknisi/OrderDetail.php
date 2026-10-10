@@ -1041,7 +1041,7 @@ class OrderDetail extends Component
             'jenis_pekerjaan' => (string) $unit->jenis_pekerjaan,
             'bagian' => $unit->bagian ?: 'indoor',
             'suhu' => $unit->suhu === null ? '' : (string) $unit->suhu,
-            'rpm' => $unit->rpm === null ? '' : (string) (int) $unit->rpm,
+            'rpm' => $unit->rpm === null ? '' : (string) (float) $unit->rpm,
             'kondisi' => (string) $unit->kondisi,
             'catatan_kondisi' => (string) $unit->catatan_kondisi,
         ];

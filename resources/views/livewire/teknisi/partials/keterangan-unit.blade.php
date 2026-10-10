@@ -167,7 +167,7 @@
                                     </div>
                                     <div>
                                         <label class="mb-1 block text-xs font-semibold text-gray-600">RPM <span class="font-normal text-gray-400">(opsional)</span></label>
-                                        <input type="number" step="1" inputmode="numeric" wire:model="{{ $k }}rpm" class="{{ $inputCls }}">
+                                        <input type="number" step="0.1" min="0" inputmode="decimal" wire:model="{{ $k }}rpm" class="{{ $inputCls }}">
                                         @error($k.'rpm') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                                     </div>
                                 </div>

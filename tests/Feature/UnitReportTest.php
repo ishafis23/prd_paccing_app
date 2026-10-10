@@ -166,6 +166,40 @@ it('suhu wajib untuk slot indoor_lengkap, RPM opsional; outdoor/bebas membuang s
     expect($unit->fresh())->suhu->toBeNull()->rpm->toBeNull();
 });
 
+it('teknisi menyimpan RPM desimal lewat Livewire tanpa terpotong; bulat tetap bulat; kosong boleh', function () {
+    $order = ($this->buatOrder)(1);
+    $unit = app(UnitReportService::class)->siapkan($order)->first();
+
+    Livewire::actingAs($this->teknisi)
+        ->test(OrderDetail::class, ['order' => $order])
+        ->set("unitForm.{$unit->id}", ($this->dataLengkap)(['rpm' => '7.3']))
+        ->call('simpanUnit', $unit->id)
+        ->assertHasNoErrors();
+    expect((float) $unit->fresh()->rpm)->toBe(7.3);
+
+    // Buka ulang form (state dimuat dari DB) lalu simpan lagi: tetap 7.3.
+    $form = Livewire::actingAs($this->teknisi)->test(OrderDetail::class, ['order' => $order->fresh()]);
+    expect($form->get("unitForm.{$unit->id}.rpm"))->toBe('7.3');
+    $form->call('simpanUnit', $unit->id)->assertHasNoErrors();
+    expect((float) $unit->fresh()->rpm)->toBe(7.3);
+
+    Livewire::actingAs($this->teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->set("unitForm.{$unit->id}", ($this->dataLengkap)(['rpm' => '1250']))
+        ->call('simpanUnit', $unit->id)
+        ->assertHasNoErrors();
+    $form = Livewire::actingAs($this->teknisi)->test(OrderDetail::class, ['order' => $order->fresh()]);
+    expect((float) $unit->fresh()->rpm)->toBe(1250.0)
+        ->and($form->get("unitForm.{$unit->id}.rpm"))->toBe('1250');
+
+    Livewire::actingAs($this->teknisi)
+        ->test(OrderDetail::class, ['order' => $order->fresh()])
+        ->set("unitForm.{$unit->id}", ($this->dataLengkap)(['rpm' => '']))
+        ->call('simpanUnit', $unit->id)
+        ->assertHasNoErrors();
+    expect($unit->fresh()->rpm)->toBeNull();
+});
+
 it('fotoWajibKurang memuat keterangan yang kurang & tidak memuat yang sudah lengkap (end-to-end Livewire)', function () {
     $order = ($this->buatOrder)(2);
     $item = $order->orderItems->first();
