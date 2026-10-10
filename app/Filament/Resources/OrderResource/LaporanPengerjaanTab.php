@@ -43,6 +43,7 @@ class LaporanPengerjaanTab
                 Section::make('Keterangan per Unit')
                     ->description('Keterangan ringkas tiap unit yang dikerjakan teknisi, beserta fotonya.')
                     ->headerActions([
+                        static::aksiPreview(),
                         static::aksiSiapkan(),
                         static::aksiEdit(),
                         static::aksiFotoSusulan(),
@@ -52,6 +53,17 @@ class LaporanPengerjaanTab
                             ->state(fn (Order $record): Order => $record),
                     ]),
             ]);
+    }
+
+    private static function aksiPreview(): InfolistAction
+    {
+        return InfolistAction::make('previewLaporan')
+            ->label('Preview Laporan')
+            ->icon('heroicon-o-document-magnifying-glass')
+            ->color('success')
+            ->visible(fn (Order $record): bool => static::boleh() && $record->status !== OrderStatus::Batal)
+            ->url(fn (Order $record): string => \App\Support\Url::absolute('laporan.preview', ['order' => $record->id]))
+            ->openUrlInNewTab();
     }
 
     private static function aksiSiapkan(): InfolistAction

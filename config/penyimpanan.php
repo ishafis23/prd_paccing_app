@@ -24,6 +24,13 @@ return [
     // Subfolder yang dibersihkan otomatis (hanya foto pengerjaan).
     'folder_foto' => 'work-reports',
 
+    // Laporan PDF (dev-plan/21 §6): disk privat (BUKAN public — tidak bisa
+    // diakses lewat URL, hanya lewat route ber-auth) + folder induknya.
+    // `<folder>/bulanan` = PDF laporan bulanan, `<folder>/cache` = cache foto
+    // yang sudah diperkecil. Keduanya ikut dihitung kuota.
+    'disk_laporan' => 'local',
+    'folder_laporan' => 'laporan',
+
     // Ambang peringatan widget (persen terpakai).
     'peringatan_persen' => 90,
 

@@ -5,8 +5,9 @@
 
     @forelse ($daftar as $baris)
         @php $order = $baris['order']; @endphp
+        <div class="rounded-2xl bg-white shadow-sm ring-1 ring-amber-200">
         <a href="{{ $baris['tautan'] }}" wire:navigate
-            class="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-200 transition active:scale-[0.99] active:bg-gray-50">
+            class="block rounded-2xl p-4 transition active:scale-[0.99] active:bg-gray-50">
             <div class="flex items-start justify-between gap-2">
                 <span class="truncate font-bold text-gray-900">{{ $order->customer->nama }}</span>
                 <x-teknisi-status-badge :status="$order->status" />
@@ -22,6 +23,14 @@
             </div>
             <p class="mt-1 text-xs text-gray-400">{{ $baris['rincian'] }}</p>
         </a>
+        <div class="border-t border-gray-100 px-4 py-2">
+            <a href="{{ \App\Support\Url::absolute('laporan.preview', ['order' => $order->id]) }}" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700">
+                <x-heroicon-o-document-magnifying-glass class="h-4 w-4" />
+                Preview Laporan
+            </a>
+        </div>
+        </div>
     @empty
         <div class="rounded-2xl bg-white px-6 py-12 text-center shadow-sm ring-1 ring-gray-100">
             <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">

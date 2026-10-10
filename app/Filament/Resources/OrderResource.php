@@ -587,6 +587,15 @@ class OrderResource extends BaseResource
                         ->url(fn (Order $record) => route('surat-jalan.show', [$record->id, $record->pastikanSuratJalanToken()]))
                         ->openUrlInNewTab(),
 
+                    Tables\Actions\Action::make('previewLaporan')
+                        ->label('Preview Laporan')
+                        ->icon('heroicon-o-document-magnifying-glass')
+                        ->color('gray')
+                        ->visible(fn (Order $record) => \App\Filament\Resources\OrderResource\LaporanPengerjaanTab::boleh()
+                            && $record->status !== OrderStatus::Batal)
+                        ->url(fn (Order $record) => \App\Support\Url::absolute('laporan.preview', ['order' => $record->id]))
+                        ->openUrlInNewTab(),
+
                     Tables\Actions\Action::make('tambahLayanan')
                         ->label('Tambah Layanan')
                         ->icon('heroicon-o-plus-circle')

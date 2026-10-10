@@ -104,6 +104,13 @@ class StorageQuotaService
             $total += (int) $this->disk()->size($file);
         }
 
+        // PDF laporan bulanan + cache foto terkecil ada di disk privat terpisah
+        // (lihat config/penyimpanan.php) tetapi tetap menempati kuota hosting.
+        $laporan = Storage::disk((string) config('penyimpanan.disk_laporan', 'local'));
+        foreach ($laporan->allFiles((string) config('penyimpanan.folder_laporan', 'laporan')) as $file) {
+            $total += (int) $laporan->size($file);
+        }
+
         return $total;
     }
 }

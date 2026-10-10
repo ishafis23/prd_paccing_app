@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
@@ -93,6 +94,14 @@ Route::post('/portal/logout', function () {
 
 Route::middleware('auth:customer')->prefix('portal')->group(function () {
     Route::get('/', PortalDashboard::class)->name('portal.dashboard');
+});
+
+// Laporan Pengerjaan (dev-plan/21 §6): preview HTML + PDF per order, unduh
+// Laporan Bulanan. Izin per baris dicek di LaporanController.
+Route::middleware(['auth', 'user.aktif'])->prefix('laporan')->group(function () {
+    Route::get('/order/{order}/preview', [LaporanController::class, 'preview'])->name('laporan.preview');
+    Route::get('/order/{order}/pdf', [LaporanController::class, 'pdf'])->name('laporan.pdf');
+    Route::get('/bulanan/{laporan}/unduh', [LaporanController::class, 'unduhBulanan'])->name('laporan.bulanan.unduh');
 });
 
 // Order Item endpoints
