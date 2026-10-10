@@ -387,7 +387,13 @@ class TeknisiService
      * bukan cuma laporan yang barusan disubmit). Balikin kosong kalau
      * sudah lengkap. Dipakai `berangkat()` (gate) & UI "Lengkapi Foto".
      *
-     * @return array<int, array{order_item: OrderItem, kode_slot: string, label: string}>
+     * Fase 4: daftar yang sama juga memuat KETERANGAN unit yang kurang
+     * (`jenis` = 'keterangan', plus `unit_no`/`unit_report_id`) — hanya untuk
+     * unit yang menurut template memang butuh keterangan, dan hanya untuk
+     * order yang punya data unit. Order lama tanpa data unit tidak terpengaruh.
+     * Entri foto membawa `jenis` = 'foto'.
+     *
+     * @return array<int, array{jenis: string, order_item: OrderItem, kode_slot: string, label: string}>
      */
     public function fotoWajibKurang(Order $order): array
     {
@@ -403,12 +409,27 @@ class TeknisiService
         foreach ($itemsAktif as $item) {
             foreach (FotoLaporanSlot::wajibUntuk($item->kategori) as $kodeSlot => $label) {
                 if (! $terisi->has($item->id.'|'.$kodeSlot)) {
-                    $kurang[] = ['order_item' => $item, 'kode_slot' => $kodeSlot, 'label' => $label];
+                    $kurang[] = ['jenis' => 'foto', 'order_item' => $item, 'kode_slot' => $kodeSlot, 'label' => $label];
                 }
             }
         }
 
-        return $kurang;
+        return [...$kurang, ...app(UnitReportService::class)->keteranganKurang($order)];
+    }
+
+    /**
+     * Order Selesai/ButuhFollowup (belum ditutup) yang foto ATAU keterangannya
+     * belum lengkap — penanda "perlu dilengkapi" & isi menu Lengkapi Laporan.
+     */
+    public function perluDilengkapi(Order $order): bool
+    {
+        if (! in_array($order->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true) || $order->sudahDitutup()) {
+            return false;
+        }
+
+        $order->loadMissing('orderItems');
+
+        return $this->fotoWajibKurang($order) !== [];
     }
 
     /**
@@ -501,10 +522,14 @@ class TeknisiService
      */
     private function catatFotoKategori(WorkReport $report, array $fotoKategori): void
     {
+        $unitReports = app(UnitReportService::class);
+
         foreach ($fotoKategori as $baris) {
             WorkReportPhoto::create([
                 'work_report_id' => $report->id,
                 'order_item_id' => $baris['order_item']->id,
+                'unit_no' => 1,
+                'order_unit_report_id' => $unitReports->unitPertamaItem($baris['order_item']->id)?->id,
                 'slot' => $baris['slot'],
                 'path' => $baris['path'],
                 'urutan' => $baris['urutan'],

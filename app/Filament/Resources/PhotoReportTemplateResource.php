@@ -76,6 +76,12 @@ class PhotoReportTemplateResource extends BaseResource
                 ->required(),
             Forms\Components\Toggle::make('wajib')
                 ->helperText('dev-plan/17 B63: submit laporan ditolak kalau ini wajib & aktif, tapi belum ada fotonya.'),
+            Forms\Components\Select::make('field_set')
+                ->label('Keterangan unit')
+                ->options(PhotoReportTemplateService::FIELD_SET_OPSI)
+                ->default('bebas')
+                ->required()
+                ->helperText('Keterangan apa yang diminta dari teknisi untuk slot ini. Outdoor/Bebas menyembunyikan suhu & RPM.'),
         ]);
     }
 
@@ -88,6 +94,19 @@ class PhotoReportTemplateResource extends BaseResource
                 Tables\Columns\TextColumn::make('urutan')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('label'),
+                Tables\Columns\TextColumn::make('field_set')
+                    ->label('Keterangan')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'indoor_lengkap' => 'Indoor lengkap',
+                        'outdoor' => 'Outdoor',
+                        default => 'Bebas',
+                    })
+                    ->color(fn (?string $state): string => match ($state) {
+                        'indoor_lengkap' => 'info',
+                        'outdoor' => 'warning',
+                        default => 'gray',
+                    }),
                 Tables\Columns\TextColumn::make('kode_slot')
                     ->label('Kode Slot')
                     ->fontFamily('mono')
@@ -122,6 +141,11 @@ class PhotoReportTemplateResource extends BaseResource
                             ->required(),
                         Forms\Components\Toggle::make('wajib')
                             ->helperText('dev-plan/17 B63: submit laporan ditolak kalau belum ada fotonya.'),
+                        Forms\Components\Select::make('field_set')
+                            ->label('Keterangan unit')
+                            ->options(PhotoReportTemplateService::FIELD_SET_OPSI)
+                            ->default('bebas')
+                            ->required(),
                     ])
                     ->action(function (array $data): void {
                         app(PhotoReportTemplateService::class)->tambah($data, auth()->user());

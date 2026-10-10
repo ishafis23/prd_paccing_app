@@ -430,6 +430,9 @@
         </div>
     @endif
 
+    {{-- Fase 4: keterangan per unit (CK mana, posisi, suhu/RPM, kondisi). --}}
+    @include('livewire.teknisi.partials.keterangan-unit')
+
     @if (in_array($order->status, [$orderStatus::Dikerjakan, $orderStatus::ButuhFollowup]))
         {{-- @submit dicek SAAT tombol ditekan: kalau masih ada foto yang
              diunggah, submit dibatalkan supaya foto yang belum selesai
@@ -752,21 +755,37 @@
          belum lengkap (supaya pembayaran tidak tertahan) — tapi teknisi
          tidak bisa berangkat ke order berikutnya sebelum ini dilengkapi. --}}
     @if (! empty($this->fotoWajibKurang))
+        @php
+            $kurangFoto = collect($this->fotoWajibKurang)->where('jenis', 'foto');
+            $kurangKeterangan = collect($this->fotoWajibKurang)->where('jenis', 'keterangan');
+        @endphp
         {{-- @submit dicek SAAT tombol ditekan: kalau masih ada foto yang
              diunggah, submit dibatalkan supaya foto yang belum selesai
              tidak hilang. --}}
-        <form x-data
+        <form x-data id="lengkapi-foto"
             @submit.prevent="($store.fotoUpload?.inFlight ?? 0) > 0 ? null : $wire.lengkapiFotoWajib()"
             class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
             <p class="flex items-center gap-2 text-sm font-bold text-amber-800">
-                <x-heroicon-o-exclamation-triangle class="h-5 w-5" /> Lengkapi Foto Wajib
+                <x-heroicon-o-exclamation-triangle class="h-5 w-5" /> {{ $kurangKeterangan->isNotEmpty() ? 'Lengkapi Foto & Keterangan Wajib' : 'Lengkapi Foto Wajib' }}
             </p>
             <p class="mt-1 text-xs text-amber-700">
-                Laporan sudah tersimpan, tapi masih ada foto wajib yang belum diisi. Anda tidak bisa berangkat ke
-                order berikutnya sampai ini dilengkapi.
+                Laporan sudah tersimpan, tapi masih ada foto atau keterangan wajib yang belum diisi. Anda tidak bisa
+                berangkat ke order berikutnya sampai ini dilengkapi.
             </p>
+            @if ($kurangKeterangan->isNotEmpty())
+                <div class="mt-3 space-y-1">
+                    @foreach ($kurangKeterangan as $ket)
+                        <button type="button" wire:click="bukaUnit({{ $ket['unit_no'] }})"
+                            @click="document.getElementById('unit-{{ $ket['unit_no'] }}')?.scrollIntoView({ behavior: 'smooth', block: 'center' })"
+                            class="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                            <span>{{ $ket['label'] }} <span class="font-normal text-amber-600">({{ $ket['order_item']->nama_layanan }})</span></span>
+                            <span class="text-amber-600">Isi →</span>
+                        </button>
+                    @endforeach
+                </div>
+            @endif
             <div class="mt-3 grid grid-cols-2 gap-2">
-                @foreach ($this->fotoWajibKurang as $kurang)
+                @foreach ($kurangFoto as $kurang)
                     <div x-data="photoUpload('fotoLengkapi.{{ $kurang['order_item']->id }}.{{ $kurang['kode_slot'] }}', {{ $order->id }})">
                         <button
                             type="button"
@@ -834,15 +853,17 @@
                     @enderror
                 @endforeach
             </div>
-            <button type="submit" wire:loading.attr="disabled" x-data
-                x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
-                x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
-                class="mt-3 w-full rounded-full bg-amber-600 py-2.5 text-sm font-bold text-white active:bg-amber-700">
-                <span wire:loading.remove>Simpan Foto</span>
-                <span wire:loading class="inline-flex items-center justify-center gap-1.5">
-                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> Menyimpan…
-                </span>
-            </button>
+            @if ($kurangFoto->isNotEmpty())
+                <button type="submit" wire:loading.attr="disabled" x-data
+                    x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
+                    x-bind:class="($store.fotoUpload?.inFlight ?? 0) > 0 ? 'opacity-60' : ''"
+                    class="mt-3 w-full rounded-full bg-amber-600 py-2.5 text-sm font-bold text-white active:bg-amber-700">
+                    <span wire:loading.remove>Simpan Foto</span>
+                    <span wire:loading class="inline-flex items-center justify-center gap-1.5">
+                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> Menyimpan…
+                    </span>
+                </button>
+            @endif
         </form>
     @endif
 

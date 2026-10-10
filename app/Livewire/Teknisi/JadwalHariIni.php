@@ -19,7 +19,7 @@ class JadwalHariIni extends Component
                 OrderStatus::ButuhFollowup->value,
                 OrderStatus::Terkendala->value,
             ])
-            ->with(['customer', 'serviceCatalog'])
+            ->with(['customer', 'serviceCatalog', 'orderItems'])
             ->orderBy('tanggal_jadwal')
             ->get();
 

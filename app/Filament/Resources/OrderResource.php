@@ -321,6 +321,8 @@ class OrderResource extends BaseResource
                                     ]),
                             ]),
 
+                        OrderResource\LaporanPengerjaanTab::tab(),
+
                         Tabs\Tab::make('Pembayaran')
                             ->schema([
                                 Section::make()

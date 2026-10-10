@@ -17,6 +17,7 @@ use App\Livewire\Teknisi\CapaianKerja;
 use App\Livewire\Teknisi\DailyReport;
 use App\Livewire\Teknisi\JadwalHariIni;
 use App\Livewire\Teknisi\Keuangan;
+use App\Livewire\Teknisi\LengkapiLaporan;
 use App\Livewire\Teknisi\LaporanPengeluaran;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Livewire\Teknisi\RiwayatAbsensi;
@@ -44,6 +45,7 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     Route::get('/absensi/{kode?}', AbsensiScan::class)->name('teknisi.absensi');
     Route::get('/riwayat-absensi', RiwayatAbsensi::class)->name('teknisi.riwayat-absensi');
     Route::get('/riwayat', RiwayatPengerjaan::class)->name('teknisi.riwayat');
+    Route::get('/lengkapi-laporan', LengkapiLaporan::class)->name('teknisi.lengkapi-laporan');
     Route::get('/capaian', CapaianKerja::class)->name('teknisi.capaian');
     Route::get('/laporan-harian', DailyReport::class)->name('teknisi.daily-report');
     Route::get('/laporan-pengeluaran', LaporanPengeluaran::class)->name('teknisi.laporan-pengeluaran');

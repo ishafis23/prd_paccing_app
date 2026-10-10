@@ -14,6 +14,8 @@ class WorkReportPhoto extends Model
     protected $fillable = [
         'work_report_id',
         'order_item_id',
+        'unit_no',
+        'order_unit_report_id',
         'slot',
         'path',
         'urutan',
@@ -34,5 +36,10 @@ class WorkReportPhoto extends Model
     public function orderItem(): BelongsTo
     {
         return $this->belongsTo(OrderItem::class);
+    }
+
+    public function unitReport(): BelongsTo
+    {
+        return $this->belongsTo(OrderUnitReport::class, 'order_unit_report_id');
     }
 }

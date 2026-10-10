@@ -65,8 +65,44 @@ class PhotoReportTemplateService
         );
     }
 
+    public const FIELD_SET_OPSI = [
+        'bebas' => 'Bebas (tanpa keterangan)',
+        'indoor_lengkap' => 'Indoor lengkap (posisi, suhu, RPM, kondisi)',
+        'outdoor' => 'Outdoor (posisi, kondisi — tanpa suhu/RPM)',
+    ];
+
     /**
-     * @param  array{kategori?: string, label?: string, urutan?: int, wajib?: bool}  $data
+     * Field-set keterangan unit yang berlaku untuk kategori ini, diturunkan
+     * dari slot aktif: `indoor_lengkap` menang atas `outdoor`, lalu `bebas`.
+     * `$hanyaWajib` = hanya slot yang juga wajib (dasar menuntut keterangan);
+     * false = semua slot aktif (dasar menentukan field yang ditampilkan).
+     */
+    public function fieldSetUntuk(?ServiceType $kategori, bool $hanyaWajib = false): string
+    {
+        if ($kategori === null) {
+            return 'bebas';
+        }
+
+        $set = Cache::remember(
+            "photo_report_templates.{$kategori->value}.fieldset".($hanyaWajib ? '.wajib' : ''),
+            300,
+            fn () => PhotoReportTemplate::query()
+                ->where('kategori', $kategori->value)
+                ->where('aktif', true)
+                ->when($hanyaWajib, fn ($q) => $q->where('wajib', true))
+                ->pluck('field_set')
+                ->all(),
+        );
+
+        return match (true) {
+            in_array('indoor_lengkap', $set, true) => 'indoor_lengkap',
+            in_array('outdoor', $set, true) => 'outdoor',
+            default => 'bebas',
+        };
+    }
+
+    /**
+     * @param  array{kategori?: string, label?: string, urutan?: int, wajib?: bool, field_set?: string}  $data
      */
     public function tambah(array $data, User $by): PhotoReportTemplate
     {
@@ -94,6 +130,7 @@ class PhotoReportTemplateService
             'label' => $label,
             'urutan' => $data['urutan'] ?? 0,
             'wajib' => (bool) ($data['wajib'] ?? false),
+            'field_set' => $this->normalisasiFieldSet($data['field_set'] ?? null),
             'aktif' => true,
         ]);
 
@@ -139,6 +176,10 @@ class PhotoReportTemplateService
             $template->wajib = (bool) $data['wajib'];
         }
 
+        if (array_key_exists('field_set', $data)) {
+            $template->field_set = $this->normalisasiFieldSet($data['field_set']);
+        }
+
         $template->save();
 
         $this->lupakanCache($template->kategori->value);
@@ -146,9 +187,22 @@ class PhotoReportTemplateService
         return $template->fresh();
     }
 
+    private function normalisasiFieldSet(mixed $nilai): string
+    {
+        $nilai = (string) ($nilai ?? 'bebas');
+
+        if (! array_key_exists($nilai, self::FIELD_SET_OPSI)) {
+            throw new BusinessRuleException('Pilihan keterangan foto tidak valid.');
+        }
+
+        return $nilai;
+    }
+
     public function lupakanCache(string $kategori): void
     {
         Cache::forget("photo_report_templates.{$kategori}");
         Cache::forget("photo_report_templates.{$kategori}.wajib");
+        Cache::forget("photo_report_templates.{$kategori}.fieldset");
+        Cache::forget("photo_report_templates.{$kategori}.fieldset.wajib");
     }
 }

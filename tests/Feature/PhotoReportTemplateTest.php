@@ -437,6 +437,13 @@ it('notifikasi sukses submitLaporan tidak sebut kekurangan kalau semua foto waji
     $item = $order->orderItems->first();
 
     $component = Livewire::actingAs($teknisi)->test(OrderDetail::class, ['order' => $order]);
+
+    // Fase 4: membuka order yang sedang dikerjakan menyiapkan keterangan per
+    // unit; "lengkap" kini berarti foto DAN keterangan unit sudah terisi.
+    $unit = \App\Models\OrderUnitReport::where('order_id', $order->id)->firstOrFail();
+    $component->set("unitForm.{$unit->id}", ['bagian' => 'indoor', 'suhu' => '16', 'rpm' => '', 'kondisi' => 'normal', 'catatan_kondisi' => ''])
+        ->call('simpanUnit', $unit->id);
+
     $component->set('catatan', 'Sudah dicuci lengkap.');
     foreach (array_keys(FotoLaporanSlot::untuk(ServiceType::CuciAc)) as $slot) {
         $component->set("fotoKategori.{$item->id}.{$slot}", UploadedFile::fake()->image("{$slot}.jpg"));

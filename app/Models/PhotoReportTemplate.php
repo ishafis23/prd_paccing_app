@@ -16,6 +16,7 @@ class PhotoReportTemplate extends Model
         'kategori',
         'kode_slot',
         'label',
+        'field_set',
         'urutan',
         'wajib',
         'aktif',

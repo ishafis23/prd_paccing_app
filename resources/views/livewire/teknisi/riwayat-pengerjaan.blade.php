@@ -40,6 +40,9 @@
                         <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0 text-gray-400" />
                         {{ $order->ringkasanLayanan() }}
                     </p>
+                    @if (app(\App\Services\TeknisiService::class)->perluDilengkapi($order))
+                        <span class="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Perlu dilengkapi</span>
+                    @endif
                     <p class="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
                         <x-heroicon-o-calendar-days class="h-3.5 w-3.5" />
                         {{ $order->updated_at->format('d M Y') }}

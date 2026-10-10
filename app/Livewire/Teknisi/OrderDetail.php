@@ -11,6 +11,7 @@ use App\Exceptions\BusinessRuleException;
 use App\Models\Attendance;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderUnitReport;
 use App\Models\StockItem;
 use App\Models\TemporaryPhotoUpload;
 use App\Models\WorkReport;
@@ -20,12 +21,14 @@ use App\Services\OrderService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
+use App\Services\UnitReportService;
 use App\Support\FotoLaporanSlot;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -93,6 +96,17 @@ class OrderDetail extends Component
 
     /** @var array<string, array> Track temporary photo uploads [fieldName => ['id' => tempId, 'file_path' => path]] */
     public array $tempPhotos = [];
+
+    /**
+     * Fase 4: form keterangan per unit [order_unit_report_id => [field => nilai]].
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $unitForm = [];
+
+    /** Nomor unit (order_unit_reports.unit_no) yang accordion-nya terbuka; bisa di-deep-link lewat ?unit=N. */
+    #[Url(as: 'unit')]
+    public ?int $unitBuka = null;
 
     public function mount(Order $order): void
     {
@@ -942,6 +956,123 @@ class OrderDetail extends Component
     }
 
     /**
+     * Fase 4: unit-unit order ini untuk bagian "Keterangan Unit". Baris unit
+     * disiapkan (prefill) hanya saat order sedang dikerjakan / sudah punya
+     * data unit — order lama tanpa data unit tidak ikut menuntut keterangan.
+     * Daftar kosong = bagian ini tidak ditampilkan.
+     *
+     * @return \Illuminate\Support\Collection<int, OrderUnitReport>
+     */
+    public function unitReports(): \Illuminate\Support\Collection
+    {
+        if (! in_array($this->order->status, [OrderStatus::Dikerjakan, OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
+            return collect();
+        }
+
+        $service = app(UnitReportService::class);
+
+        return $service->bolehDisiapkanOtomatis($this->order)
+            ? $service->siapkan($this->order)
+            : $service->unitAktif($this->order);
+    }
+
+    /**
+     * Isi $unitForm untuk unit yang belum punya state (tidak menimpa ketikan).
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderUnitReport>  $units
+     */
+    private function muatUnitForm($units): void
+    {
+        foreach ($units as $unit) {
+            if (isset($this->unitForm[$unit->id])) {
+                continue;
+            }
+
+            $this->unitForm[$unit->id] = $this->stateUnit($unit);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function stateUnit(OrderUnitReport $unit): array
+    {
+        return [
+            'lokasi_label' => (string) $unit->lokasi_label,
+            'posisi' => (string) $unit->posisi,
+            'jenis_pekerjaan' => (string) $unit->jenis_pekerjaan,
+            'bagian' => $unit->bagian ?: 'indoor',
+            'suhu' => $unit->suhu === null ? '' : (string) $unit->suhu,
+            'rpm' => $unit->rpm === null ? '' : (string) (int) $unit->rpm,
+            'kondisi' => (string) $unit->kondisi,
+            'catatan_kondisi' => (string) $unit->catatan_kondisi,
+        ];
+    }
+
+    public function toggleUnit(int $unitNo): void
+    {
+        $this->unitBuka = $this->unitBuka === $unitNo ? null : $unitNo;
+    }
+
+    public function bukaUnit(int $unitNo): void
+    {
+        $this->unitBuka = $unitNo;
+    }
+
+    /**
+     * Salin posisi dari unit sebelumnya (nomor terdekat di bawahnya) ke form
+     * unit ini — hanya mengisi form, tersimpan saat tombol Simpan ditekan.
+     */
+    public function salinPosisiSebelumnya(int $unitReportId): void
+    {
+        $unit = OrderUnitReport::query()->where('order_id', $this->orderId)->find($unitReportId);
+        if ($unit === null) {
+            return;
+        }
+
+        $sebelumnya = OrderUnitReport::query()
+            ->where('order_id', $this->orderId)
+            ->where('unit_no', '<', $unit->unit_no)
+            ->orderByDesc('unit_no')
+            ->first();
+
+        if ($sebelumnya === null) {
+            session()->flash('error', 'Ini unit pertama — tidak ada unit sebelumnya.');
+
+            return;
+        }
+
+        $this->muatUnitForm(collect([$sebelumnya, $unit]));
+        $this->unitForm[$unit->id]['posisi'] = $this->unitForm[$sebelumnya->id]['posisi'] ?? (string) $sebelumnya->posisi;
+    }
+
+    public function simpanUnit(int $unitReportId): void
+    {
+        $unit = OrderUnitReport::query()->where('order_id', $this->orderId)->with('orderItem')->find($unitReportId);
+        if ($unit === null) {
+            session()->flash('error', 'Unit tidak ditemukan pada order ini.');
+
+            return;
+        }
+
+        $service = app(UnitReportService::class);
+        $prefix = "unitForm.{$unitReportId}.";
+
+        // Validasi sisi server (Livewire) supaya pesan error menempel di field.
+        $this->validate($service->aturan($unit->orderItem, $prefix));
+
+        try {
+            $service->simpan($unit, $this->unitForm[$unitReportId] ?? [], auth()->user());
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        $this->unitForm[$unitReportId] = $this->stateUnit($unit->fresh());
+        $this->order->unsetRelation('workReports');
+        session()->flash('status', "Keterangan Unit {$unit->unit_no} tersimpan.");
+    }
+
+    /**
      * Toggle expanded/collapsed state untuk order item
      */
     public function toggleItemExpanded(int $itemId): void
@@ -994,7 +1125,30 @@ class OrderDetail extends Component
             ];
         }
 
+        $unitService = app(UnitReportService::class);
+        $unitReports = $this->unitReports();
+        $this->muatUnitForm($unitReports);
+
+        $unitView = $unitReports->map(function (OrderUnitReport $unit) use ($unitService, $order, $unitReports): array {
+            $item = $unit->orderItem;
+            $pertamaItem = $unitReports->where('order_item_id', $item->id)->min('unit_no') === $unit->unit_no;
+
+            return [
+                'unit' => $unit,
+                'item' => $item,
+                'tampil' => $unitService->fieldSetTampil($item),
+                'suhuWajib' => $unitService->suhuWajib($item),
+                'butuh' => $unitService->butuhKeterangan($item),
+                'lengkap' => $unitService->lengkap($unit, $item),
+                // Foto slot milik baris layanan dipajang di unit pertama baris itu.
+                'foto' => $pertamaItem
+                    ? $order->workReports->flatMap->photos->where('order_item_id', $item->id)->sortBy('urutan')->values()
+                    : collect(),
+            ];
+        });
+
         return view('livewire.teknisi.order-detail', [
+            'unitView' => $unitView,
             'order' => $order,
             'stockItems' => StockItem::query()->where('aktif', true)->orderBy('nama_barang')->get(),
             'orderStatus' => OrderStatus::class,
