@@ -32,31 +32,31 @@
         {{-- ================= TAB 1: CUSTOMER ================= --}}
         @if ($tab === 'customer')
             <div class="space-y-5">
-                <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
-                    <div class="{{ $kartu }}">
+                <div class="flex flex-wrap gap-4">
+                    <div class="{{ $kartu }} min-w-[9rem] flex-1">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Customer</p>
                         <p class="mt-1 text-2xl font-bold text-gray-800">{{ $angka($customer['total']) }}</p>
                     </div>
-                    <div class="{{ $kartu }}">
+                    <div class="{{ $kartu }} min-w-[9rem] flex-1">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Aktif</p>
                         <p class="mt-1 text-2xl font-bold text-emerald-600">{{ $angka($customer['aktif']) }}</p>
                     </div>
-                    <div class="{{ $kartu }}">
+                    <div class="{{ $kartu }} min-w-[9rem] flex-1">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Lead</p>
                         <p class="mt-1 text-2xl font-bold text-amber-600">{{ $angka($customer['lead']) }}</p>
                     </div>
-                    <div class="{{ $kartu }}">
+                    <div class="{{ $kartu }} min-w-[9rem] flex-1">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Nonaktif</p>
                         <p class="mt-1 text-2xl font-bold text-gray-500">{{ $angka($customer['nonaktif']) }}</p>
                     </div>
-                    <div class="{{ $kartu }}">
+                    <div class="{{ $kartu }} min-w-[9rem] flex-1">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Baru {{ $bulanLabel }}</p>
                         <p class="mt-1 text-2xl font-bold text-primary-600">{{ $angka($customer['baru_bulan_ini']) }}</p>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                    <div class="{{ $kartu }}">
+                <div class="flex flex-wrap gap-4">
+                    <div class="{{ $kartu }} min-w-[14rem] flex-1">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Unit AC</p>
                         <p class="mt-1 text-2xl font-bold text-gray-800">{{ $angka($unit['total_unit']) }}</p>
                         <p class="mt-1 text-xs text-gray-400">
@@ -64,7 +64,7 @@
                             rata-rata {{ $unit['rata_rata'] }} unit/customer
                         </p>
                     </div>
-                    <div class="{{ $kartu }} lg:col-span-2">
+                    <div class="{{ $kartu }} min-w-[18rem] flex-[2]">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Top Customer (jumlah unit)</p>
                         @if (empty($unit['top']))
                             <p class="mt-2 text-sm text-gray-400">Belum ada unit terdaftar.</p>
@@ -83,16 +83,16 @@
 
                 <div>
                     <p class="mb-2 text-sm font-semibold text-gray-600">Follow-up jadwal cuci — {{ $bulanLabel }}</p>
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div class="{{ $kartu }} border-l-4 border-amber-400">
+                    <div class="flex flex-wrap gap-4">
+                        <div class="{{ $kartu }} min-w-[12rem] flex-1 border-l-4 border-amber-400">
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Perlu Difollow Up</p>
                             <p class="mt-1 text-2xl font-bold text-amber-600">{{ $angka($followUp['perlu_difollow_up']) }}</p>
                         </div>
-                        <div class="{{ $kartu }} border-l-4 border-blue-400">
+                        <div class="{{ $kartu }} min-w-[12rem] flex-1 border-l-4 border-blue-400">
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Sudah Di-follow Up (Pending)</p>
                             <p class="mt-1 text-2xl font-bold text-blue-600">{{ $angka($followUp['sudah_pending']) }}</p>
                         </div>
-                        <div class="{{ $kartu }} border-l-4 border-emerald-400">
+                        <div class="{{ $kartu }} min-w-[12rem] flex-1 border-l-4 border-emerald-400">
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Sudah Di-follow Up (Terlaksana)</p>
                             <p class="mt-1 text-2xl font-bold text-emerald-600">{{ $angka($followUp['terlaksana']) }}</p>
                         </div>
