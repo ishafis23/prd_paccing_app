@@ -158,3 +158,14 @@ Tidak ada migrasi yang menghapus kolom/tabel data. Satu migrasi bersifat backfil
 - PDF/PNG bukti visual: `_brief/scratch/sup06-hal1.png` (laporan), `sup09-invoice-saja-hal1.png`
   (faktur), `sup09-invoice-lampiran-hal{2,3}.png` (lampiran laporan di belakang faktur).
 - Backup DB sebelum tiap gelombang: `_backup/database-pre-fase*.sqlite`.
+
+---
+
+## 9. Perbaikan SETELAH push pertama (ditemukan saat deploy live)
+
+| Isu | Sifat | Perbaikan |
+|---|---|---|
+| Halaman **Laporan Bulanan** error saat customer dipilih: `TypeError: Select::isOptionDisabled(): Argument #2 ($label) must be of type string, null given` | **Bug nyata di kode**, hanya muncul pada data produksi: `customer_addresses.nama_lokasi` NULL (di data uji semua terisi) | Opsi "Cabang" dibentuk dari `labelTampil()` + fallback `Cabang #id`; ditambah test regresi yang TERBUKTI gagal pada kode lama dan lulus pada kode baru — commit `42d2d50` |
+| `Class "Barryvdh\DomPDF\Facade\Pdf" not found` saat deploy | **Bukan bug**: paket belum terpasang di hosting karena `composer install` belum berhasil (`php composer install` → PHP mencari file bernama "composer"). Folder `vendor/` memang tidak ikut git | Selesaikan `composer install --no-dev --optimize-autoloader` (program `composer`, bukan argumen `php`) |
+| `FilePenyimpananTest` ×2 merah setelah siapa pun membuat laporan PDF di mesin itu | Kelemahan isolasi test (bukan bug produk): kuota penyimpanan ikut menghitung disk `local`, sementara test hanya mem-fake disk `public` | `Storage::fake('local')` di test — dibuktikan: dengan file nyata 200 KB di `storage/app/private/laporan/cache`, test tetap lulus |
+

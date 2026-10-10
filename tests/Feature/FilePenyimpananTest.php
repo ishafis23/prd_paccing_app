@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     Storage::fake('public');
+    // Kuota menghitung disk `local` juga (folder laporan PDF/cache resize, dev-plan/21 fase 5).
+    // Tanpa fake ini, test jadi bergantung file nyata di storage/app/private/laporan — mis.
+    // sisa dari siapa pun yang baru membuat laporan di mesin itu.
+    Storage::fake('local');
     config(['penyimpanan.kuota_mb' => 1]); // 1 MB default utk test
     StorageQuotaService::lupakanCache();
 });
