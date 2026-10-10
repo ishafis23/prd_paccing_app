@@ -209,7 +209,7 @@ class OrderDispatchImportService
             $order = Order::create([
                 'customer_id' => $customer->id,
                 'service_catalog_id' => $catalog->id,
-                'jumlah_unit' => 1,
+                'jumlah_unit' => count($antrian),
                 'alamat_pengerjaan' => $customer->alamat,
                 'jenis_pelanggan' => $customer->jenis?->value,
                 'tanggal_jadwal' => $meta['tanggal_jadwal'] ?? null,

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\IncomeCategory;
 use App\Enums\ServiceType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,8 @@ class OrderItem extends Model
         'customer_ac_unit_id',
         'nama_layanan',
         'kategori',
+        'komponen',
+        'penyesuaian',
         'harga',
         'jumlah',
         'dibatalkan',
@@ -37,11 +40,32 @@ class OrderItem extends Model
     {
         return [
             'kategori' => ServiceType::class,
+            'komponen' => IncomeCategory::class,
+            'penyesuaian' => 'boolean',
             'harga' => 'decimal:2',
             'jumlah' => 'integer',
             'dibatalkan' => 'boolean',
             'dibatalkan_pada' => 'datetime',
         ];
+    }
+
+    /**
+     * `komponen` selalu terisi: bila pembuat baris tidak menyebutnya, turunkan
+     * dari mode_omset katalog, atau dari kategori/nama baris (manual).
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (OrderItem $item): void {
+            if ($item->komponen !== null) {
+                return;
+            }
+
+            $catalog = $item->service_catalog_id !== null ? ServiceCatalog::find($item->service_catalog_id) : null;
+
+            $item->komponen = $catalog !== null
+                ? $catalog->komponenOmset()
+                : IncomeCategory::defaultUntukBaris($item->kategori, $item->nama_layanan);
+        });
     }
 
     /**
@@ -80,6 +104,36 @@ class OrderItem extends Model
     public function subtotal(): float
     {
         return (float) $this->harga * $this->jumlah;
+    }
+
+    /**
+     * Baris ini jasa atau material? (kolom `komponen`, bisa diubah admin).
+     */
+    public function komponenOmset(): IncomeCategory
+    {
+        return $this->komponen ?? IncomeCategory::untukLayanan($this->kategori);
+    }
+
+    /**
+     * Total omset per komponen utk sekumpulan baris (baris dibatalkan diabaikan).
+     * Σ jasa + Σ material = Σ subtotal baris aktif = Order::total().
+     *
+     * @param  iterable<int, OrderItem>  $items
+     * @return array{jasa: float, material: float}
+     */
+    public static function totalPerKomponen(iterable $items): array
+    {
+        $hasil = ['jasa' => 0.0, 'material' => 0.0];
+
+        foreach ($items as $item) {
+            if ($item->dibatalkan()) {
+                continue;
+            }
+
+            $hasil[$item->komponenOmset()->value] += $item->subtotal();
+        }
+
+        return $hasil;
     }
 
     /**

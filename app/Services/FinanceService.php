@@ -68,7 +68,7 @@ class FinanceService
         $pendapatan = $akuntan->pendapatan($dari, $sampai);
         $pengeluaran = $akuntan->pengeluaran($dari, $sampai)->filter(fn (array $r): bool => $r['dihitung']);
 
-        $pendapatanPer = fn (IncomeCategory $k): float => (float) $pendapatan->where('kategori', $k)->sum('total');
+        $pendapatanPer = fn (IncomeCategory $k): float => (float) $pendapatan->sum('total_'.$k->value);
         // Pengeluaran teknisi (bensin/makan/dll.) masuk operasional; 'material' tetap material.
         $pengeluaranPer = fn (ExpenseCategory $k): float => (float) $pengeluaran->filter(
             fn (array $r): bool => $r['kategori'] === $k->value

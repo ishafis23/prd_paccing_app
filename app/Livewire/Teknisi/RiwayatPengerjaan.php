@@ -50,7 +50,7 @@ class RiwayatPengerjaan extends Component
                 'serviceCatalog',
                 fn ($qc) => $qc->where('jenis_layanan', $this->jenisLayanan)
             ))
-            ->with(['customer', 'serviceCatalog', 'latestPayment'])
+            ->with(['customer', 'serviceCatalog', 'latestPayment', 'orderItems'])
             ->orderByDesc('updated_at')
             ->paginate(10);
 

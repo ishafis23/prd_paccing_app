@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\IncomeCategory;
 use App\Enums\ServiceType;
 use App\Enums\UnitType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +18,7 @@ class ServiceCatalog extends Model
         'jenis_unit',
         'pk',
         'harga',
+        'mode_omset',
         'interval_bulan',
         'aktif',
         // B38: konten layanan untuk landing page.
@@ -51,6 +53,15 @@ class ServiceCatalog extends Model
         ]);
 
         return implode(' · ', $bagian);
+    }
+
+    /**
+     * Komponen omset baris order yang dibuat dari katalog ini: `jasa`/`material`
+     * bila dipaksa owner, selain itu otomatis menurut jenis layanan.
+     */
+    public function komponenOmset(): IncomeCategory
+    {
+        return IncomeCategory::tryFrom((string) $this->mode_omset) ?? IncomeCategory::untukLayanan($this->jenis_layanan);
     }
 
     public function orders(): HasMany

@@ -39,6 +39,16 @@ class ServiceCatalogResource extends BaseResource
                     ->numeric()
                     ->prefix('Rp')
                     ->required(),
+                Forms\Components\Select::make('mode_omset')
+                    ->label('Masuk Omset')
+                    ->options([
+                        'otomatis' => 'Otomatis (Cuci/Service = Jasa, lainnya = Material)',
+                        'jasa' => 'Selalu Jasa',
+                        'material' => 'Selalu Material',
+                    ])
+                    ->default('otomatis')
+                    ->required()
+                    ->helperText('Dipakai saat baris order dibuat dari katalog ini. Bisa diubah per baris di detail order.'),
                 Forms\Components\TextInput::make('interval_bulan')
                     ->label('Interval Reminder (bulan)')
                     ->helperText('Kosongkan jika layanan ini tidak perlu reminder servis berikutnya (mis. pengadaan AC).')
@@ -56,6 +66,7 @@ class ServiceCatalogResource extends BaseResource
                 Tables\Columns\TextColumn::make('jenis_unit')->sortable(),
                 Tables\Columns\TextColumn::make('pk')->label('PK'),
                 Tables\Columns\TextColumn::make('harga')->money('IDR')->sortable(),
+                Tables\Columns\TextColumn::make('mode_omset')->label('Omset')->badge()->formatStateUsing(fn (?string $state): string => ucfirst($state ?? 'otomatis')),
                 Tables\Columns\TextColumn::make('interval_bulan')->label('Interval (bln)'),
                 Tables\Columns\IconColumn::make('aktif')->boolean(),
             ])

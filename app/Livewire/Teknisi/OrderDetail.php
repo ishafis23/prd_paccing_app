@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Teknisi;
 
+use App\Enums\IncomeCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
@@ -77,6 +78,9 @@ class OrderDetail extends Component
     public string $layananBaruKategori = '';
 
     public string $layananBaruHarga = '';
+
+    /** Komponen omset baris baru: jasa|material (default otomatis dari kategori/nama, bisa diganti). */
+    public string $layananBaruKomponen = 'jasa';
 
     public int $layananBaruJumlah = 1;
 
@@ -555,6 +559,25 @@ class OrderDetail extends Component
         $this->resetValidation();
     }
 
+    public function updatedLayananBaruNama(): void
+    {
+        $this->setKomponenDefault();
+    }
+
+    public function updatedLayananBaruKategori(): void
+    {
+        $this->setKomponenDefault();
+    }
+
+    /** Default Jasa/Material: material bila Pengadaan atau nama terbaca barang. */
+    private function setKomponenDefault(): void
+    {
+        $this->layananBaruKomponen = IncomeCategory::defaultUntukBaris(
+            ServiceType::tryFrom($this->layananBaruKategori),
+            $this->layananBaruNama,
+        )->value;
+    }
+
     /**
      * Teknisi menambah baris layanan saat order berjalan (menuju
      * lokasi/dikerjakan). Isian manual: nama + kategori (menentukan grup
@@ -566,6 +589,7 @@ class OrderDetail extends Component
             'layananBaruNama' => ['required', 'string', 'min:2', 'max:100'],
             'layananBaruKategori' => ['required', Rule::in(array_keys($this->kategoriLayanan))],
             'layananBaruHarga' => ['required', 'numeric', 'min:0'],
+            'layananBaruKomponen' => ['required', Rule::in(['jasa', 'material'])],
             'layananBaruJumlah' => ['required', 'integer', 'min:1', 'max:1000'],
             'layananBaruCatatan' => ['nullable', 'string', 'max:255'],
         ]);
@@ -574,6 +598,7 @@ class OrderDetail extends Component
             app(OrderService::class)->tambahLayananOlehTeknisi($this->order, auth()->user(), [
                 'nama_layanan' => $this->layananBaruNama,
                 'kategori' => $this->layananBaruKategori,
+                'komponen' => $this->layananBaruKomponen,
                 'harga' => (float) $this->layananBaruHarga,
                 'jumlah' => (int) $this->layananBaruJumlah,
                 'catatan' => $this->layananBaruCatatan,

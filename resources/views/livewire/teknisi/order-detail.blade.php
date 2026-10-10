@@ -117,9 +117,7 @@
         <div class="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
             <span class="flex min-w-0 items-center gap-2 text-sm text-gray-500">
                 <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" />
-                <span class="truncate">{{ $order->serviceCatalog->jenis_layanan->value }}</span>
-                <span class="text-gray-300">&middot;</span>
-                <span class="shrink-0">{{ $order->jumlah_unit }} unit</span>
+                <span class="truncate">{{ $order->ringkasanLayanan() }}</span>
             </span>
             <span class="shrink-0 text-sm font-extrabold text-gray-900">{{ $fmtRp($totalTagihan) }}</span>
         </div>
@@ -334,14 +332,14 @@
                 <form wire:submit="tambahLayanan" class="mt-3 space-y-2.5 rounded-xl bg-blue-50 p-3 ring-1 ring-blue-200">
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-blue-900">Nama layanan</label>
-                        <input type="text" wire:model="layananBaruNama" placeholder="mis. Cuci AC tambahan"
+                        <input type="text" wire:model.live.blur="layananBaruNama" placeholder="mis. Cuci AC tambahan"
                             class="w-full rounded-lg border border-blue-200 bg-white text-sm">
                         @error('layananBaruNama') <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="mb-1 block text-xs font-semibold text-blue-900">Kategori</label>
-                            <select wire:model="layananBaruKategori" class="w-full rounded-lg border border-blue-200 bg-white text-sm">
+                            <select wire:model.live="layananBaruKategori" class="w-full rounded-lg border border-blue-200 bg-white text-sm">
                                 <option value="">— pilih —</option>
                                 @foreach ($this->kategoriLayanan as $nilai => $label)
                                     <option value="{{ $nilai }}">{{ $label }}</option>
@@ -368,6 +366,14 @@
                             <input type="text" wire:model="layananBaruCatatan"
                                 class="w-full rounded-lg border border-blue-200 bg-white text-sm">
                         </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-blue-900">Masuk omset</label>
+                        <div class="flex gap-4 text-sm text-blue-900">
+                            <label class="flex items-center gap-1.5"><input type="radio" wire:model="layananBaruKomponen" value="jasa"> Jasa</label>
+                            <label class="flex items-center gap-1.5"><input type="radio" wire:model="layananBaruKomponen" value="material"> Material</label>
+                        </div>
+                        @error('layananBaruKomponen') <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <p class="text-[11px] text-blue-700">Grup foto otomatis mengikuti kategori yang dipilih.</p>
                     <div class="flex gap-2">

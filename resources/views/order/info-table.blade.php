@@ -16,7 +16,7 @@
                 <tr class="border-b border-gray-200 dark:border-gray-700">
                     <td class="py-4 px-4 font-semibold text-gray-700 dark:text-gray-300 w-1/3 align-top">Layanan</td>
                     <td class="py-4 px-4 text-gray-900 dark:text-white align-top">
-                        {{ $getState()->serviceCatalog?->jenis_layanan->value ?? '—' }}
+                        {{ $getState()->ringkasanLayanan() }}
                     </td>
                 </tr>
                 <tr class="border-b border-gray-200 dark:border-gray-700">

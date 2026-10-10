@@ -26,7 +26,7 @@ use Illuminate\Support\Collection;
 class AkuntanService
 {
     /**
-     * @return Collection<int, array{order_id: int, tanggal: string, customer: string, layanan: string, total: float, kategori: IncomeCategory, items: array<int, array<string, mixed>>}>
+     * @return Collection<int, array{order_id: int, tanggal: string, customer: string, layanan: string, total: float, total_jasa: float, total_material: float, kategori: IncomeCategory, items: array<int, array<string, mixed>>}>
      */
     public function pendapatan(CarbonInterface $dari, CarbonInterface $sampai): Collection
     {
@@ -42,14 +42,27 @@ class AkuntanService
             ->map(function (Order $order): array {
                 $items = $order->orderItems->sortBy('id')->values();
                 $utama = $items->first();
+                $total = $order->total();
+
+                // Omset dipisah per komponen baris (jasa/material). Order tanpa
+                // item (data sangat lama) jatuh ke aturan lama per katalog.
+                if ($items->isNotEmpty()) {
+                    $split = $order->totalPerKomponen();
+                } else {
+                    $kategoriLama = IncomeCategory::untukLayanan($order->serviceCatalog?->jenis_layanan);
+                    $split = ['jasa' => 0.0, 'material' => 0.0, $kategoriLama->value => $total];
+                }
 
                 return [
                     'order_id' => $order->id,
                     'tanggal' => (string) $order->getAttribute('tanggal_pendapatan'),
                     'customer' => $order->customer?->nama ?? 'Tanpa nama',
                     'layanan' => $utama?->nama_layanan ?? 'Layanan',
-                    'total' => $order->total(),
-                    'kategori' => IncomeCategory::untukLayanan($order->serviceCatalog?->jenis_layanan),
+                    'total' => $total,
+                    'total_jasa' => (float) $split['jasa'],
+                    'total_material' => (float) $split['material'],
+                    // Komponen dominan — hanya utk tampilan/kompatibilitas; hitungan memakai total_jasa/total_material.
+                    'kategori' => $split['material'] > $split['jasa'] ? IncomeCategory::Material : IncomeCategory::Jasa,
                     'items' => $items->map(fn ($item, int $i) => [
                         'nama' => $item->nama_layanan,
                         'jumlah' => (int) $item->jumlah,

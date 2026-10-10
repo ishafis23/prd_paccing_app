@@ -252,6 +252,63 @@ class Order extends Model
     }
 
     /**
+     * Baris item yang dihitung sebagai layanan/unit: bukan dibatalkan dan
+     * bukan baris penyesuaian koreksi total.
+     *
+     * @return \Illuminate\Support\Collection<int, OrderItem>
+     */
+    private function itemsUnitAktif(): \Illuminate\Support\Collection
+    {
+        return $this->orderItems->reject(fn (OrderItem $i) => $i->dibatalkan() || $i->penyesuaian);
+    }
+
+    /**
+     * Jumlah unit sebenarnya = Σ order_items.jumlah baris aktif. Kolom
+     * `jumlah_unit` hanya fallback utk order tanpa item.
+     */
+    public function jumlahUnit(): int
+    {
+        if ($this->orderItems->isEmpty()) {
+            return (int) $this->jumlah_unit ?: 1;
+        }
+
+        return (int) $this->itemsUnitAktif()->sum('jumlah');
+    }
+
+    /**
+     * Ringkasan per layanan, mis. "Cuci AC · 2 unit, Ganti Kapasitor · 1 unit".
+     */
+    public function ringkasanLayanan(): string
+    {
+        $aktif = $this->itemsUnitAktif();
+
+        if ($aktif->isEmpty()) {
+            $nama = $this->serviceCatalog !== null
+                ? str($this->serviceCatalog->jenis_layanan->value)->headline()->toString()
+                : 'Layanan';
+
+            return $nama.' · '.$this->jumlahUnit().' unit';
+        }
+
+        return $aktif
+            ->groupBy(fn (OrderItem $i) => str_contains((string) $i->nama_layanan, '_')
+                ? str($i->nama_layanan)->headline()->toString() // data lama menyimpan nilai enum mentah (cuci_ac)
+                : ($i->nama_layanan ?: 'Layanan'))
+            ->map(fn ($baris, string $nama) => $nama.' · '.(int) $baris->sum('jumlah').' unit')
+            ->implode(', ');
+    }
+
+    /**
+     * Omset order dipisah per komponen baris: ['jasa' => x, 'material' => y].
+     *
+     * @return array{jasa: float, material: float}
+     */
+    public function totalPerKomponen(): array
+    {
+        return OrderItem::totalPerKomponen($this->orderItems);
+    }
+
+    /**
      * Baris order_items pertama dibuat otomatis dari service_catalog_id/
      * jumlah_unit saat order dibuat — supaya Order::total() konsisten
      * lintas semua jalur pembuatan order (OrderService, factory, seeder)

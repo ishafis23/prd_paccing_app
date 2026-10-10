@@ -146,8 +146,8 @@ class DashboardPimpinanService
 
         return [
             'pendapatan' => $totalPendapatan,
-            'pendapatan_jasa' => (float) $pendapatan->where('kategori', IncomeCategory::Jasa)->sum('total'),
-            'pendapatan_material' => (float) $pendapatan->where('kategori', IncomeCategory::Material)->sum('total'),
+            'pendapatan_jasa' => (float) $pendapatan->sum('total_jasa'),
+            'pendapatan_material' => (float) $pendapatan->sum('total_material'),
             'pengeluaran' => $totalPengeluaran,
             'pengeluaran_pending' => (float) $pengeluaran->where('dihitung', false)->sum('nominal'),
             'laba_rugi' => $totalPendapatan - $totalPengeluaran,

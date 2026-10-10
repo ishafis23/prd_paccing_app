@@ -87,7 +87,7 @@
         @endif
         <div class="flex justify-between gap-4">
             <dt class="text-gray-500 shrink-0">Layanan</dt>
-            <dd class="text-right">{{ $layananNama }}{{ $unitNama ? ' — ' . $unitNama : '' }} &times; {{ $order->jumlah_unit }}</dd>
+            <dd class="text-right">{{ $layananNama }}{{ $unitNama ? ' — ' . $unitNama : '' }} &times; {{ $order->jumlahUnit() }}</dd>
         </div>
         <div class="flex justify-between gap-4">
             <dt class="text-gray-500 shrink-0">Teknisi</dt>

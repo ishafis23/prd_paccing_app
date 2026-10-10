@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\IncomeCategory;
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
 use App\Enums\ServiceType;
@@ -137,7 +138,7 @@ class OrderService
                 'customer_id' => $customer->id,
                 'customer_address_id' => $alamat?->id,
                 'service_catalog_id' => $catalog->id,
-                'jumlah_unit' => 1,
+                'jumlah_unit' => $units->count(),
                 'alamat_pengerjaan' => $alamat?->alamat ?? $customer->alamat,
                 'jenis_pelanggan' => $customer->jenis?->value,
                 'tanggal_jadwal' => $data['tanggal_jadwal'] ?? null,
@@ -154,6 +155,7 @@ class OrderService
             $stub->update([
                 'customer_ac_unit_id' => $units->first()->id,
                 'harga' => $hargaDefault,
+                'jumlah' => 1, // stub memakai orders.jumlah_unit (= jumlah unit total), baris ini hanya 1 unit
             ]);
 
             foreach ($units->slice(1) as $unit) {
@@ -311,6 +313,7 @@ class OrderService
                         'customer_ac_unit_id' => $acUnit?->id,
                         'nama_layanan' => str($catalog->jenis_layanan->value)->headline()->toString(),
                         'kategori' => $catalog->jenis_layanan,
+                        'komponen' => $catalog->komponenOmset(),
                         'harga' => $harga,
                         'jumlah' => max(1, (int) ($item['jumlah'] ?? 1)),
                         'catatan' => filled($item['catatan'] ?? null) ? $item['catatan'] : null,
@@ -325,7 +328,7 @@ class OrderService
                     'service_catalog_id' => $first['service_catalog_id'],
                     'customer_ac_unit_id' => $first['customer_ac_unit_id'],
                     'teknisi_id' => $teknisi?->id,
-                    'jumlah_unit' => 1,
+                    'jumlah_unit' => max(1, (int) array_sum(array_column($resolved, 'jumlah'))),
                     'alamat_pengerjaan' => $alamat?->alamat ?? $customer->alamat,
                     'jenis_pelanggan' => $data['jenis_pelanggan'] ?? $customer->jenis?->value,
                     'tanggal_jadwal' => $blok['tanggal_jadwal'] ?? null,
@@ -687,15 +690,38 @@ class OrderService
         $kategori = filled($data['kategori'] ?? null) ? ServiceType::from($data['kategori']) : null;
         $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $order->customer);
 
-        return $order->orderItems()->create([
+        $komponen = filled($data['komponen'] ?? null)
+            ? (IncomeCategory::tryFrom((string) $data['komponen']) ?? throw new BusinessRuleException('Komponen omset harus Jasa atau Material.'))
+            : IncomeCategory::defaultUntukBaris($kategori, $namaLayanan);
+
+        $item = $order->orderItems()->create([
             'customer_ac_unit_id' => $acUnit?->id,
             'nama_layanan' => $namaLayanan,
             'kategori' => $kategori,
+            'komponen' => $komponen,
             'harga' => $harga,
             'jumlah' => $jumlah,
             'catatan' => filled($data['catatan'] ?? null) ? $data['catatan'] : null,
             'ditambahkan_oleh' => $actor->id,
         ]);
+
+        $order->unsetRelation('orderItems');
+
+        return $item;
+    }
+
+    /**
+     * Ubah komponen omset (jasa/material) sebuah baris — Owner/Admin/Finance,
+     * bukan teknisi. Tidak mengubah harga/total.
+     */
+    public function ubahKomponenItem(OrderItem $item, IncomeCategory $komponen, User $actor): OrderItem
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner, RoleName::Finance]);
+
+        $item->komponen = $komponen;
+        $item->save();
+
+        return $item->fresh();
     }
 
     /**
@@ -860,12 +886,30 @@ class OrderService
             throw new BusinessRuleException('Total baru harus berbeda dari total lama.');
         }
 
-        return OrderTotalCorrection::create([
-            'order_id' => $order->id,
-            'total_original' => $totalAsli,
-            'total_terkoreksi' => $totalBaru,
-            'alasan' => $alasan,
-            'dikoreksi_oleh' => $actor->id,
-        ]);
+        return DB::transaction(function () use ($order, $totalAsli, $totalBaru, $alasan, $actor): OrderTotalCorrection {
+            $koreksi = OrderTotalCorrection::create([
+                'order_id' => $order->id,
+                'total_original' => $totalAsli,
+                'total_terkoreksi' => $totalBaru,
+                'alasan' => $alasan,
+                'dikoreksi_oleh' => $actor->id,
+            ]);
+
+            // Selisih dicatat sebagai baris penyesuaian (komponen jasa) supaya
+            // Σ item = total terkoreksi: Order::total() & laporan ikut berubah.
+            $order->orderItems()->create([
+                'nama_layanan' => 'Penyesuaian total',
+                'kategori' => null,
+                'komponen' => IncomeCategory::Jasa,
+                'penyesuaian' => true,
+                'harga' => round($totalBaru - $totalAsli, 2),
+                'jumlah' => 1,
+                'catatan' => $alasan,
+                'ditambahkan_oleh' => $actor->id,
+            ]);
+            $order->unsetRelation('orderItems');
+
+            return $koreksi;
+        });
     }
 }

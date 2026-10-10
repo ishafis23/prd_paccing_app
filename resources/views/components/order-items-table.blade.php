@@ -54,6 +54,7 @@
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-sm font-semibold text-slate-900 dark:text-white w-12">Aksi</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Layanan</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Kategori</th>
+                <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-semibold text-slate-900 dark:text-white">Komponen</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Qty</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Harga</th>
                 <th class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-white">Subtotal</th>
@@ -116,6 +117,19 @@
                             <span class="text-slate-400">—</span>
                         @endif
                     </td>
+                    <td class="border border-slate-300 dark:border-slate-600 px-3 py-3 whitespace-nowrap">
+                        @php($komponenItem = $item->komponenOmset())
+                        @if (auth()->user()?->hasAnyRole(['owner', 'admin', 'finance']))
+                            <button type="button"
+                                onclick="ubahKomponenItem({{ $item->id }}, '{{ $komponenItem === \App\Enums\IncomeCategory::Jasa ? 'material' : 'jasa' }}')"
+                                title="Klik untuk pindah ke {{ $komponenItem === \App\Enums\IncomeCategory::Jasa ? 'Material' : 'Jasa' }}"
+                                class="inline-block px-2 py-1 text-xs font-semibold rounded cursor-pointer {{ $komponenItem === \App\Enums\IncomeCategory::Jasa ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                {{ $komponenItem->label() }} &#8646;
+                            </button>
+                        @else
+                            <span class="inline-block px-2 py-1 text-xs font-semibold rounded {{ $komponenItem === \App\Enums\IncomeCategory::Jasa ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">{{ $komponenItem->label() }}</span>
+                        @endif
+                    </td>
                     <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white font-medium">
                         {{ number_format($item->jumlah, 0, ',', '.') }}
                     </td>
@@ -128,7 +142,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-slate-500 dark:text-slate-400">
+                    <td colspan="8" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-slate-500 dark:text-slate-400">
                         Tidak ada layanan
                     </td>
                 </tr>
@@ -136,7 +150,7 @@
         </tbody>
         <tfoot>
             <tr class="bg-green-50 dark:bg-green-900/20 font-bold">
-                <td colspan="6" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white">
+                <td colspan="7" class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-slate-900 dark:text-white">
                     Total Keseluruhan:
                 </td>
                 <td class="border border-slate-300 dark:border-slate-600 px-4 py-3 text-right text-lg text-green-600 dark:text-green-400">
@@ -254,6 +268,30 @@
 
             // Close dropdown
             document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.add('hidden'));
+        }
+
+        async function ubahKomponenItem(id, komponen) {
+            try {
+                const response = await fetch(`${orderItemBaseUrl}/order-items/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ komponen })
+                });
+
+                if (response.ok) {
+                    location.reload();
+                    return;
+                }
+
+                const err = await response.json().catch(() => ({}));
+                alert('Gagal: ' + (err.message || ('Status ' + response.status)));
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
         }
 
         async function toggleBatalItem(id, el) {

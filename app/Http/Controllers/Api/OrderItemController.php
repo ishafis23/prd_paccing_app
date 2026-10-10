@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\IncomeCategory;
 use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
 use App\Models\OrderItem;
@@ -23,7 +24,19 @@ class OrderItemController extends Controller
             'harga' => 'sometimes|required|numeric|min:0',
             'catatan' => 'nullable|string|max:500',
             'dibatalkan' => 'sometimes|boolean',
+            'komponen' => 'sometimes|in:jasa,material',
         ]);
+
+        // Ubah komponen omset (jasa/material) — Owner/Admin/Finance, bukan teknisi.
+        if (array_key_exists('komponen', $validated)) {
+            try {
+                app(OrderService::class)->ubahKomponenItem($orderItem, IncomeCategory::from($validated['komponen']), $request->user());
+            } catch (AuthorizationException $e) {
+                return response()->json(['message' => $e->getMessage()], 403);
+            }
+
+            $orderItem->refresh();
+        }
 
         // Tandai/aktifkan kembali unit "tidak jadi/batal" (revisi customer).
         if (array_key_exists('dibatalkan', $validated)) {

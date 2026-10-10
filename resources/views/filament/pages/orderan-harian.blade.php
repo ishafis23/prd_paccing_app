@@ -64,7 +64,7 @@
                                         <p class="font-semibold text-gray-900">{{ $order->customer?->nama }}</p>
                                         <p class="max-w-[220px] truncate text-xs text-gray-400">{{ $order->alamat_pengerjaan }}</p>
                                     </td>
-                                    <td class="px-4 py-3 text-gray-600">{{ $order->serviceCatalog?->jenis_layanan?->value }}</td>
+                                    <td class="px-4 py-3 text-gray-600">{{ $order->ringkasanLayanan() }}</td>
                                     <td class="px-4 py-3 text-gray-600">
                                         {{ $tim->isNotEmpty() ? $tim->join(', ') : '— belum di-assign —' }}
                                     </td>

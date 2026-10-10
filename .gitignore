@@ -28,3 +28,9 @@ Thumbs.db
 
 # Ekspor kontak WA (.vcf, data pribadi) — disimpan sementara di project, jangan masuk git.
 /dev-plan/dataexportwa/
+
+# Artefak kerja agen (brief, laporan, log, backup DB) — lokal saja, jangan masuk git.
+/_brief/
+/_backup/
+/_log/
+/storage/framework/lsp-*.php

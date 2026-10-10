@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\CustomerArea;
 use App\Enums\CustomerJenis;
 use App\Enums\ExpenseCategory;
+use App\Enums\IncomeCategory;
 use App\Enums\LeadSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -31,6 +32,7 @@ use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Infolists\Components\Actions;
 use Filament\Infolists\Components\Actions\Action as InfolistAction;
 use Filament\Infolists\Components\ImageEntry;
@@ -289,6 +291,7 @@ class OrderResource extends BaseResource
                                                 try {
                                                     $totalBaru = (float) $data['total_terkoreksi'];
                                                     $alasan = $data['alasan'];
+                                                    $totalLama = $record->total();
 
                                                     app(OrderService::class)->koreksiTotal(
                                                         $record,
@@ -300,7 +303,7 @@ class OrderResource extends BaseResource
                                                     Notification::make()
                                                         ->success()
                                                         ->title('Total berhasil dikoreksi')
-                                                        ->body("Total lama: Rp".number_format($record->total(), 0, ',', '.')." → Total baru: Rp".number_format($totalBaru, 0, ',', '.'))
+                                                        ->body("Total lama: Rp".number_format($totalLama, 0, ',', '.')." → Total baru: Rp".number_format($totalBaru, 0, ',', '.'))
                                                         ->send();
 
                                                     $record->refresh();
@@ -514,6 +517,10 @@ class OrderResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('customer.nama')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
+                Tables\Columns\TextColumn::make('unit')
+                    ->label('Unit')
+                    ->state(fn (Order $record): string => $record->jumlahUnit().' unit')
+                    ->tooltip(fn (Order $record): string => $record->ringkasanLayanan()),
                 Tables\Columns\TextColumn::make('teknisi.name')->label('Teknisi (PIC)')->placeholder('— belum di-assign —'),
                 Tables\Columns\TextColumn::make('anggota_tim')
                     ->label('Anggota Tim')
@@ -603,9 +610,25 @@ class OrderResource extends BaseResource
                             Forms\Components\TextInput::make('nama_layanan')
                                 ->label('Nama Layanan/Sparepart')
                                 ->required()
-                                ->maxLength(255),
+                                ->maxLength(255)
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn (Get $get, Set $set) => $set('komponen', IncomeCategory::defaultUntukBaris(
+                                    filled($get('kategori')) ? ServiceType::from($get('kategori')) : null,
+                                    $get('nama_layanan'),
+                                )->value)),
                             Forms\Components\Select::make('kategori')
-                                ->options(EnumOptions::for(ServiceType::class)),
+                                ->options(EnumOptions::for(ServiceType::class))
+                                ->live()
+                                ->afterStateUpdated(fn (Get $get, Set $set) => $set('komponen', IncomeCategory::defaultUntukBaris(
+                                    filled($get('kategori')) ? ServiceType::from($get('kategori')) : null,
+                                    $get('nama_layanan'),
+                                )->value)),
+                            Forms\Components\Radio::make('komponen')
+                                ->label('Masuk omset')
+                                ->options(['jasa' => 'Jasa', 'material' => 'Material'])
+                                ->default('jasa')
+                                ->inline()
+                                ->required(),
                             Forms\Components\Select::make('customer_ac_unit_id')
                                 ->label('Unit AC (opsional)')
                                 ->options(fn (Order $record) => CustomerAcUnit::query()
