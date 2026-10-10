@@ -10,10 +10,13 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderUnitReport;
 use App\Models\User;
+use App\Models\WorkReport;
 use App\Models\WorkReportPhoto;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -314,6 +317,211 @@ class UnitReportService
             'path' => $path,
             'urutan' => $urutan,
         ]));
+    }
+
+    /**
+     * Foto baris layanan ini diunggah PER UNIT (accordion Unit N)? Ya bila
+     * `jumlah` > 1 DAN baris unitnya sudah ada. Baris `jumlah` = 1 (atau
+     * order lama tanpa baris unit) tetap memakai unggahan per baris.
+     *
+     * @param  Collection<int, OrderUnitReport>|null  $unitItem  baris unit milik item ini
+     */
+    public function fotoPerUnit(OrderItem $item, ?Collection $unitItem): bool
+    {
+        return (int) $item->jumlah > 1 && $unitItem !== null && $unitItem->isNotEmpty();
+    }
+
+    /**
+     * Urutan unit DI DALAM baris layanannya (1..jumlah) — nilai `unit_no`
+     * pada work_report_photos (berbeda dengan order_unit_reports.unit_no
+     * yang berlanjut lintas baris dalam satu order).
+     */
+    public function urutanDalamBaris(OrderUnitReport $unit): int
+    {
+        return OrderUnitReport::query()
+            ->where('order_item_id', $unit->order_item_id)
+            ->where('unit_no', '<=', $unit->unit_no)
+            ->count();
+    }
+
+    /**
+     * Foto wajib yang kurang untuk baris layanan yang fotonya per unit
+     * (lihat fotoPerUnit()). Foto lama tanpa `order_unit_report_id` dihitung
+     * milik unit pertama barisnya. Baris yang ditangani di sini dilaporkan
+     * lewat 'item_ids' supaya pemeriksaan per baris×slot melewatinya.
+     *
+     * @param  Collection<int, OrderItem>  $itemsAktif
+     * @param  Collection<int, WorkReportPhoto>  $fotos
+     * @return array{kurang: array<int, array<string, mixed>>, item_ids: array<int, int>}
+     */
+    public function fotoUnitKurang(Order $order, Collection $itemsAktif, Collection $fotos): array
+    {
+        $unitPerItem = OrderUnitReport::query()
+            ->where('order_id', $order->id)
+            ->whereIn('order_item_id', $itemsAktif->pluck('id'))
+            ->orderBy('unit_no')
+            ->get()
+            ->groupBy('order_item_id');
+
+        $perUnit = $itemsAktif->filter(fn (OrderItem $i): bool => $this->fotoPerUnit($i, $unitPerItem->get($i->id)));
+
+        $idPerUnit = $perUnit->pluck('id')->flip();
+
+        $terisi = [];
+        foreach ($fotos as $foto) {
+            if (! $idPerUnit->has($foto->order_item_id)) {
+                continue;
+            }
+
+            $unitId = $foto->order_unit_report_id ?? $unitPerItem->get($foto->order_item_id)->first()->id;
+            $terisi[$unitId.'|'.$foto->slot] = true;
+        }
+
+        $kurang = [];
+        foreach ($perUnit as $item) {
+            foreach ($unitPerItem->get($item->id)->values() as $idx => $unit) {
+                foreach (\App\Support\FotoLaporanSlot::wajibUntuk($item->kategori) as $kodeSlot => $label) {
+                    if (isset($terisi[$unit->id.'|'.$kodeSlot])) {
+                        continue;
+                    }
+
+                    $kurang[] = [
+                        'jenis' => 'foto',
+                        'order_item' => $item,
+                        'kode_slot' => $kodeSlot,
+                        'label' => "{$item->nama_layanan} · Unit {$unit->unit_no} · {$label}",
+                        'unit_no' => $unit->unit_no,
+                        'unit_ke' => $idx + 1,
+                        'unit_report_id' => $unit->id,
+                    ];
+                }
+            }
+        }
+
+        return ['kurang' => $kurang, 'item_ids' => $perUnit->pluck('id')->all()];
+    }
+
+    /**
+     * Simpan (atau ganti) foto satu slot milik satu UNIT. Ditautkan ke laporan
+     * terakhir order; foto lama pada slot & unit yang sama dihapus (baris +
+     * file) supaya tidak ada sampah di disk.
+     *
+     * @throws BusinessRuleException|AuthorizationException
+     */
+    public function simpanFotoUnit(OrderUnitReport $unit, string $slot, UploadedFile|string $file, User $oleh): WorkReportPhoto
+    {
+        $order = Order::query()->findOrFail($unit->order_id);
+        $this->pastikanBolehMengisi($order, $oleh);
+
+        $item = $unit->orderItem()->firstOrFail();
+        if ($item->dibatalkan()) {
+            throw new BusinessRuleException('Layanan unit ini sudah dibatalkan.');
+        }
+
+        $urutan = array_search($slot, array_keys(\App\Support\FotoLaporanSlot::untuk($item->kategori)), true);
+        if ($urutan === false) {
+            throw new BusinessRuleException("Slot foto '{$slot}' tidak valid untuk layanan {$item->nama_layanan}.");
+        }
+
+        $laporan = $order->workReports()->latest('id')->first()
+            ?? throw new BusinessRuleException('Belum ada laporan pengerjaan — foto unit ikut tersimpan saat laporan dikirim.');
+
+        $path = $file instanceof UploadedFile ? $file->store('work-reports', 'public') : trim($file);
+        if ($path === '') {
+            throw new BusinessRuleException('Path foto tidak valid.');
+        }
+
+        return $this->tulisFotoUnit($laporan, $unit, $item, $slot, (int) $urutan, $path);
+    }
+
+    /**
+     * Validasi baris foto per unit dari payload submit laporan SEBELUM ada
+     * tulisan: unit harus milik order ini & item aktif, slot sesuai template.
+     *
+     * @param  array<int, array{order_unit_report_id: int, slot: string, path: string}>  $rows
+     * @return array<int, array{unit: OrderUnitReport, item: OrderItem, slot: string, path: string, urutan: int}>
+     */
+    public function validasiFotoUnit(Order $order, array $rows): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $units = OrderUnitReport::query()->where('order_id', $order->id)->with('orderItem')->get()->keyBy('id');
+        $hasil = [];
+
+        foreach ($rows as $row) {
+            $unit = $units->get((int) ($row['order_unit_report_id'] ?? 0))
+                ?? throw new BusinessRuleException('Unit untuk foto tidak ditemukan pada order ini.');
+            $item = $unit->orderItem;
+            if ($item === null || $item->dibatalkan()) {
+                throw new BusinessRuleException('Layanan unit ini sudah dibatalkan.');
+            }
+
+            $slot = trim((string) ($row['slot'] ?? ''));
+            $urutan = array_search($slot, array_keys(\App\Support\FotoLaporanSlot::untuk($item->kategori)), true);
+            if ($urutan === false) {
+                throw new BusinessRuleException("Slot foto '{$slot}' tidak valid untuk layanan {$item->nama_layanan}.");
+            }
+
+            $path = trim((string) ($row['path'] ?? ''));
+            if ($path === '') {
+                throw new BusinessRuleException('Path foto tidak valid.');
+            }
+
+            $hasil[] = ['unit' => $unit, 'item' => $item, 'slot' => $slot, 'path' => $path, 'urutan' => (int) $urutan];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param  array<int, array{unit: OrderUnitReport, item: OrderItem, slot: string, path: string, urutan: int}>  $rows  hasil validasiFotoUnit()
+     */
+    public function catatFotoUnit(WorkReport $laporan, array $rows): void
+    {
+        foreach ($rows as $row) {
+            $this->tulisFotoUnit($laporan, $row['unit'], $row['item'], $row['slot'], $row['urutan'], $row['path']);
+        }
+    }
+
+    private function tulisFotoUnit(WorkReport $laporan, OrderUnitReport $unit, OrderItem $item, string $slot, int $urutan, string $path): WorkReportPhoto
+    {
+        $unitKe = $this->urutanDalamBaris($unit);
+
+        [$foto, $pathLama] = DB::transaction(function () use ($laporan, $unit, $item, $slot, $urutan, $path, $unitKe): array {
+            $lama = WorkReportPhoto::query()
+                ->where('slot', $slot)
+                ->where(function ($q) use ($unit, $item, $unitKe): void {
+                    $q->where('order_unit_report_id', $unit->id);
+
+                    // Foto lama (sebelum Fase 4) tanpa tautan unit = milik unit pertama barisnya.
+                    if ($unitKe === 1) {
+                        $q->orWhere(fn ($w) => $w->where('order_item_id', $item->id)->whereNull('order_unit_report_id'));
+                    }
+                })
+                ->get();
+
+            $foto = WorkReportPhoto::create([
+                'work_report_id' => $laporan->id,
+                'order_item_id' => $item->id,
+                'unit_no' => $unitKe,
+                'order_unit_report_id' => $unit->id,
+                'slot' => $slot,
+                'path' => $path,
+                'urutan' => $urutan,
+            ]);
+
+            $lama->each->delete();
+
+            return [$foto, $lama->pluck('path')->filter()->reject(fn ($p) => $p === $path)->all()];
+        });
+
+        foreach ($pathLama as $p) {
+            Storage::disk('public')->delete($p);
+        }
+
+        return $foto;
     }
 
     /**

@@ -204,7 +204,7 @@ class TeknisiService
      * Efek otomatis (PRD alur 5): stok keluar per material, status order
      * menjadi `selesai` atau `butuh_followup`, check-out attendance.
      *
-     * @param  array{catatan: string, materials: array<int, array{stock_item_id: int, jumlah: int}>, foto_sebelum?: ?string, foto_sesudah?: ?string, foto_kategori?: array<int, array{order_item_id: int, slot: string, path: string}>, butuh_followup?: bool}  $payload
+     * @param  array{catatan: string, materials: array<int, array{stock_item_id: int, jumlah: int}>, foto_sebelum?: ?string, foto_sesudah?: ?string, foto_kategori?: array<int, array{order_item_id: int, slot: string, path: string}>, foto_unit?: array<int, array{order_unit_report_id: int, slot: string, path: string}>, butuh_followup?: bool}  $payload
      */
     public function submitLaporan(Order $order, User $teknisi, array $payload): WorkReport
     {
@@ -228,6 +228,9 @@ class TeknisiService
         // foto_sebelum/foto_sesudah generik utk laporan baru).
         $fotoKategori = $this->validasiFotoKategori($order, $payload['foto_kategori'] ?? []);
 
+        // Fase 4b: foto yang diunggah per UNIT (baris layanan jumlah > 1).
+        $fotoUnit = app(UnitReportService::class)->validasiFotoUnit($order, $payload['foto_unit'] ?? []);
+
         // dev-plan/17, B63 (direvisi 18 Sep): foto wajib yang kurang TIDAK
         // lagi memblokir submit di sini (supaya pembayaran tidak ikut
         // tertahan) — sebagai gantinya, teknisi ditahan sebelum berangkat
@@ -236,7 +239,7 @@ class TeknisiService
 
         // B25 (lapis kedua): kalau penyimpanan sudah penuh dan laporan
         // membawa foto, tolak sejak awal.
-        $bawaFoto = filled($payload['foto_sebelum'] ?? null) || filled($payload['foto_sesudah'] ?? null) || $fotoKategori !== [];
+        $bawaFoto = filled($payload['foto_sebelum'] ?? null) || filled($payload['foto_sesudah'] ?? null) || $fotoKategori !== [] || $fotoUnit !== [];
         if ($bawaFoto) {
             $quota = app(StorageQuotaService::class);
             if ($quota->pakaiBytes(segar: true) >= $quota->kuotaBytes()) {
@@ -244,7 +247,7 @@ class TeknisiService
             }
         }
 
-        return DB::transaction(function () use ($order, $teknisi, $payload, $catatan, $materials, $fotoKategori): WorkReport {
+        return DB::transaction(function () use ($order, $teknisi, $payload, $catatan, $materials, $fotoKategori, $fotoUnit): WorkReport {
             $attendance = $order->attendances()
                 ->where('user_id', $teknisi->id)
                 ->whereNull('jam_keluar')
@@ -265,6 +268,7 @@ class TeknisiService
 
             $this->catatMaterial($report, $teknisi, $materials);
             $this->catatFotoKategori($report, $fotoKategori);
+            app(UnitReportService::class)->catatFotoUnit($report, $fotoUnit);
 
             $order->status = ! empty($payload['butuh_followup'])
                 ? OrderStatus::ButuhFollowup
@@ -399,14 +403,25 @@ class TeknisiService
     {
         $itemsAktif = $order->orderItems->reject(fn (OrderItem $i): bool => $i->dibatalkan());
 
-        $terisi = WorkReportPhoto::query()
+        $fotos = WorkReportPhoto::query()
             ->whereIn('order_item_id', $itemsAktif->pluck('id'))
-            ->get()
+            ->get();
+
+        $terisi = $fotos
             ->map(fn (WorkReportPhoto $p): string => $p->order_item_id.'|'.$p->slot)
             ->flip();
 
+        // Baris layanan jumlah > 1 yang punya baris unit: foto wajib dicek
+        // PER UNIT (bukan per baris×slot) — lihat UnitReportService::fotoUnitKurang().
+        $unitReports = app(UnitReportService::class);
+        $perUnit = $unitReports->fotoUnitKurang($order, $itemsAktif, $fotos);
+
         $kurang = [];
         foreach ($itemsAktif as $item) {
+            if (in_array($item->id, $perUnit['item_ids'], true)) {
+                continue;
+            }
+
             foreach (FotoLaporanSlot::wajibUntuk($item->kategori) as $kodeSlot => $label) {
                 if (! $terisi->has($item->id.'|'.$kodeSlot)) {
                     $kurang[] = ['jenis' => 'foto', 'order_item' => $item, 'kode_slot' => $kodeSlot, 'label' => $label];
@@ -414,7 +429,7 @@ class TeknisiService
             }
         }
 
-        return [...$kurang, ...app(UnitReportService::class)->keteranganKurang($order)];
+        return [...$kurang, ...$perUnit['kurang'], ...$unitReports->keteranganKurang($order)];
     }
 
     /**

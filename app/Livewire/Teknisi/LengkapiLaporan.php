@@ -29,7 +29,8 @@ class LengkapiLaporan extends Component
             ->get()
             ->map(function (Order $order) use ($service): array {
                 $kurang = collect($service->fotoWajibKurang($order));
-                $ketPertama = $kurang->firstWhere('jenis', 'keterangan');
+                // Keterangan unit atau foto per unit (Fase 4b) — keduanya diisi di accordion unit.
+                $ketPertama = $kurang->first(fn (array $k): bool => isset($k['unit_no']));
 
                 return [
                     'order' => $order,

@@ -515,12 +515,20 @@
                                                 <span class="font-normal text-gray-400">— {{ $item->acUnit->labelTampil() }}</span>
                                             @endif
                                         </p>
-                                        <p class="mt-0.5 text-xs text-gray-500">{{ $uploadedCount }}/{{ $totalSlots }} foto terupload</p>
+                                        @if (isset($itemFotoPerUnit[$item->id]))
+                                            <p class="mt-0.5 text-xs text-gray-500">Foto diunggah per unit</p>
+                                        @else
+                                            <p class="mt-0.5 text-xs text-gray-500">{{ $uploadedCount }}/{{ $totalSlots }} foto terupload</p>
+                                        @endif
                                     </div>
 
                                     <div class="flex items-center gap-2 shrink-0">
                                         {{-- Status indicator --}}
-                                        @if ($fotoLengkap)
+                                        @if (isset($itemFotoPerUnit[$item->id]))
+                                            <span class="flex items-center justify-center text-blue-500">
+                                                <x-heroicon-o-information-circle class="h-5 w-5" />
+                                            </span>
+                                        @elseif ($fotoLengkap)
                                             <span class="flex items-center justify-center text-emerald-600">
                                                 <x-heroicon-o-check-circle class="h-5 w-5" />
                                             </span>
@@ -538,7 +546,14 @@
                                 </button>
 
                                 {{-- Content area (collapsible) --}}
-                                @if ($isExpanded)
+                                @if ($isExpanded && isset($itemFotoPerUnit[$item->id]))
+                                    {{-- Fase 4b: baris jumlah > 1 — foto menempel ke tiap unit, bukan ke baris. --}}
+                                    <div class="border-t border-gray-100 p-3 text-xs text-gray-500">
+                                        Layanan ini {{ $item->jumlah }} unit. Foto diunggah per unit di bagian
+                                        <a href="#keterangan-unit" class="font-semibold text-blue-600">Keterangan Unit</a>
+                                        (buka accordion Unit 1, 2, …).
+                                    </div>
+                                @elseif ($isExpanded)
                                     <div class="border-t border-gray-100 p-3">
                                         <div class="grid grid-cols-2 gap-2">
                                             @foreach ($fotoSlots[$item->id] ?? [] as $slotKey => $slotLabel)
@@ -756,8 +771,9 @@
          tidak bisa berangkat ke order berikutnya sebelum ini dilengkapi. --}}
     @if (! empty($this->fotoWajibKurang))
         @php
-            $kurangFoto = collect($this->fotoWajibKurang)->where('jenis', 'foto');
-            $kurangKeterangan = collect($this->fotoWajibKurang)->where('jenis', 'keterangan');
+            // Foto per unit (Fase 4b) tidak diunggah di sini — tautkan ke accordion unitnya.
+            $kurangFoto = collect($this->fotoWajibKurang)->where('jenis', 'foto')->whereNull('unit_report_id');
+            $kurangKeterangan = collect($this->fotoWajibKurang)->filter(fn ($k) => $k['jenis'] === 'keterangan' || isset($k['unit_report_id']));
         @endphp
         {{-- @submit dicek SAAT tombol ditekan: kalau masih ada foto yang
              diunggah, submit dibatalkan supaya foto yang belum selesai
@@ -778,7 +794,7 @@
                         <button type="button" wire:click="bukaUnit({{ $ket['unit_no'] }})"
                             @click="document.getElementById('unit-{{ $ket['unit_no'] }}')?.scrollIntoView({ behavior: 'smooth', block: 'center' })"
                             class="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-                            <span>{{ $ket['label'] }} <span class="font-normal text-amber-600">({{ $ket['order_item']->nama_layanan }})</span></span>
+                            <span>{{ $ket['label'] }}@if ($ket['jenis'] === 'keterangan') <span class="font-normal text-amber-600">({{ $ket['order_item']->nama_layanan }})</span>@endif</span>
                             <span class="text-amber-600">Isi →</span>
                         </button>
                     @endforeach

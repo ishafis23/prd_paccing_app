@@ -67,6 +67,9 @@ class OrderDetail extends Component
     /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] */
     public array $fotoKategori = [];
 
+    /** @var array<int, array<string, mixed>> [order_unit_report_id => [slot => UploadedFile]] — Fase 4b: foto per UNIT (baris layanan jumlah > 1). */
+    public array $fotoUnit = [];
+
     /** @var array<int, array<string, mixed>> [order_item_id => [slot => UploadedFile]] — dev-plan/17, B63 (revisi): lengkapi foto wajib setelah laporan tersubmit. */
     public array $fotoLengkapi = [];
 
@@ -754,6 +757,7 @@ class OrderDetail extends Component
             'fotoSebelum' => ['nullable', 'image', 'max:5120'],
             'fotoSesudah' => ['nullable', 'image', 'max:5120'],
             'fotoKategori.*.*' => ['nullable', 'image', 'max:5120'],
+            'fotoUnit.*.*' => ['nullable', 'image', 'max:5120'],
         ]);
 
         // B25: cek kuota SEBELUM file foto disimpan ke disk.
@@ -762,7 +766,7 @@ class OrderDetail extends Component
             $tambahBytes = (int) ($this->fotoSebelum?->getSize() ?? 0)
                 + (int) ($this->fotoSesudah?->getSize() ?? 0);
 
-            foreach ($this->fotoKategori as $slots) {
+            foreach ([...$this->fotoKategori, ...$this->fotoUnit] as $slots) {
                 foreach ($slots as $file) {
                     $tambahBytes += (int) ($file?->getSize() ?? 0);
                 }
@@ -792,6 +796,21 @@ class OrderDetail extends Component
             }
         }
 
+        $fotoUnit = [];
+        foreach ($this->fotoUnit as $unitId => $slots) {
+            foreach ($slots as $slot => $file) {
+                if (! $file instanceof UploadedFile) {
+                    continue;
+                }
+
+                $fotoUnit[] = [
+                    'order_unit_report_id' => (int) $unitId,
+                    'slot' => (string) $slot,
+                    'path' => $file->store('work-reports', 'public'),
+                ];
+            }
+        }
+
         $fotoSebelum = $this->fotoSebelum?->store('work-reports', 'public');
         $fotoSesudah = $this->fotoSesudah?->store('work-reports', 'public');
 
@@ -814,7 +833,27 @@ class OrderDetail extends Component
             ->mapWithKeys(fn (array $r): array => [$r['order_item_id'].'|'.$r['slot'] => true])
             ->all();
 
+        $sudahUnit = collect($fotoUnit)
+            ->mapWithKeys(fn (array $r): array => [$r['order_unit_report_id'].'|'.$r['slot'] => true])
+            ->all();
+
         foreach ($temp as $fieldName => $photo) {
+            if (str_starts_with($fieldName, 'fotoUnit.')) {
+                $bagian = explode('.', $fieldName);
+                $kunci = count($bagian) === 3 ? ((int) $bagian[1]).'|'.$bagian[2] : null;
+
+                if ($kunci !== null && ! isset($sudahUnit[$kunci])) {
+                    $fotoUnit[] = [
+                        'order_unit_report_id' => (int) $bagian[1],
+                        'slot' => (string) $bagian[2],
+                        'path' => $this->salinFotoTemp($photo->file_path, 'work-reports'),
+                    ];
+                    $sudahUnit[$kunci] = true;
+                }
+
+                continue;
+            }
+
             if (! str_starts_with($fieldName, 'fotoKategori.')) {
                 continue;
             }
@@ -849,6 +888,7 @@ class OrderDetail extends Component
             'foto_sebelum' => $fotoSebelum,
             'foto_sesudah' => $fotoSesudah,
             'foto_kategori' => $fotoKategori,
+            'foto_unit' => $fotoUnit,
         ];
 
         try {
@@ -876,9 +916,9 @@ class OrderDetail extends Component
             // Cleanup temp-photo yang sudah dikonsumsi jalur laporan
             // (fotoSebelum/Sesudah/fotoKategori). Sisa temp yang belum
             // terpakai sengaja dibiarkan agar bisa dilengkapi belakangan.
-            $this->bersihkanFotoTemp(['fotoSebelum', 'fotoSesudah', 'fotoKategori.']);
+            $this->bersihkanFotoTemp(['fotoSebelum', 'fotoSesudah', 'fotoKategori.', 'fotoUnit.']);
 
-            $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori']);
+            $this->reset(['materials', 'catatan', 'butuhFollowup', 'isKlaim', 'fotoSebelum', 'fotoSesudah', 'fotoKategori', 'fotoUnit']);
             $this->tempPhotos = [];
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
@@ -1073,6 +1113,63 @@ class OrderDetail extends Component
     }
 
     /**
+     * Fase 4b: simpan foto yang sudah diunggah pada satu UNIT (setelah laporan
+     * tersubmit). Sebelum laporan ada, foto itu ditahan di `$fotoUnit` dan
+     * ikut tersimpan saat submitLaporan(). Foto pada slot yang sama
+     * menggantikan foto lama unit itu.
+     */
+    public function simpanFotoUnitTerunggah(int $unitReportId): void
+    {
+        $unit = OrderUnitReport::query()->where('order_id', $this->orderId)->with('orderItem')->find($unitReportId);
+        if ($unit === null) {
+            session()->flash('error', 'Unit tidak ditemukan pada order ini.');
+
+            return;
+        }
+
+        $this->validate(["fotoUnit.{$unitReportId}.*" => ['nullable', 'image', 'max:5120']]);
+
+        $files = collect($this->fotoUnit[$unitReportId] ?? [])->filter(fn ($f): bool => $f instanceof UploadedFile);
+
+        // Jalur cadangan (endpoint temp-photo lama), pola sama dgn submitLaporan().
+        $temp = collect($this->fotoTempTersedia())
+            ->filter(fn ($p, string $nama): bool => str_starts_with($nama, "fotoUnit.{$unitReportId}.") && count(explode('.', $nama)) === 3)
+            ->reject(fn ($p, string $nama): bool => $files->has(explode('.', $nama)[2]));
+
+        if ($files->isEmpty() && $temp->isEmpty()) {
+            session()->flash('error', 'Pilih foto dulu sebelum menyimpan.');
+
+            return;
+        }
+
+        try {
+            $tambahBytes = (int) $files->sum(fn (UploadedFile $f): int => (int) $f->getSize());
+            if ($tambahBytes > 0) {
+                app(StorageQuotaService::class)->pastikanCukup($tambahBytes);
+            }
+
+            $service = app(UnitReportService::class);
+            foreach ($files as $slot => $file) {
+                $service->simpanFotoUnit($unit, (string) $slot, $file, auth()->user());
+            }
+            foreach ($temp as $nama => $photo) {
+                $service->simpanFotoUnit($unit, explode('.', $nama)[2], $this->salinFotoTemp($photo->file_path, 'work-reports'), auth()->user());
+            }
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        $this->bersihkanFotoTemp(["fotoUnit.{$unitReportId}."]);
+        unset($this->fotoUnit[$unitReportId]);
+        StorageQuotaService::lupakanCache();
+        $this->order->unsetRelation('workReports');
+
+        session()->flash('status', "Foto Unit {$unit->unit_no} tersimpan.");
+    }
+
+    /**
      * Toggle expanded/collapsed state untuk order item
      */
     public function toggleItemExpanded(int $itemId): void
@@ -1128,27 +1225,44 @@ class OrderDetail extends Component
         $unitService = app(UnitReportService::class);
         $unitReports = $this->unitReports();
         $this->muatUnitForm($unitReports);
+        $semuaFoto = $order->workReports->flatMap->photos;
 
-        $unitView = $unitReports->map(function (OrderUnitReport $unit) use ($unitService, $order, $unitReports): array {
+        $unitView = $unitReports->map(function (OrderUnitReport $unit) use ($unitService, $unitReports, $semuaFoto): array {
             $item = $unit->orderItem;
-            $pertamaItem = $unitReports->where('order_item_id', $item->id)->min('unit_no') === $unit->unit_no;
+            $unitItem = $unitReports->where('order_item_id', $item->id);
+            $pertamaItem = $unitItem->min('unit_no') === $unit->unit_no;
+
+            // Tiap unit hanya memuat fotonya sendiri; foto lama tanpa
+            // `order_unit_report_id` (sebelum Fase 4) tampil di unit pertama barisnya.
+            $foto = $semuaFoto
+                ->where('order_item_id', $item->id)
+                ->filter(fn ($p): bool => $p->order_unit_report_id === null
+                    ? $pertamaItem
+                    : (int) $p->order_unit_report_id === $unit->id)
+                ->sortBy('urutan')
+                ->values();
 
             return [
+                'perUnit' => $unitService->fotoPerUnit($item, $unitItem),
+                'slots' => \App\Support\FotoLaporanSlot::untuk($item->kategori),
+                'slotWajib' => \App\Support\FotoLaporanSlot::wajibUntuk($item->kategori),
+                'fotoPerSlot' => $foto->keyBy('slot'),
                 'unit' => $unit,
                 'item' => $item,
                 'tampil' => $unitService->fieldSetTampil($item),
                 'suhuWajib' => $unitService->suhuWajib($item),
                 'butuh' => $unitService->butuhKeterangan($item),
                 'lengkap' => $unitService->lengkap($unit, $item),
-                // Foto slot milik baris layanan dipajang di unit pertama baris itu.
-                'foto' => $pertamaItem
-                    ? $order->workReports->flatMap->photos->where('order_item_id', $item->id)->sortBy('urutan')->values()
-                    : collect(),
+                'foto' => $foto,
             ];
         });
 
+        // Baris layanan yang fotonya diunggah per unit — unggahan per baris disembunyikan.
+        $itemFotoPerUnit = $unitView->where('perUnit', true)->pluck('item.id')->unique()->flip()->all();
+
         return view('livewire.teknisi.order-detail', [
             'unitView' => $unitView,
+            'itemFotoPerUnit' => $itemFotoPerUnit,
             'order' => $order,
             'stockItems' => StockItem::query()->where('aktif', true)->orderBy('nama_barang')->get(),
             'orderStatus' => OrderStatus::class,

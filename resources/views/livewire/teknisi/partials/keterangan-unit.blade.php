@@ -38,7 +38,80 @@
 
                     @if ($terbuka)
                         <div class="space-y-3 border-t border-gray-100 bg-white p-3">
-                            @if ($uv['foto']->isNotEmpty())
+                            @if ($uv['perUnit'])
+                                {{-- Fase 4b: foto milik unit ini (baris layanan jumlah > 1). --}}
+                                @php $sudahLaporan = $order->workReports->isNotEmpty(); @endphp
+                                <div>
+                                    <p class="mb-1 text-xs font-semibold text-gray-600">Foto Unit {{ $unit->unit_no }}</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        @foreach ($uv['slots'] as $slotKey => $slotLabel)
+                                            @php
+                                                $tersimpan = $uv['fotoPerSlot']->get($slotKey);
+                                                $wajib = array_key_exists($slotKey, $uv['slotWajib']);
+                                            @endphp
+                                            <div wire:key="fotounit-{{ $unit->id }}-{{ $slotKey }}" x-data="photoUpload('fotoUnit.{{ $unit->id }}.{{ $slotKey }}', {{ $order->id }})">
+                                                <button type="button" @click="openDialog()"
+                                                    class="relative flex h-28 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white text-center text-gray-400 transition hover:border-blue-400 hover:bg-blue-50">
+                                                    @if ($tersimpan)
+                                                        <img src="{{ asset('storage/'.ltrim($tersimpan->path, '/')) }}" alt="{{ $slotLabel }}"
+                                                            class="absolute inset-0 h-full w-full object-cover">
+                                                    @else
+                                                        <template x-if="!preview">
+                                                            <div class="flex flex-col items-center">
+                                                                <x-heroicon-o-camera class="h-5 w-5" />
+                                                                <span class="mt-0.5 px-1 text-[11px]">{{ $slotLabel }}@if ($wajib) <span class="text-rose-500">*Wajib</span>@endif</span>
+                                                            </div>
+                                                        </template>
+                                                    @endif
+                                                    <img x-show="preview" x-cloak :src="preview" alt="Pratinjau {{ $slotLabel }}"
+                                                        class="absolute inset-0 h-full w-full object-cover">
+                                                    <span @if (! $tersimpan) x-show="preview" x-cloak @endif
+                                                        class="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[9px] leading-tight text-white">{{ $slotLabel }}@if ($tersimpan) · ganti @endif</span>
+                                                </button>
+
+                                                <div x-show="showDialog" x-cloak class="fixed inset-0 z-50 flex items-end bg-black/40 transition" @click="showDialog = false">
+                                                    <div class="w-full rounded-t-2xl bg-white shadow-xl" @click.stop>
+                                                        <div class="border-b border-gray-100 px-4 py-3">
+                                                            <h3 class="text-sm font-bold text-gray-900">Unit {{ $unit->unit_no }} · {{ $slotLabel }}</h3>
+                                                            <p class="mt-0.5 text-xs text-gray-500">Pilih sumber foto</p>
+                                                        </div>
+                                                        <div class="space-y-2 p-4">
+                                                            <button type="button" @click="openCamera()"
+                                                                class="flex w-full items-center gap-3 rounded-xl bg-blue-50 px-4 py-3 text-left font-semibold text-blue-700 active:bg-blue-100">
+                                                                <x-heroicon-o-camera class="h-5 w-5 shrink-0" /> Buka Kamera
+                                                            </button>
+                                                            <button type="button" @click="openGallery()"
+                                                                class="flex w-full items-center gap-3 rounded-xl bg-green-50 px-4 py-3 text-left font-semibold text-green-700 active:bg-green-100">
+                                                                <x-heroicon-o-photo class="h-5 w-5 shrink-0" /> Pilih dari Gallery
+                                                            </button>
+                                                        </div>
+                                                        <div class="border-t border-gray-100 p-4">
+                                                            <button type="button" @click="showDialog = false"
+                                                                class="w-full rounded-xl bg-gray-100 py-2.5 font-semibold text-gray-600 active:bg-gray-200">Batal</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div x-show="uploading" x-cloak class="mt-1 flex items-center gap-1 text-[10px] text-blue-600">
+                                                    <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
+                                                    Mengunggah<span x-show="progress > 0" x-text="' ('+progress+'%)'"></span>
+                                                </div>
+                                                <p x-show="error" x-text="error" class="mt-1 text-[10px] font-medium text-rose-600"></p>
+                                                @error('fotoUnit.'.$unit->id.'.'.$slotKey) <p class="mt-1 text-[10px] text-red-600">{{ $message }}</p> @enderror
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    @if ($sudahLaporan)
+                                        <button type="button" wire:click="simpanFotoUnitTerunggah({{ $unit->id }})" wire:loading.attr="disabled"
+                                            x-data x-bind:disabled="($store.fotoUpload?.inFlight ?? 0) > 0"
+                                            class="mt-2 w-full rounded-full bg-emerald-600 py-2 text-sm font-bold text-white disabled:opacity-60 active:bg-emerald-700">
+                                            Simpan Foto Unit {{ $unit->unit_no }}
+                                        </button>
+                                    @else
+                                        <p class="mt-1 text-[11px] text-gray-400">Foto ikut tersimpan saat laporan dikirim.</p>
+                                    @endif
+                                </div>
+                            @elseif ($uv['foto']->isNotEmpty())
                                 <div class="flex gap-2 overflow-x-auto pb-1">
                                     @foreach ($uv['foto'] as $f)
                                         <div class="w-20 shrink-0">
