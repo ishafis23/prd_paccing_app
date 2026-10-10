@@ -335,3 +335,32 @@ it('6 foto = 1 halaman, 8 foto = 2 halaman (6 per halaman)', function () {
     expect(LaporanPdfService::jumlahHalaman($enam))->toBe(1)
         ->and(LaporanPdfService::jumlahHalaman($delapan))->toBe(2);
 });
+
+it('halaman Laporan Bulanan tetap jalan walau cabang tidak punya nama_lokasi (label opsi tidak boleh null)', function () {
+    // Data nyata produksi punya customer_addresses.nama_lokasi (dan alamat) NULL.
+    // Dulu opsi select memakai pluck('nama_lokasi') → label null → Filament melempar
+    // TypeError saat render (Select::isOptionDisabled(): $label must be of type string).
+    $tanpaNamaLokasi = CustomerAddress::factory()->create([
+        'customer_id' => $this->customer->id,
+        'nama_lokasi' => null,
+        'alamat' => 'Jl. Tanpa Nama 5',
+    ]);
+
+    $kosongTotal = CustomerAddress::factory()->create([
+        'customer_id' => $this->customer->id,
+        'nama_lokasi' => null,
+        'alamat' => '', // alamat NOT NULL, tapi boleh string kosong
+    ]);
+
+    \Livewire\Livewire::actingAs($this->admin)
+        ->test(\App\Filament\Pages\LaporanBulananCustomer::class)
+        ->fillForm(['customer_id' => $this->customer->id, 'bulan' => '2026-09'])
+        ->assertOk()
+        ->assertHasNoFormErrors()
+        ->assertSee('Jl. Tanpa Nama 5')
+        ->assertSee('Cabang #'.$kosongTotal->id);
+
+    // Label opsi benar-benar terbentuk (fallback terakhir "Cabang #id" bila keduanya kosong).
+    expect(trim((string) $tanpaNamaLokasi->labelTampil()))->toBe('Jl. Tanpa Nama 5')
+        ->and(trim((string) $kosongTotal->labelTampil()))->toBe('');
+});

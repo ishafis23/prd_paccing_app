@@ -79,9 +79,25 @@ class LaporanBulananCustomer extends Page implements HasForms
                 Select::make('customer_address_id')
                     ->label('Cabang (opsional)')
                     ->placeholder('Semua cabang')
-                    ->options(fn (callable $get): array => $get('customer_id')
-                        ? CustomerAddress::query()->where('customer_id', $get('customer_id'))->orderBy('nama_lokasi')->pluck('nama_lokasi', 'id')->all()
-                        : []),
+                    ->options(function (callable $get): array {
+                        if (! $get('customer_id')) {
+                            return [];
+                        }
+
+                        // `nama_lokasi` (dan `alamat`) boleh kosong di data nyata —
+                        // label opsi TIDAK BOLEH null, kalau null Filament melempar
+                        // TypeError (Select::isOptionDisabled(): $label must be string).
+                        return CustomerAddress::query()
+                            ->where('customer_id', $get('customer_id'))
+                            ->orderBy('nama_lokasi')
+                            ->get()
+                            ->mapWithKeys(function (CustomerAddress $alamat): array {
+                                $label = trim((string) $alamat->labelTampil());
+
+                                return [$alamat->id => $label !== '' ? $label : 'Cabang #'.$alamat->id];
+                            })
+                            ->all();
+                    }),
             ])
             ->columns(3)
             ->statePath('data');
