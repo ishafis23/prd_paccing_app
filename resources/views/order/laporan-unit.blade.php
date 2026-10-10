@@ -37,7 +37,7 @@
                     <div><dt class="text-xs text-gray-500">Bagian</dt><dd>{{ \App\Models\OrderUnitReport::BAGIAN[$u->bagian] ?? '—' }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Kondisi</dt><dd>{{ \App\Models\OrderUnitReport::KONDISI[$u->kondisi] ?? 'Belum diisi' }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Suhu</dt><dd>{{ $u->suhu !== null ? $u->suhu.' °C' : '—' }}</dd></div>
-                    <div><dt class="text-xs text-gray-500">RPM</dt><dd>{{ $u->rpm !== null ? (int) $u->rpm : '—' }}</dd></div>
+                    <div><dt class="text-xs text-gray-500">RPM</dt><dd>{{ $u->rpm !== null ? rtrim(rtrim(number_format((float) $u->rpm, 1, ',', ''), '0'), ',') : '—' }}</dd></div>
                     <div class="col-span-2"><dt class="text-xs text-gray-500">Catatan kondisi</dt><dd>{{ $u->catatan_kondisi ?: '—' }}</dd></div>
                 </dl>
                 @if ($fotoUnit->isNotEmpty())

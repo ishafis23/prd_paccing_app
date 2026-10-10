@@ -14,59 +14,57 @@
 @endphp
 <style>
     @if ($pdf)
-        @page { margin: 3.4cm 1.5cm 1.9cm 1.5cm; }
-        .kop { position: fixed; top: -3.1cm; left: -1.5cm; right: -1.5cm; height: 2.6cm; }
-        .footer { position: fixed; bottom: -1.5cm; left: -1.5cm; right: -1.5cm; height: 1cm; }
+        /* Kop/footer = elemen fixed (diulang dompdf di tiap halaman) yang HARUS muat
+           di dalam margin halaman: kop 2.7cm di margin atas 3.2cm, footer 0.9cm di
+           margin bawah 1.8cm. Isinya div + posisi absolut (bukan tabel: tabel di
+           dalam elemen fixed hilang di halaman lanjutan pada dompdf). */
+        @page { margin: 3.2cm 1.5cm 1.8cm 1.5cm; }
+        .lp-kop { position: fixed; top: -3.2cm; left: -1.5cm; right: -1.5cm; height: 2.7cm; }
+        .lp-footer { position: fixed; bottom: -1.8cm; left: -1.5cm; right: -1.5cm; height: 0.9cm; }
     @endif
     .laporan { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #111827; }
-    .laporan .kop, .laporan .footer { background: {{ $biru }}; color: #ffffff; }
-    .laporan .kop table { width: 100%; border-collapse: collapse; }
-    .laporan .kop td { vertical-align: middle; padding: 0.35cm 1.5cm; }
-    .laporan .kop img { height: 1.6cm; }
-    .laporan .judul { font-size: 14pt; font-weight: bold; letter-spacing: 0.3px; }
-    .laporan .subjudul { font-size: 10pt; margin-top: 3px; }
-    .laporan .footer { text-align: center; font-size: 9pt; padding: 0.3cm 0; }
-    .laporan .info { border-collapse: collapse; margin-bottom: 0.4cm; }
+    .lp-kop, .lp-footer { font-family: Helvetica, Arial, sans-serif; background: {{ $biru }}; color: #ffffff; }
+    .lp-kop img { position: absolute; left: 1.5cm; top: 0.55cm; height: 1.6cm; }
+    .lp-kop .teks { position: absolute; left: 1.5cm; right: 1.5cm; top: 0.75cm; }
+    .lp-kop .teks.dgn-logo { left: 4.3cm; }
+    .lp-kop .judul { font-size: 14pt; font-weight: bold; letter-spacing: 0.3px; }
+    .lp-kop .subjudul { font-size: 10pt; margin-top: 3px; }
+    .lp-footer { height: 0.9cm; line-height: 0.9cm; text-align: center; font-size: 9pt; }
+    .laporan .info { border-collapse: collapse; margin-bottom: 0.3cm; }
     .laporan .info td { padding: 1px 4px 1px 0; vertical-align: top; font-size: 11pt; }
     .laporan .info td.k { width: 3.6cm; font-weight: bold; }
     .laporan .kunjungan { margin-bottom: 0.6cm; }
     .laporan .kunjungan.baru { page-break-before: always; }
     .laporan .grid { width: 100%; border-collapse: collapse; }
-    .laporan .grid td { width: 50%; vertical-align: top; padding: 0 0.25cm 0.4cm 0; }
-    .laporan .grid td.kanan { padding: 0 0 0.4cm 0.25cm; }
+    /* 2 kolom x 9cm (konten 18cm). Tinggi baris dikunci 7.2cm => 3 baris (6 foto)
+       per halaman: 3 x 7.2 + blok info ±2.2cm < 24.7cm area isi. */
+    .laporan .grid td { width: 50%; height: 7.2cm; vertical-align: top; padding: 0 0.3cm 0 0; }
+    .laporan .grid td.kanan { padding: 0 0 0 0.3cm; }
+    .laporan .caption, .laporan .catatan { width: 8.4cm; }
     .laporan .label { font-size: 8pt; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 2px; }
     .laporan .caption { font-size: 8pt; font-weight: bold; margin-top: 3px; }
     .laporan .catatan { font-size: 8pt; color: #b91c1c; margin-top: 2px; }
-    .laporan .kosong { border: 1px dashed #9ca3af; background: #f3f4f6; color: #6b7280; text-align: center; height: 3.4cm; padding-top: 1.3cm; font-size: 9pt; }
+    .laporan .kosong { border: 1px dashed #9ca3af; background: #f3f4f6; color: #6b7280; text-align: center; height: 5cm; padding-top: 2.2cm; font-size: 9pt; }
     .laporan .foto { border: 1px solid #d1d5db; }
     @if (! $pdf)
         .laporan { max-width: 18cm; margin: 0 auto; background: #ffffff; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
-        .laporan .kop { margin-bottom: 0.6cm; }
-        .laporan .footer { margin-top: 0.4cm; }
+        .lp-kop { position: relative; height: 2.7cm; margin-bottom: 0.6cm; }
+        .lp-footer { margin-top: 0.4cm; }
         .laporan .isi { padding: 0 1.5cm; }
         .laporan .kunjungan.baru { border-top: 2px dashed #9ca3af; padding-top: 0.5cm; page-break-before: auto; }
     @endif
 </style>
 
-<div class="laporan">
-    <div class="kop">
-        <table>
-            <tr>
-                @if ($logo)
-                    <td style="width: 2.4cm;"><img src="{{ $logo }}" alt=""></td>
-                @endif
-                <td>
-                    <div class="judul">{{ $dokumen['judul'] }}</div>
-                    @if (! empty($dokumen['subjudul']))
-                        <div class="subjudul">{{ $dokumen['subjudul'] }}</div>
-                    @endif
-                </td>
-            </tr>
-        </table>
-    </div>
+{{-- PDF: kop & footer fixed HARUS anak langsung body (di dalam div pembungkus dompdf
+     tidak mengulangnya di halaman lanjutan), jadi dirender SEBELUM .laporan. --}}
+@if ($pdf)
+    @include('laporan._kop')
+    <div class="lp-footer">{{ $kop['nama'] }}</div>
+@endif
 
-    @if ($pdf)
-        <div class="footer">{{ $kop['nama'] }}</div>
+<div class="laporan">
+    @if (! $pdf)
+        @include('laporan._kop')
     @endif
 
     <div class="isi">
@@ -92,10 +90,13 @@
                                 @php
                                     $src = $f['ada'] ? $svc->dataUri($f['file']) : null;
                                     if ($src) {
-                                        $r = $f['lebar'] / max(1, $f['tinggi']);
-                                        $w = 8.4;
-                                        $h = $w / $r;
-                                        if ($h > 6.2) { $h = 6.2; $w = $h * $r; }
+                                        // Muat ke kotak kolom 8.4 x 5.0 cm dengan rasio aspek dijaga
+                                        // (skala = min(8.4/lebar, 5.0/tinggi)); piksel hanya dipakai
+                                        // untuk rasio, BUKAN ukuran cetak. Potret ekstrem dibatasi
+                                        // tinggi 5.0cm (lebarnya mengecil), tidak digepengkan.
+                                        $skala = min(8.4 / max(1, $f['lebar']), 5.0 / max(1, $f['tinggi']));
+                                        $w = $f['lebar'] * $skala;
+                                        $h = $f['tinggi'] * $skala;
                                     }
                                 @endphp
                                 <td class="{{ $i === 1 ? 'kanan' : '' }}">
@@ -126,6 +127,6 @@
     </div>
 
     @if (! $pdf)
-        <div class="footer">{{ $kop['nama'] }}</div>
+        <div class="lp-footer">{{ $kop['nama'] }}</div>
     @endif
 </div>

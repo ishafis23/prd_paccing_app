@@ -46,7 +46,7 @@ class OrderUnitReport extends Model
         return [
             'unit_no' => 'integer',
             'suhu' => 'decimal:1',
-            'rpm' => 'decimal:0',
+            'rpm' => 'decimal:1',
         ];
     }
 

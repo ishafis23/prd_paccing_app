@@ -102,7 +102,7 @@ class LaporanPengerjaanTab
                         'jenis_pekerjaan' => $u->jenis_pekerjaan,
                         'bagian' => $u->bagian ?: 'indoor',
                         'suhu' => $u->suhu,
-                        'rpm' => $u->rpm === null ? null : (int) $u->rpm,
+                        'rpm' => $u->rpm === null ? null : (float) $u->rpm,
                         'kondisi' => $u->kondisi,
                         'catatan_kondisi' => $u->catatan_kondisi,
                     ])->values()->all()];

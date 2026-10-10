@@ -313,3 +313,25 @@ it('halaman Laporan Bulanan: tombol sinkron menghasilkan file dan tampil di daft
 
     expect(LaporanBulanan::first()->status)->toBe(LaporanBulanan::SELESAI);
 });
+
+it('RPM desimal tersimpan dan tampil dengan koma; angka bulat tanpa ,0', function () {
+    $order = ($this->buatOrder)(2);
+    [$a, $b] = OrderUnitReport::where('order_id', $order->id)->orderBy('unit_no')->get()->all();
+    $a->update(['rpm' => 7.3]);
+
+    $svc = app(LaporanPengerjaanService::class);
+    expect((float) $a->fresh()->rpm)->toBe(7.3)
+        ->and($svc->captionUnit($a->fresh(), 'CK Dadi'))->toContain('RPM 7,3')
+        ->and($svc->captionUnit($b->fresh()->forceFill(['rpm' => 1250]), 'CK Dadi'))->toContain('RPM 1250')->not->toContain('1250,0');
+});
+
+it('6 foto = 1 halaman, 8 foto = 2 halaman (6 per halaman)', function () {
+    $svc = app(LaporanPengerjaanService::class);
+    $pdf = app(LaporanPdfService::class);
+
+    $enam = $pdf->render($svc->dokumenOrder(($this->buatOrder)(6)));
+    $delapan = $pdf->render($svc->dokumenOrder(($this->buatOrder)(8, tanggal: '2026-09-02')));
+
+    expect(LaporanPdfService::jumlahHalaman($enam))->toBe(1)
+        ->and(LaporanPdfService::jumlahHalaman($delapan))->toBe(2);
+});
