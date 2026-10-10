@@ -98,7 +98,7 @@ class BusinessInfoService
     /**
      * Perbarui info usaha (Owner/Admin).
      *
-     * @param  array{nama_usaha: string, alamat?: ?string, kontak_wa?: ?string, email?: ?string, nama_pemilik?: ?string}  $data
+     * @param  array{nama_usaha: string, alamat?: ?string, kontak_wa?: ?string, email?: ?string, nama_pemilik?: ?string, bank_nama?: ?string, bank_rekening?: ?string, bank_atas_nama?: ?string}  $data
      */
     public function perbarui(
         array $data,
@@ -125,6 +125,14 @@ class BusinessInfoService
         $info->kontak_wa = $this->nullJikaKosong($data['kontak_wa'] ?? null);
         $info->email = $this->nullJikaKosong($email);
         $info->nama_pemilik = $this->nullJikaKosong($data['nama_pemilik'] ?? null);
+        // Rekening bank (untuk invoice): hanya diubah bila kuncinya dikirim,
+        // agar pemanggil lama yang tidak mengenalnya tidak menghapus isinya.
+        foreach (['bank_nama', 'bank_rekening', 'bank_atas_nama'] as $kolom) {
+            if (array_key_exists($kolom, $data)) {
+                $info->{$kolom} = $this->nullJikaKosong($data[$kolom]);
+            }
+        }
+
         $info->diubah_oleh = $by->id;
 
         $pathLama = $info->logo_path;

@@ -21,6 +21,9 @@ class BusinessInfo extends Model
         'email',
         'nama_pemilik',
         'logo_path',
+        'bank_nama',
+        'bank_rekening',
+        'bank_atas_nama',
         'diubah_oleh',
     ];
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PhotoController;
@@ -103,6 +104,12 @@ Route::middleware(['auth', 'user.aktif'])->prefix('laporan')->group(function () 
     Route::get('/order/{order}/pdf', [LaporanController::class, 'pdf'])->name('laporan.pdf');
     Route::get('/bulanan/{laporan}/unduh', [LaporanController::class, 'unduhBulanan'])->name('laporan.bulanan.unduh');
 });
+
+// Invoice (dev-plan/21 §7): unduh PDF untuk admin (login, izin dicek di controller)
+// + halaman publik read-only bertoken (404 bila token salah / draft / batal).
+Route::middleware(['auth', 'user.aktif'])->get('/faktur/{invoice}/pdf', [InvoiceController::class, 'pdfAdmin'])->name('invoice.pdf');
+Route::get('/invoice/{invoice}/{token}', [InvoiceController::class, 'publik'])->name('invoice.publik');
+Route::get('/invoice/{invoice}/{token}/pdf', [InvoiceController::class, 'publikPdf'])->name('invoice.publik.pdf');
 
 // Order Item endpoints
 Route::middleware('auth')->group(function () {

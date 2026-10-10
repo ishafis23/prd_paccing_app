@@ -39,6 +39,12 @@ class KelolaInfoUsaha extends Page
 
     public string $namaPemilik = '';
 
+    public string $bankNama = '';
+
+    public string $bankRekening = '';
+
+    public string $bankAtasNama = '';
+
     public bool $hapusLogo = false;
 
     public $logoFile;
@@ -62,6 +68,9 @@ class KelolaInfoUsaha extends Page
         $this->kontakWa = (string) ($info->kontak_wa ?? '');
         $this->email = (string) ($info->email ?? '');
         $this->namaPemilik = (string) ($info->nama_pemilik ?? '');
+        $this->bankNama = (string) ($info->bank_nama ?? '');
+        $this->bankRekening = (string) ($info->bank_rekening ?? '');
+        $this->bankAtasNama = (string) ($info->bank_atas_nama ?? '');
     }
 
     public function simpan(): void
@@ -72,6 +81,9 @@ class KelolaInfoUsaha extends Page
             'kontakWa' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'namaPemilik' => ['nullable', 'string', 'max:255'],
+            'bankNama' => ['nullable', 'string', 'max:100'],
+            'bankRekening' => ['nullable', 'string', 'max:50'],
+            'bankAtasNama' => ['nullable', 'string', 'max:255'],
             'logoFile' => ['nullable', 'image', 'max:2048'],
         ]);
 
@@ -82,6 +94,9 @@ class KelolaInfoUsaha extends Page
                 'kontak_wa' => $this->kontakWa,
                 'email' => $this->email,
                 'nama_pemilik' => $this->namaPemilik,
+                'bank_nama' => $this->bankNama,
+                'bank_rekening' => $this->bankRekening,
+                'bank_atas_nama' => $this->bankAtasNama,
             ], auth()->user(), $this->logoFile, $this->hapusLogo);
 
             $this->logoFile = null;

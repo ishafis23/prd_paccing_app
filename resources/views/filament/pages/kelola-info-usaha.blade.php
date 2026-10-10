@@ -101,6 +101,32 @@
                             class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500" />
                     </div>
 
+                    <div class="sm:col-span-2 border-t border-gray-100 pt-4">
+                        <h3 class="text-sm font-semibold text-gray-950">Rekening Pembayaran (untuk Invoice)</h3>
+                        <p class="mt-0.5 text-xs text-gray-400">Disalin ke invoice saat invoice dibuat; mengubahnya tidak mengubah invoice lama.</p>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nama Bank</label>
+                        <input type="text" wire:model="bankNama" placeholder="contoh: BCA"
+                            class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500" />
+                        @error('bankNama') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">No. Rekening</label>
+                        <input type="text" wire:model="bankRekening" placeholder="nomor rekening"
+                            class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500" />
+                        @error('bankRekening') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Atas Nama</label>
+                        <input type="text" wire:model="bankAtasNama" placeholder="nama pemilik rekening"
+                            class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500" />
+                        @error('bankAtasNama') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
                     <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 sm:col-span-2">
                         <x-filament::button type="submit" icon="heroicon-m-check-circle">
                             Simpan Info Usaha

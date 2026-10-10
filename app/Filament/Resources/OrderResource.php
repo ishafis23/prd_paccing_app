@@ -26,6 +26,7 @@ use App\Models\Titik;
 use App\Models\User;
 use App\Services\CustomerService;
 use App\Services\FinanceService;
+use App\Services\InvoiceService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Support\EnumOptions;
@@ -513,6 +514,40 @@ class OrderResource extends BaseResource
         );
     }
 
+    /**
+     * Isian aksi "Buat Invoice" (tabel & halaman view Order).
+     *
+     * @return array<int, Forms\Components\Component>
+     */
+    public static function formInvoice(): array
+    {
+        return [
+            Forms\Components\DatePicker::make('tanggal')->default(now())->required(),
+            Forms\Components\DatePicker::make('jatuh_tempo')->label('Jatuh tempo')->default(now()->addDays(7))->required(),
+            Forms\Components\Textarea::make('catatan')->label('Catatan (opsional)'),
+        ];
+    }
+
+    /**
+     * Buat invoice dari satu order lalu arahkan ke halaman invoice-nya.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function buatInvoice(Order $order, array $data): void
+    {
+        try {
+            $invoice = app(InvoiceService::class)->buat([$order], auth()->user(), $data);
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            Notification::make()->danger()->title('Gagal membuat invoice')->body($e->getMessage())->send();
+
+            return;
+        }
+
+        Notification::make()->success()->title('Invoice '.$invoice->nomor.' dibuat (draft)')->send();
+
+        redirect(InvoiceResource::getUrl('view', ['record' => $invoice]));
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -594,6 +629,26 @@ class OrderResource extends BaseResource
                         ->visible(fn (Order $record) => \App\Filament\Resources\OrderResource\LaporanPengerjaanTab::boleh()
                             && $record->status !== OrderStatus::Batal)
                         ->url(fn (Order $record) => \App\Support\Url::absolute('laporan.preview', ['order' => $record->id]))
+                        ->openUrlInNewTab(),
+
+                    Tables\Actions\Action::make('buatInvoice')
+                        ->label('Buat Invoice')
+                        ->icon('heroicon-o-document-plus')
+                        ->color('gray')
+                        ->visible(fn (Order $record) => InvoiceService::boleh(auth()->user())
+                            && app(InvoiceService::class)->bisaDibuatInvoice($record))
+                        ->modalHeading('Buat Invoice')
+                        ->modalDescription('Baris invoice diturunkan dari layanan order ini; masih bisa diedit selama draft.')
+                        ->form(self::formInvoice())
+                        ->action(fn (Order $record, array $data) => self::buatInvoice($record, $data)),
+
+                    Tables\Actions\Action::make('lihatInvoice')
+                        ->label('Lihat Invoice')
+                        ->icon('heroicon-o-document-currency-dollar')
+                        ->color('gray')
+                        ->visible(fn (Order $record) => InvoiceService::boleh(auth()->user())
+                            && app(InvoiceService::class)->punyaInvoiceAktif($record))
+                        ->url(fn (Order $record) => InvoiceResource::getUrl('view', ['record' => app(InvoiceService::class)->invoiceAktifOrder($record)]))
                         ->openUrlInNewTab(),
 
                     Tables\Actions\Action::make('tambahLayanan')
