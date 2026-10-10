@@ -16,8 +16,8 @@ use Illuminate\Support\Collection;
  * Read-only: tidak menulis apa pun, tidak mengubah menu keuangan lama.
  *
  * Pendapatan = order berstatus selesai, nominal = Order::total() (layanan
- * utama + item tambahan), tanggal = tanggal bayar lunas, fallback tanggal
- * order diperbarui terakhir.
+ * utama + item tambahan), tanggal = OmsetService::tanggalPendapatanSql()
+ * (tanggal bayar lunas, fallback tanggal order diperbarui terakhir).
  *
  * Pengeluaran = expenses (admin) + teknisi_expenses. Teknisi: hanya
  * `approved` yang dihitung ke total; `pending` ditampilkan terpisah;
@@ -30,13 +30,8 @@ class AkuntanService
      */
     public function pendapatan(CarbonInterface $dari, CarbonInterface $sampai): Collection
     {
-        $tanggalExpr = "COALESCE((SELECT MAX(p.tanggal_bayar) FROM payments p WHERE p.order_id = orders.id AND p.status = ? AND p.deleted_at IS NULL), DATE(orders.updated_at))";
-
-        return Order::query()
-            ->where('status', OrderStatus::Selesai->value)
-            ->whereRaw("{$tanggalExpr} BETWEEN ? AND ?", [PaymentStatus::Lunas->value, $dari->toDateString(), $sampai->toDateString()])
-            ->select('orders.*')
-            ->selectRaw("{$tanggalExpr} AS tanggal_pendapatan", [PaymentStatus::Lunas->value])
+        // Aturan tanggal pendapatan satu pintu di OmsetService (sama dgn dashboard & pimpinan).
+        return app(OmsetService::class)->orderSelesai($dari, $sampai)
             ->with(['customer', 'serviceCatalog', 'orderItems'])
             ->get()
             ->map(function (Order $order): array {

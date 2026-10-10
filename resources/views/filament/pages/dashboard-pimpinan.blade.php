@@ -330,6 +330,7 @@
                                     {{ $angka($k['unit']) }} <span class="text-sm font-normal text-gray-400">unit</span>
                                 </p>
                                 <p class="text-sm font-semibold text-gray-600">{{ $rp($k['rupiah']) }}</p>
+                                <p class="text-xs text-gray-500">Jasa {{ $rp($k['jasa'] ?? 0) }} · Material {{ $rp($k['material'] ?? 0) }}</p>
                                 <p class="text-xs text-gray-400">{{ $angka($k['transaksi']) }} baris layanan</p>
 
                                 <div class="mt-3 border-t border-gray-100 pt-3">
@@ -341,7 +342,7 @@
                                             @foreach ($k['items'] as $it)
                                                 <li class="flex items-center justify-between gap-2">
                                                     <span class="truncate text-gray-600">{{ $it['label'] }}</span>
-                                                    <span class="whitespace-nowrap text-gray-500">{{ $angka($it['unit']) }} unit · {{ $rp($it['rupiah']) }}</span>
+                                                    <span class="whitespace-nowrap text-gray-500">{{ $angka($it['unit']) }} unit · {{ $rp($it['rupiah']) }} (Jasa {{ $rp($it['jasa'] ?? 0) }} · Mat. {{ $rp($it['material'] ?? 0) }})</span>
                                                 </li>
                                             @endforeach
                                         </ul>

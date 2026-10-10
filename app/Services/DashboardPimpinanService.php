@@ -428,19 +428,15 @@ class DashboardPimpinanService
     }
 
     /**
-     * Pengerjaan per klasifikasi (cuci / service / pemasangan) bulan terpilih,
-     * lengkap dengan rincian tiap jenis layanan di dalamnya.
+     * Pengerjaan per klasifikasi (cuci / service / pemasangan) periode terpilih,
+     * lengkap dengan rincian tiap jenis layanan di dalamnya. Sumber data =
+     * OmsetService (tanggal pendapatan & split jasa/material sama dgn Akuntan).
      *
-     * @return array<string, array{unit: int, rupiah: float, transaksi: int, items: array<int, array{label: string, unit: int, rupiah: float}>}>
+     * @return array<string, array{unit: int, rupiah: float, jasa: float, material: float, transaksi: int, items: array<int, array{label: string, unit: int, rupiah: float, jasa: float, material: float}>}>
      */
     public function klasifikasiPengerjaan(CarbonInterface $awal, CarbonInterface $akhir): array
     {
-        $items = OrderItem::query()
-            ->where('dibatalkan', false)
-            ->whereHas('order', fn ($q) => $q
-                ->where('status', OrderStatus::Selesai->value)
-                ->whereBetween('updated_at', [$awal, $akhir]))
-            ->get();
+        $perJenis = collect(app(OmsetService::class)->ringkasan($awal, $akhir))->keyBy('kategori');
 
         $grup = [
             'cuci' => [ServiceType::CuciAc],
@@ -451,26 +447,28 @@ class DashboardPimpinanService
         $hasil = [];
 
         foreach ($grup as $nama => $jenis) {
-            $rows = $items->whereIn('kategori', $jenis);
+            $rows = collect($jenis)
+                ->map(fn (ServiceType $st): ?array => $perJenis->get($st->value))
+                ->filter();
 
-            $rincian = collect($jenis)
-                ->map(function (ServiceType $st) use ($rows): array {
-                    $perJenis = $rows->where('kategori', $st);
-
-                    return [
-                        'label' => self::LABEL_LAYANAN[$st->value] ?? $st->value,
-                        'unit' => (int) $perJenis->sum('jumlah'),
-                        'rupiah' => (float) $perJenis->sum(fn (OrderItem $i): float => (float) $i->harga * (int) $i->jumlah),
-                    ];
-                })
+            $rincian = $rows
+                ->map(fn (array $r): array => [
+                    'label' => self::LABEL_LAYANAN[$r['kategori']] ?? $r['kategori'],
+                    'unit' => $r['unit'],
+                    'rupiah' => $r['total'],
+                    'jasa' => $r['jasa'],
+                    'material' => $r['material'],
+                ])
                 ->filter(fn (array $x): bool => $x['unit'] > 0 || $x['rupiah'] > 0)
                 ->values()
                 ->all();
 
             $hasil[$nama] = [
-                'unit' => (int) $rows->sum('jumlah'),
-                'rupiah' => (float) $rows->sum(fn (OrderItem $i): float => (float) $i->harga * (int) $i->jumlah),
-                'transaksi' => $rows->count(),
+                'unit' => (int) $rows->sum('unit'),
+                'rupiah' => (float) $rows->sum('total'),
+                'jasa' => (float) $rows->sum('jasa'),
+                'material' => (float) $rows->sum('material'),
+                'transaksi' => (int) $rows->sum('transaksi'),
                 'items' => $rincian,
             ];
         }
