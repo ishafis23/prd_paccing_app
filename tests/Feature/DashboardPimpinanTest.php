@@ -129,7 +129,7 @@ it('keuangan menghitung pendapatan, pengeluaran, dan laba/rugi', function () {
         ->and($data['laba_rugi'])->toBe(70000.0);
 });
 
-it('klasifikasi pengerjaan mengelompok cuci, service, dan pemasangan', function () {
+it('klasifikasi pengerjaan mengelompok cuci, service, dan pemasangan + rinciannya', function () {
     [$awal, $akhir] = dpBulan();
 
     $order = Order::factory()->create([
@@ -147,7 +147,43 @@ it('klasifikasi pengerjaan mengelompok cuci, service, dan pemasangan', function 
         ->and($data['service']['unit'])->toBe(1)
         ->and($data['service']['rupiah'])->toBe(200000.0)
         ->and($data['pemasangan']['unit'])->toBe(2)
-        ->and($data['pemasangan']['rupiah'])->toBe(1000000.0);
+        ->and($data['pemasangan']['rupiah'])->toBe(1000000.0)
+        ->and(collect($data['service']['items'])->firstWhere('label', 'Service AC')['unit'])->toBe(1)
+        ->and(collect($data['pemasangan']['items'])->firstWhere('label', 'Instalasi')['rupiah'])->toBe(1000000.0);
+});
+
+it('rekap pekanan mengelompokkan pendapatan per pekan Senin-Minggu', function () {
+    $awal = CarbonImmutable::parse('2026-09-01');
+    $akhir = CarbonImmutable::parse('2026-09-30');
+
+    dpOrderLunas('2026-09-01', 100000); // pekan 31 Agu–06 Sep
+    dpOrderLunas('2026-09-03', 50000);  // pekan yang sama
+    dpOrderLunas('2026-09-10', 70000);  // pekan berikutnya
+
+    $rekap = app(DashboardPimpinanService::class)->pendapatanPekanan($awal, $akhir);
+
+    expect($rekap)->toHaveCount(2)
+        ->and($rekap->first()['total'])->toBe(150000.0)
+        ->and($rekap->last()['total'])->toBe(70000.0);
+});
+
+it('laba/rugi harian dan pekanan = pendapatan dikurangi pengeluaran', function () {
+    $awal = CarbonImmutable::parse('2026-09-01');
+    $akhir = CarbonImmutable::parse('2026-09-30');
+
+    dpOrderLunas('2026-09-02', 100000);
+    Expense::factory()->create(['tanggal' => '2026-09-02', 'nominal' => 30000]);
+    dpOrderLunas('2026-09-08', 200000);
+
+    $service = app(DashboardPimpinanService::class);
+    $harian = $service->labaRugiHarian($awal, $akhir);
+    $pekanan = $service->labaRugiPekanan($awal, $akhir);
+
+    $tgl2 = $harian->firstWhere('tanggal', '2026-09-02');
+    expect($tgl2['pendapatan'])->toBe(100000.0)
+        ->and($tgl2['pengeluaran'])->toBe(30000.0)
+        ->and($tgl2['laba_rugi'])->toBe(70000.0)
+        ->and($pekanan->sum('laba_rugi'))->toBe(270000.0);
 });
 
 it('performa teknisi menghitung order, unit, dan rupiah', function () {
@@ -220,14 +256,26 @@ it('arus kas menghitung masuk, keluar, dan saldo', function () {
         ->and($data['saldo_akhir'])->toBe(70000.0);
 });
 
-it('halaman menampilkan data sesuai bulan terpilih', function () {
+it('halaman menampilkan tab aspek dan sub-tab keuangan', function () {
     $admin = dpUser(RoleName::Admin->value);
     dpOrderLunas(CarbonImmutable::now()->toDateString(), 100000);
 
     Livewire\Livewire::actingAs($admin)->test(DashboardPimpinan::class)
-        ->assertSee('Dashboard Pimpinan')
         ->assertSee('Aspek Customer')
         ->assertSee('Aspek Keuangan')
         ->assertSee('Aspek Performa')
-        ->assertSee('Rp 100.000');
+        ->assertSee('Total Customer')
+        ->assertSee('Segera hadir') // placeholder area kecamatan
+        ->call('setTab', 'keuangan')
+        ->assertSet('tab', 'keuangan')
+        ->assertSee('2.1 Pendapatan')
+        ->assertSet('keuangan', 'pendapatan')
+        ->assertSee('Rp 100.000')
+        ->call('setKeuangan', 'laba_rugi')
+        ->assertSee('Laba/Rugi Harian')
+        ->call('setTab', 'performa')
+        ->assertSet('tab', 'performa')
+        ->call('setPerforma', 'klasifikasi')
+        ->assertSee('Cuci')
+        ->assertSee('Pemasangan');
 });

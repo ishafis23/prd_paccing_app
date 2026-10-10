@@ -33,6 +33,18 @@ class DashboardPimpinan extends Page
     #[Url]
     public string $bulan = '';
 
+    /** Tab aspek aktif: customer | keuangan | performa. */
+    #[Url]
+    public string $tab = 'customer';
+
+    /** Sub-tab Aspek Keuangan: pendapatan | pengeluaran | laba_rugi | neraca | arus_kas. */
+    #[Url]
+    public string $keuangan = 'pendapatan';
+
+    /** Sub-tab Aspek Performa: teknisi | kehadiran | klasifikasi. */
+    #[Url]
+    public string $performa = 'teknisi';
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
@@ -48,12 +60,45 @@ class DashboardPimpinan extends Page
         if (! preg_match('/^\d{4}-\d{2}$/', $this->bulan)) {
             $this->bulan = now()->format('Y-m');
         }
+
+        if (! in_array($this->tab, ['customer', 'keuangan', 'performa'], true)) {
+            $this->tab = 'customer';
+        }
+
+        if (! in_array($this->keuangan, ['pendapatan', 'pengeluaran', 'laba_rugi', 'neraca', 'arus_kas'], true)) {
+            $this->keuangan = 'pendapatan';
+        }
+
+        if (! in_array($this->performa, ['teknisi', 'kehadiran', 'klasifikasi'], true)) {
+            $this->performa = 'teknisi';
+        }
     }
 
     public function updatedBulan(): void
     {
         if (! preg_match('/^\d{4}-\d{2}$/', $this->bulan)) {
             $this->bulan = now()->format('Y-m');
+        }
+    }
+
+    public function setTab(string $tab): void
+    {
+        if (in_array($tab, ['customer', 'keuangan', 'performa'], true)) {
+            $this->tab = $tab;
+        }
+    }
+
+    public function setKeuangan(string $sub): void
+    {
+        if (in_array($sub, ['pendapatan', 'pengeluaran', 'laba_rugi', 'neraca', 'arus_kas'], true)) {
+            $this->keuangan = $sub;
+        }
+    }
+
+    public function setPerforma(string $sub): void
+    {
+        if (in_array($sub, ['teknisi', 'kehadiran', 'klasifikasi'], true)) {
+            $this->performa = $sub;
         }
     }
 
@@ -69,10 +114,16 @@ class DashboardPimpinan extends Page
             'customer' => $service->ringkasanCustomer($awal, $akhir),
             'unit' => $service->unitPerCustomer(),
             'followUp' => $service->followUp($awal, $akhir),
-            'keuangan' => $service->keuangan($awal, $akhir),
+            'keuanganRingkas' => $service->keuangan($awal, $akhir),
+            'pendapatanHarian' => $service->pendapatanHarian($awal, $akhir),
+            'pendapatanPekanan' => $service->pendapatanPekanan($awal, $akhir),
+            'pengeluaranHarian' => $service->pengeluaranHarian($awal, $akhir),
+            'pengeluaranPekanan' => $service->pengeluaranPekanan($awal, $akhir),
+            'labaRugiHarian' => $service->labaRugiHarian($awal, $akhir),
+            'labaRugiPekanan' => $service->labaRugiPekanan($awal, $akhir),
             'neraca' => $service->neraca(),
             'arusKas' => $service->arusKas($awal, $akhir),
-            'performa' => $service->performaTeknisi($awal, $akhir),
+            'performaTeknisi' => $service->performaTeknisi($awal, $akhir),
             'kehadiran' => $service->kehadiranTeknisi($awal, $akhir),
             'klasifikasi' => $service->klasifikasiPengerjaan($awal, $akhir),
         ];

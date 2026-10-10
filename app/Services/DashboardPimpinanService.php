@@ -22,6 +22,7 @@ use App\Models\ServiceReminder;
 use App\Models\StockItem;
 use App\Models\TeknisiExpense;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -38,6 +39,17 @@ use Illuminate\Support\Collection;
  */
 class DashboardPimpinanService
 {
+    /** Label manusiawi per kategori layanan (poin di dalam klasifikasi). */
+    private const LABEL_LAYANAN = [
+        'cuci_ac' => 'Cuci AC',
+        'service_ac' => 'Service AC',
+        'pengadaan_ac' => 'Pengadaan AC',
+        'tambah_freon' => 'Tambah Freon',
+        'instalasi' => 'Instalasi',
+        'relokasi' => 'Relokasi',
+        'bongkar' => 'Bongkar',
+    ];
+
     public function __construct(private readonly AkuntanService $akuntan) {}
 
     /**
@@ -290,9 +302,136 @@ class DashboardPimpinanService
     }
 
     /**
-     * Pengerjaan per klasifikasi (cuci / service / pemasangan) bulan terpilih.
+     * Rekap pendapatan harian (desc) pada bulan terpilih.
      *
-     * @return array<string, array{unit: int, rupiah: float, transaksi: int}>
+     * @return Collection<int, array{tanggal: string, jumlah: int, total: float, pending: float}>
+     */
+    public function pendapatanHarian(CarbonInterface $awal, CarbonInterface $akhir): Collection
+    {
+        return $this->akuntan->rekapHarian($this->akuntan->pendapatan($awal, $akhir));
+    }
+
+    /**
+     * Rekap pengeluaran harian (desc) pada bulan terpilih.
+     *
+     * @return Collection<int, array{tanggal: string, jumlah: int, total: float, pending: float}>
+     */
+    public function pengeluaranHarian(CarbonInterface $awal, CarbonInterface $akhir): Collection
+    {
+        return $this->akuntan->rekapHarian($this->akuntan->pengeluaran($awal, $akhir));
+    }
+
+    /**
+     * @return Collection<int, array{mulai: string, label: string, jumlah: int, total: float, pending: float}>
+     */
+    public function pendapatanPekanan(CarbonInterface $awal, CarbonInterface $akhir): Collection
+    {
+        return $this->rekapPekanan($this->akuntan->pendapatan($awal, $akhir));
+    }
+
+    /**
+     * @return Collection<int, array{mulai: string, label: string, jumlah: int, total: float, pending: float}>
+     */
+    public function pengeluaranPekanan(CarbonInterface $awal, CarbonInterface $akhir): Collection
+    {
+        return $this->rekapPekanan($this->akuntan->pengeluaran($awal, $akhir));
+    }
+
+    /**
+     * Laba/rugi per hari: pendapatan (accrual) dikurangi pengeluaran (yang
+     * dihitung) pada tanggal yang sama.
+     *
+     * @return Collection<int, array{tanggal: string, pendapatan: float, pengeluaran: float, laba_rugi: float}>
+     */
+    public function labaRugiHarian(CarbonInterface $awal, CarbonInterface $akhir): Collection
+    {
+        $pendapatan = $this->pendapatanHarian($awal, $akhir)->keyBy('tanggal');
+        $pengeluaran = $this->pengeluaranHarian($awal, $akhir)->keyBy('tanggal');
+
+        return $pendapatan->keys()
+            ->merge($pengeluaran->keys())
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->map(function (string $tanggal) use ($pendapatan, $pengeluaran): array {
+                $masuk = (float) (($pendapatan->get($tanggal)['total'] ?? null) ?? 0);
+                $keluar = (float) (($pengeluaran->get($tanggal)['total'] ?? null) ?? 0);
+
+                return [
+                    'tanggal' => $tanggal,
+                    'pendapatan' => $masuk,
+                    'pengeluaran' => $keluar,
+                    'laba_rugi' => $masuk - $keluar,
+                ];
+            });
+    }
+
+    /**
+     * Laba/rugi per pekan (Senin–Minggu) pada bulan terpilih.
+     *
+     * @return Collection<int, array{mulai: string, label: string, pendapatan: float, pengeluaran: float, laba_rugi: float}>
+     */
+    public function labaRugiPekanan(CarbonInterface $awal, CarbonInterface $akhir): Collection
+    {
+        return $this->labaRugiHarian($awal, $akhir)
+            ->groupBy(fn (array $r): string => CarbonImmutable::parse($r['tanggal'])
+                ->startOfWeek(CarbonInterface::MONDAY)
+                ->toDateString())
+            ->map(function (Collection $grup, string $mulai): array {
+                $awalPekan = CarbonImmutable::parse($mulai);
+                $akhirPekan = $awalPekan->endOfWeek(CarbonInterface::SUNDAY);
+                $pendapatan = (float) $grup->sum('pendapatan');
+                $pengeluaran = (float) $grup->sum('pengeluaran');
+
+                return [
+                    'mulai' => $mulai,
+                    'label' => $awalPekan->translatedFormat('d M').' – '.$akhirPekan->translatedFormat('d M'),
+                    'pendapatan' => $pendapatan,
+                    'pengeluaran' => $pengeluaran,
+                    'laba_rugi' => $pendapatan - $pengeluaran,
+                ];
+            })
+            ->sortBy('mulai')
+            ->values();
+    }
+
+    /**
+     * Rekap per pekan (Senin–Minggu) dari baris pendapatan/pengeluaran.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return Collection<int, array{mulai: string, label: string, jumlah: int, total: float, pending: float}>
+     */
+    public function rekapPekanan(Collection $rows): Collection
+    {
+        return $rows
+            ->groupBy(fn (array $r): string => CarbonImmutable::parse($r['tanggal'])
+                ->startOfWeek(CarbonInterface::MONDAY)
+                ->toDateString())
+            ->map(function (Collection $grup, string $mulai): array {
+                $awalPekan = CarbonImmutable::parse($mulai);
+                $akhirPekan = $awalPekan->endOfWeek(CarbonInterface::SUNDAY);
+
+                return [
+                    'mulai' => $mulai,
+                    'label' => $awalPekan->translatedFormat('d M').' – '.$akhirPekan->translatedFormat('d M'),
+                    'jumlah' => $grup->count(),
+                    'total' => (float) $grup
+                        ->filter(fn (array $r): bool => $r['dihitung'] ?? true)
+                        ->sum(fn (array $r) => $r['total'] ?? $r['nominal']),
+                    'pending' => (float) $grup
+                        ->filter(fn (array $r): bool => ! ($r['dihitung'] ?? true))
+                        ->sum('nominal'),
+                ];
+            })
+            ->sortBy('mulai')
+            ->values();
+    }
+
+    /**
+     * Pengerjaan per klasifikasi (cuci / service / pemasangan) bulan terpilih,
+     * lengkap dengan rincian tiap jenis layanan di dalamnya.
+     *
+     * @return array<string, array{unit: int, rupiah: float, transaksi: int, items: array<int, array{label: string, unit: int, rupiah: float}>}>
      */
     public function klasifikasiPengerjaan(CarbonInterface $awal, CarbonInterface $akhir): array
     {
@@ -314,10 +453,25 @@ class DashboardPimpinanService
         foreach ($grup as $nama => $jenis) {
             $rows = $items->whereIn('kategori', $jenis);
 
+            $rincian = collect($jenis)
+                ->map(function (ServiceType $st) use ($rows): array {
+                    $perJenis = $rows->where('kategori', $st);
+
+                    return [
+                        'label' => self::LABEL_LAYANAN[$st->value] ?? $st->value,
+                        'unit' => (int) $perJenis->sum('jumlah'),
+                        'rupiah' => (float) $perJenis->sum(fn (OrderItem $i): float => (float) $i->harga * (int) $i->jumlah),
+                    ];
+                })
+                ->filter(fn (array $x): bool => $x['unit'] > 0 || $x['rupiah'] > 0)
+                ->values()
+                ->all();
+
             $hasil[$nama] = [
                 'unit' => (int) $rows->sum('jumlah'),
                 'rupiah' => (float) $rows->sum(fn (OrderItem $i): float => (float) $i->harga * (int) $i->jumlah),
                 'transaksi' => $rows->count(),
+                'items' => $rincian,
             ];
         }
 
