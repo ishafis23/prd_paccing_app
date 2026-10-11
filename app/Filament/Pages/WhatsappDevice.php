@@ -214,7 +214,17 @@ class WhatsappDevice extends Page
     private function pesanQr(array $hasil): string
     {
         if (empty($hasil['ok'])) {
-            return (string) ($hasil['error'] ?? 'Gagal menghubungi gateway.');
+            // Tampilkan pesan asli gateway dulu (mis. "Parameter device dan
+            // iduser wajib diisi.") agar penyebabnya tidak tertutup pesan umum.
+            $pesan = trim((string) ($hasil['error'] ?? ''));
+            if ($pesan === '') {
+                $pesan = trim((string) ($hasil['message'] ?? ''));
+            }
+            if ($pesan === '') {
+                $pesan = 'Gagal menghubungi gateway (HTTP '.(int) ($hasil['status_code'] ?? 0).').';
+            }
+
+            return $pesan;
         }
 
         if (! empty($hasil['has_qr'])) {
