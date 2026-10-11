@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\ServiceType;
+use App\Casts\ServiceTypeCast;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -25,7 +25,7 @@ class PhotoReportTemplate extends Model
     protected function casts(): array
     {
         return [
-            'kategori' => ServiceType::class,
+            'kategori' => ServiceTypeCast::class,
             'urutan' => 'integer',
             'wajib' => 'boolean',
             'aktif' => 'boolean',

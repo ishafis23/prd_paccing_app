@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\ServiceTypeCast;
 use App\Enums\IncomeCategory;
-use App\Enums\ServiceType;
+use App\Support\ServiceTypeResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,7 +40,7 @@ class OrderItem extends Model
     protected function casts(): array
     {
         return [
-            'kategori' => ServiceType::class,
+            'kategori' => ServiceTypeCast::class,
             'komponen' => IncomeCategory::class,
             'penyesuaian' => 'boolean',
             'harga' => 'decimal:2',
@@ -111,7 +112,7 @@ class OrderItem extends Model
      */
     public function komponenOmset(): IncomeCategory
     {
-        return $this->komponen ?? IncomeCategory::untukLayanan($this->kategori);
+        return $this->komponen ?? ServiceTypeResolver::komponen($this->kategori);
     }
 
     /**

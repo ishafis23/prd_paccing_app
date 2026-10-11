@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\CustomerJenis;
-use App\Enums\IncomeCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
@@ -15,6 +14,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\ServiceReminder;
 use App\Models\User;
+use App\Support\ServiceTypeResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -194,7 +194,7 @@ class PaymentService
 
     private function catatIncome(Order $order, Payment $payment): void
     {
-        $kategori = IncomeCategory::untukLayanan($order->serviceCatalog?->jenis_layanan);
+        $kategori = ServiceTypeResolver::komponen($order->serviceCatalog?->jenis_layanan);
 
         $exists = Income::where('order_id', $order->id)->where('kategori', $kategori->value)->exists();
 

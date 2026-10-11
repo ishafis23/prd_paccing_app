@@ -7,6 +7,7 @@ use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\PhotoReportTemplate;
 use App\Models\User;
+use App\Support\ServiceTypeValue;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -24,7 +25,7 @@ class PhotoReportTemplateService
     /**
      * Slot aktif utk kategori tsb, terurut — [kode_slot => label].
      */
-    public function untukKategori(?ServiceType $kategori): array
+    public function untukKategori(ServiceType|ServiceTypeValue|null $kategori): array
     {
         if ($kategori === null) {
             return [];
@@ -46,7 +47,7 @@ class PhotoReportTemplateService
      * Slot aktif & wajib utk kategori tsb — [kode_slot => label] (subset
      * dari untukKategori()). Dipakai validasi submit & penanda "Wajib".
      */
-    public function daftarWajib(?ServiceType $kategori): array
+    public function daftarWajib(ServiceType|ServiceTypeValue|null $kategori): array
     {
         if ($kategori === null) {
             return [];
@@ -77,7 +78,7 @@ class PhotoReportTemplateService
      * `$hanyaWajib` = hanya slot yang juga wajib (dasar menuntut keterangan);
      * false = semua slot aktif (dasar menentukan field yang ditampilkan).
      */
-    public function fieldSetUntuk(?ServiceType $kategori, bool $hanyaWajib = false): string
+    public function fieldSetUntuk(ServiceType|ServiceTypeValue|null $kategori, bool $hanyaWajib = false): string
     {
         if ($kategori === null) {
             return 'bebas';

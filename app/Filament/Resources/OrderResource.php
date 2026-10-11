@@ -33,6 +33,7 @@ use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\WhatsappService;
 use App\Support\EnumOptions;
+use App\Support\ServiceTypeResolver;
 use App\Support\Url;
 use App\Support\WhatsappTemplate;
 use Filament\Forms;
@@ -561,6 +562,34 @@ class OrderResource extends BaseResource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('customer.nama')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('customer.no_hp')
+                    ->label('Telepon')
+                    ->placeholder('—')
+                    ->icon('heroicon-o-phone')
+                    ->color('primary')
+                    ->url(fn (Order $record): ?string => filled($record->customer?->no_hp)
+                        ? 'tel:'.preg_replace('/\D/', '', (string) $record->customer->no_hp)
+                        : null)
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('customer_wa')
+                    ->label('WA')
+                    ->placeholder('—')
+                    ->icon('heroicon-o-chat-bubble-left-right')
+                    ->color('success')
+                    ->state('WhatsApp')
+                    ->url(function (Order $record): ?string {
+                        $digits = preg_replace('/\D/', '', (string) $record->customer?->no_hp);
+
+                        if ($digits === '') {
+                            return null;
+                        }
+
+                        $wa = str_starts_with($digits, '0') ? '62'.substr($digits, 1) : $digits;
+
+                        return 'https://wa.me/'.$wa;
+                    })
+                    ->openUrlInNewTab()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('serviceCatalog.jenis_layanan')->label('Layanan')->badge(),
                 Tables\Columns\TextColumn::make('unit')
                     ->label('Unit')
@@ -697,14 +726,14 @@ class OrderResource extends BaseResource
                                 ->maxLength(255)
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(fn (Get $get, Set $set) => $set('komponen', IncomeCategory::defaultUntukBaris(
-                                    filled($get('kategori')) ? ServiceType::from($get('kategori')) : null,
+                                    filled($get('kategori')) ? ServiceType::tryFrom((string) $get('kategori')) : null,
                                     $get('nama_layanan'),
                                 )->value)),
                             Forms\Components\Select::make('kategori')
-                                ->options(EnumOptions::for(ServiceType::class))
+                                ->options(ServiceTypeResolver::options())
                                 ->live()
                                 ->afterStateUpdated(fn (Get $get, Set $set) => $set('komponen', IncomeCategory::defaultUntukBaris(
-                                    filled($get('kategori')) ? ServiceType::from($get('kategori')) : null,
+                                    filled($get('kategori')) ? ServiceType::tryFrom((string) $get('kategori')) : null,
                                     $get('nama_layanan'),
                                 )->value)),
                             Forms\Components\Radio::make('komponen')
@@ -758,7 +787,7 @@ class OrderResource extends BaseResource
                                 ->required()
                                 ->maxLength(255),
                             Forms\Components\Select::make('kategori')
-                                ->options(EnumOptions::for(ServiceType::class)),
+                                ->options(ServiceTypeResolver::options()),
                             Forms\Components\Select::make('customer_ac_unit_id')
                                 ->label('Unit AC (opsional)')
                                 ->options(fn (Order $record) => CustomerAcUnit::query()

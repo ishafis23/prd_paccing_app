@@ -23,6 +23,7 @@ use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
 use App\Services\UnitReportService;
 use App\Support\FotoLaporanSlot;
+use App\Support\ServiceTypeResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -170,9 +171,7 @@ class OrderDetail extends Component
      */
     public function getKategoriLayananProperty(): array
     {
-        return collect(ServiceType::cases())
-            ->mapWithKeys(fn (ServiceType $c): array => [$c->value => str($c->value)->headline()->toString()])
-            ->all();
+        return ServiceTypeResolver::options();
     }
 
     /**

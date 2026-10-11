@@ -2,12 +2,11 @@
 
 namespace App\Services;
 
-use App\Enums\IncomeCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Enums\ServiceType;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Support\ServiceTypeResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -97,7 +96,7 @@ class OmsetService
                 if ($order->orderItems->isEmpty()) {
                     $jenis = $order->serviceCatalog?->jenis_layanan;
                     $komponen = $order->serviceCatalog?->komponenOmset()
-                        ?? IncomeCategory::untukLayanan($jenis);
+                        ?? ServiceTypeResolver::komponen($jenis);
                     $unit = max(1, (int) $order->jumlah_unit);
 
                     $hasil->push([
@@ -122,7 +121,7 @@ class OmsetService
                     $hasil->push([
                         'order_id' => $order->id,
                         'tanggal' => $tanggal,
-                        'kategori' => $item->kategori instanceof ServiceType ? $item->kategori->value : 'lainnya',
+                        'kategori' => ServiceTypeResolver::kode($item->kategori) ?? 'lainnya',
                         'nama' => $this->namaBaris($item),
                         'komponen' => $item->komponenOmset()->value,
                         'unit' => $item->penyesuaian ? 0 : (int) $item->jumlah,
@@ -149,9 +148,8 @@ class OmsetService
             ->values();
         $utama = $items->first();
 
-        $kategori = $utama?->kategori instanceof ServiceType
-            ? $utama->kategori->value
-            : ($order->serviceCatalog?->jenis_layanan?->value ?? 'lainnya');
+        $kategori = ServiceTypeResolver::kode($utama?->kategori)
+            ?? ($order->serviceCatalog?->jenis_layanan?->value ?? 'lainnya');
         $nama = $utama !== null ? $this->namaBaris($utama) : 'Layanan';
 
         $unit = $order->jumlahUnit();

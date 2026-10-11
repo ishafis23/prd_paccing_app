@@ -3,15 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Enums\RoleName;
-use App\Enums\ServiceType;
 use App\Filament\Resources\PhotoReportTemplateResource\Pages;
 use App\Models\PhotoReportTemplate;
 use App\Services\PhotoReportTemplateService;
-use App\Support\EnumOptions;
+use App\Support\ServiceTypeResolver;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -120,7 +118,7 @@ class PhotoReportTemplateResource extends BaseResource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('kategori')
-                    ->options(EnumOptions::for(ServiceType::class)),
+                    ->options(ServiceTypeResolver::options()),
             ])
             ->headerActions([
                 Tables\Actions\Action::make('tambahItem')
@@ -129,7 +127,7 @@ class PhotoReportTemplateResource extends BaseResource
                     ->visible(fn (): bool => static::bolehKelola())
                     ->form([
                         Forms\Components\Select::make('kategori')
-                            ->options(EnumOptions::for(ServiceType::class))
+                            ->options(ServiceTypeResolver::options())
                             ->required(),
                         Forms\Components\TextInput::make('label')
                             ->label('Label (nama yang dilihat teknisi)')

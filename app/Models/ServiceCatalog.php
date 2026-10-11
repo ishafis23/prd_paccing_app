@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Casts\ServiceTypeCast;
 use App\Enums\IncomeCategory;
-use App\Enums\ServiceType;
 use App\Enums\UnitType;
+use App\Support\ServiceTypeResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -31,7 +32,7 @@ class ServiceCatalog extends Model
     protected function casts(): array
     {
         return [
-            'jenis_layanan' => ServiceType::class,
+            'jenis_layanan' => ServiceTypeCast::class,
             'jenis_unit' => UnitType::class,
             'harga' => 'decimal:2',
             'interval_bulan' => 'integer',
@@ -61,7 +62,7 @@ class ServiceCatalog extends Model
      */
     public function komponenOmset(): IncomeCategory
     {
-        return IncomeCategory::tryFrom((string) $this->mode_omset) ?? IncomeCategory::untukLayanan($this->jenis_layanan);
+        return IncomeCategory::tryFrom((string) $this->mode_omset) ?? ServiceTypeResolver::komponen($this->jenis_layanan);
     }
 
     public function orders(): HasMany

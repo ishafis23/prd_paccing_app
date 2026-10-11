@@ -3,9 +3,8 @@
 namespace App\Livewire\Teknisi;
 
 use App\Enums\OrderStatus;
-use App\Enums\ServiceType;
 use App\Models\Order;
-use App\Support\EnumOptions;
+use App\Support\ServiceTypeResolver;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -56,7 +55,7 @@ class RiwayatPengerjaan extends Component
 
         return view('livewire.teknisi.riwayat-pengerjaan', [
             'orders' => $orders,
-            'opsiLayanan' => EnumOptions::for(ServiceType::class),
+            'opsiLayanan' => ServiceTypeResolver::options(),
         ])
             ->layout('layouts.teknisi', ['title' => 'Riwayat Pengerjaan']);
     }

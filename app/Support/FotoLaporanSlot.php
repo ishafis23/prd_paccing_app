@@ -21,7 +21,7 @@ class FotoLaporanSlot
      * dapat template umum sebelum/sesudah — jaring pengaman, bukan bagian
      * yang diatur admin, dan tidak pernah wajib.
      */
-    public static function untuk(?ServiceType $kategori): array
+    public static function untuk(ServiceType|ServiceTypeValue|null $kategori): array
     {
         $slot = app(PhotoReportTemplateService::class)->untukKategori($kategori);
 
@@ -36,7 +36,7 @@ class FotoLaporanSlot
      * (dev-plan/17, B63). Selalu kosong utk kategori yang jatuh ke
      * fallback umum (sebelum/sesudah tidak pernah wajib).
      */
-    public static function wajibUntuk(?ServiceType $kategori): array
+    public static function wajibUntuk(ServiceType|ServiceTypeValue|null $kategori): array
     {
         return app(PhotoReportTemplateService::class)->daftarWajib($kategori);
     }

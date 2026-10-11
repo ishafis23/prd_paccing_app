@@ -2,14 +2,13 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\ServiceType;
 use App\Enums\UnitType;
 use App\Filament\Resources\ServiceCatalogResource\Pages;
 use App\Models\ServiceCatalog;
 use App\Support\EnumOptions;
+use App\Support\ServiceTypeResolver;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -28,7 +27,7 @@ class ServiceCatalogResource extends BaseResource
         return $form
             ->schema([
                 Forms\Components\Select::make('jenis_layanan')
-                    ->options(EnumOptions::for(ServiceType::class))
+                    ->options(ServiceTypeResolver::options())
                     ->required(),
                 Forms\Components\Select::make('jenis_unit')
                     ->options(EnumOptions::for(UnitType::class)),
@@ -71,7 +70,7 @@ class ServiceCatalogResource extends BaseResource
                 Tables\Columns\IconColumn::make('aktif')->boolean(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('jenis_layanan')->options(EnumOptions::for(ServiceType::class)),
+                Tables\Filters\SelectFilter::make('jenis_layanan')->options(ServiceTypeResolver::options()),
                 Tables\Filters\TernaryFilter::make('aktif'),
             ])
             ->actions([

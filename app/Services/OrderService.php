@@ -20,6 +20,7 @@ use App\Models\Titik;
 use App\Models\User;
 use App\Models\WorkReport;
 use App\Models\WorkReportPhoto;
+use App\Support\ServiceTypeResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
@@ -789,17 +790,27 @@ class OrderService
             throw new BusinessRuleException('Jumlah terlalu besar — maksimal 1000 unit per baris layanan.');
         }
 
-        $kategori = filled($data['kategori'] ?? null) ? ServiceType::from($data['kategori']) : null;
+        // Kategori boleh jenis bawaan (enum) atau tambahan (tabel service_types).
+        $kategoriKode = filled($data['kategori'] ?? null) ? (string) $data['kategori'] : null;
+        if ($kategoriKode !== null && ! ServiceTypeResolver::valid($kategoriKode)) {
+            $kategoriKode = null;
+        }
+        $kategoriEnum = $kategoriKode !== null ? ServiceType::tryFrom($kategoriKode) : null;
+
         $acUnit = $this->resolveAcUnit($data['customer_ac_unit_id'] ?? null, $order->customer);
 
         $komponen = filled($data['komponen'] ?? null)
             ? (IncomeCategory::tryFrom((string) $data['komponen']) ?? throw new BusinessRuleException('Komponen omset harus Jasa atau Material.'))
-            : IncomeCategory::defaultUntukBaris($kategori, $namaLayanan);
+            : ($kategoriEnum !== null
+                ? IncomeCategory::defaultUntukBaris($kategoriEnum, $namaLayanan)
+                : ($kategoriKode !== null
+                    ? ServiceTypeResolver::komponen($kategoriKode)
+                    : IncomeCategory::defaultUntukBaris(null, $namaLayanan)));
 
         $item = $order->orderItems()->create([
             'customer_ac_unit_id' => $acUnit?->id,
             'nama_layanan' => $namaLayanan,
-            'kategori' => $kategori,
+            'kategori' => $kategoriKode,
             'komponen' => $komponen,
             'harga' => $harga,
             'jumlah' => $jumlah,
