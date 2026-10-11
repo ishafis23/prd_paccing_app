@@ -24,6 +24,10 @@
                     </div>
                     <p class="mt-2 text-center text-xs text-gray-400">QR tidak tampil? Klik "Ambil QR" lagi, atau klik "Cek Status".</p>
                 @endif
+
+                @if ($qrDetail)
+                    <p class="mt-2 break-all text-xs text-gray-400">Respons gateway: {{ $qrDetail }}</p>
+                @endif
             </div>
         @endif
 

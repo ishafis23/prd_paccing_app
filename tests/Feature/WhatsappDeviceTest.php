@@ -14,6 +14,19 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
 
+    // Pin config WA agar test tidak bergantung pada .env developer.
+    config([
+        'wa.aktif' => false,
+        'wa.rate_limit' => 0,
+        'wa.pdf_secret' => null,
+        'wa.document_token' => null,
+        'wa.base_url.qr' => null,
+        'wa.base_url.send' => null,
+        'wa.base_url.group' => null,
+        'wa.base_url.document' => null,
+        'wa.base_url.reset' => null,
+    ]);
+
     $this->mkUser = function (string $role): User {
         $user = User::factory()->create();
         $user->assignRole($role);

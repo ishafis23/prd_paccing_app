@@ -41,6 +41,8 @@ class WhatsappDevice extends Page
 
     public ?string $statusMessage = null;
 
+    public ?string $qrDetail = null;
+
     public bool $gatewayAktif = false;
 
     // --- Uji kirim teks (fase 23-B) ---
@@ -108,6 +110,17 @@ class WhatsappDevice extends Page
 
         $this->qrImage = $hasil['image'] ?? null;
         $this->qrMessage = $this->pesanQr($hasil);
+        $this->qrDetail = $this->detailGateway($hasil);
+
+        // Beri notifikasi jelas berhasil/gagal (sebelumnya hanya teks kecil).
+        Notification::make()
+            ->title(empty($hasil['ok'])
+                ? 'Gagal menghubungi gateway'
+                : (! empty($hasil['has_qr']) ? 'QR siap discan' : 'Device sudah terhubung'))
+            ->body($this->qrMessage)
+            ->status(empty($hasil['ok']) ? 'danger' : 'success')
+            ->send();
+
         $this->muatDevices();
     }
 
@@ -125,6 +138,7 @@ class WhatsappDevice extends Page
         $hasil = app(WhatsappService::class)->status($device);
 
         $this->qrMessage = $this->pesanQr($hasil);
+        $this->qrDetail = $this->detailGateway($hasil);
         $this->statusMessage = $hasil['terhubung']
             ? 'Device '.$device->device_name.' terhubung.'
             : 'Device '.$device->device_name.' BELUM terhubung.';
@@ -161,6 +175,7 @@ class WhatsappDevice extends Page
         }
 
         $this->qrMessage = $this->pesanQr($hasil);
+        $this->qrDetail = $this->detailGateway($hasil);
 
         Notification::make()
             ->title(($reset['ok'] ?? false) ? 'Reset dikirim' : 'Reset gagal')
@@ -209,6 +224,21 @@ class WhatsappDevice extends Page
         }
 
         $this->muatDevices();
+    }
+
+    /** Ringkasan teknis respons gateway (kode HTTP + body) untuk diagnosa. */
+    private function detailGateway(array $hasil): string
+    {
+        $kode = 'HTTP '.(int) ($hasil['status_code'] ?? 0);
+        $body = $hasil['parsed'] ?? $hasil['body'] ?? null;
+
+        if (is_array($body)) {
+            $body = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+
+        $body = trim((string) $body);
+
+        return $body === '' ? $kode : $kode.' · '.mb_substr($body, 0, 500);
     }
 
     private function pesanQr(array $hasil): string
