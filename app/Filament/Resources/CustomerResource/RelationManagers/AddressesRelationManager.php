@@ -85,10 +85,14 @@ class AddressesRelationManager extends RelationManager
                             ),
                         Forms\Components\TextInput::make('latitude')
                             ->numeric()
+                            ->minValue(-90)
+                            ->maxValue(90)
                             ->step('0.0000001')
                             ->live(onBlur: true),
                         Forms\Components\TextInput::make('longitude')
                             ->numeric()
+                            ->minValue(-180)
+                            ->maxValue(180)
                             ->step('0.0000001')
                             ->live(onBlur: true),
                         Forms\Components\ViewField::make('peta_lokasi')

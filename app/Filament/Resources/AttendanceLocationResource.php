@@ -11,7 +11,6 @@ use App\Services\GoogleMapsLinkService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -132,12 +131,18 @@ class AttendanceLocationResource extends BaseResource
                     Forms\Components\TextInput::make('latitude')
                         ->required()
                         ->numeric()
+                        ->minValue(-90)
+                        ->maxValue(90)
                         ->step('0.0000001')
+                        ->helperText('Format desimal pakai titik, mis. -5.1412593 (bukan -51412593).')
                         ->live(onBlur: true),
                     Forms\Components\TextInput::make('longitude')
                         ->required()
                         ->numeric()
+                        ->minValue(-180)
+                        ->maxValue(180)
                         ->step('0.0000001')
+                        ->helperText('Format desimal pakai titik, mis. 119.5223176 (bukan 1195223176).')
                         ->live(onBlur: true),
                     Forms\Components\ViewField::make('peta_lokasi')
                         ->label('Peta (klik/geser pin untuk koreksi titik)')
