@@ -2,6 +2,12 @@
     $bisnis = app(\App\Services\BusinessInfoService::class);
     $namaUsaha = $bisnis->namaUsaha();
     $logoUrl = $bisnis->logoUrl();
+    $nav = [
+        ['route' => 'portal.dashboard', 'label' => 'Ringkasan', 'icon' => 'heroicon-o-home'],
+        ['route' => 'portal.pekerjaan', 'label' => 'Pekerjaan', 'icon' => 'heroicon-o-wrench-screwdriver'],
+        ['route' => 'portal.unit', 'label' => 'Unit AC', 'icon' => 'heroicon-o-squares-2x2'],
+        ['route' => 'portal.invoice', 'label' => 'Invoice', 'icon' => 'heroicon-o-document-text'],
+    ];
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -14,7 +20,7 @@
     @livewireStyles
 </head>
 <body class="min-h-screen bg-gray-200/80 text-gray-900 antialiased">
-    <div class="relative mx-auto min-h-screen w-full max-w-[480px] bg-gray-100 shadow-2xl shadow-gray-400/30">
+    <div class="relative mx-auto min-h-screen w-full max-w-[480px] bg-gray-100 shadow-2xl shadow-gray-400/30 md:max-w-3xl">
 
         <header class="sticky top-0 z-40 bg-gradient-to-r from-sky-600 via-blue-600 to-blue-700 shadow-lg shadow-blue-900/20">
             <div class="flex h-14 items-center justify-between gap-3 px-4">
@@ -41,6 +47,20 @@
                     </button>
                 </form>
             </div>
+
+            <nav class="flex gap-1 overflow-x-auto px-2 pb-2">
+                @foreach ($nav as $item)
+                    <a href="{{ route($item['route']) }}"
+                        @class([
+                            'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition',
+                            'bg-white text-blue-700 shadow-sm' => request()->routeIs($item['route'].'*'),
+                            'text-sky-100 hover:bg-white/15' => ! request()->routeIs($item['route'].'*'),
+                        ])>
+                        <x-dynamic-component :component="$item['icon']" class="h-3.5 w-3.5" />
+                        {{ $item['label'] }}
+                    </a>
+                @endforeach
+            </nav>
         </header>
 
         <main class="pb-10">

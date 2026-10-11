@@ -46,7 +46,7 @@ it('aturPassword menolak customer tanpa email', function () {
     $customer = Customer::factory()->create(['email' => null]);
 
     app(CustomerPortalService::class)->aturPassword($customer, 'rahasia123', $admin);
-})->throws(BusinessRuleException::class, 'harus punya email');
+})->throws(BusinessRuleException::class, 'username atau email');
 
 it('aturPassword menolak password kurang dari 8 karakter', function () {
     $admin = ($this->mkAdmin)();
@@ -86,11 +86,11 @@ it('cabutAkses mengosongkan password (portal nonaktif lagi)', function () {
 
 it('login portal berhasil dgn kredensial benar & redirect ke dashboard', function () {
     $admin = ($this->mkAdmin)();
-    $customer = Customer::factory()->create(['email' => 'sekolah@contoh.id']);
+    $customer = Customer::factory()->create(['email' => 'sekolah@contoh.id', 'jenis' => CustomerJenis::Company]);
     app(CustomerPortalService::class)->aturPassword($customer, 'rahasia123', $admin);
 
     Livewire::test(PortalLogin::class)
-        ->set('email', 'sekolah@contoh.id')
+        ->set('identitas', 'sekolah@contoh.id')
         ->set('password', 'rahasia123')
         ->call('login')
         ->assertRedirect(route('portal.dashboard'));
@@ -101,38 +101,38 @@ it('login portal berhasil dgn kredensial benar & redirect ke dashboard', functio
 
 it('login portal gagal dgn password salah', function () {
     $admin = ($this->mkAdmin)();
-    $customer = Customer::factory()->create(['email' => 'sekolah@contoh.id']);
+    $customer = Customer::factory()->create(['email' => 'sekolah@contoh.id', 'jenis' => CustomerJenis::Company]);
     app(CustomerPortalService::class)->aturPassword($customer, 'rahasia123', $admin);
 
     Livewire::test(PortalLogin::class)
-        ->set('email', 'sekolah@contoh.id')
+        ->set('identitas', 'sekolah@contoh.id')
         ->set('password', 'salah-password')
         ->call('login')
-        ->assertHasErrors('email');
+        ->assertHasErrors('identitas');
 
     expect(Auth::guard('customer')->check())->toBeFalse();
 });
 
 it('login portal ditolak kalau akses belum diaktifkan (password kosong)', function () {
-    Customer::factory()->create(['email' => 'belum@contoh.id']);
+    Customer::factory()->create(['email' => 'belum@contoh.id', 'jenis' => CustomerJenis::Company]);
 
     Livewire::test(PortalLogin::class)
-        ->set('email', 'belum@contoh.id')
+        ->set('identitas', 'belum@contoh.id')
         ->set('password', 'apapun123')
         ->call('login')
-        ->assertHasErrors('email');
+        ->assertHasErrors('identitas');
 });
 
 it('login portal ditolak utk customer nonaktif walau password sudah diatur', function () {
     $admin = ($this->mkAdmin)();
-    $customer = Customer::factory()->create(['email' => 'nonaktif@contoh.id', 'status' => CustomerStatus::Nonaktif]);
+    $customer = Customer::factory()->create(['email' => 'nonaktif@contoh.id', 'status' => CustomerStatus::Nonaktif, 'jenis' => CustomerJenis::Company]);
     app(CustomerPortalService::class)->aturPassword($customer, 'rahasia123', $admin);
 
     Livewire::test(PortalLogin::class)
-        ->set('email', 'nonaktif@contoh.id')
+        ->set('identitas', 'nonaktif@contoh.id')
         ->set('password', 'rahasia123')
         ->call('login')
-        ->assertHasErrors('email');
+        ->assertHasErrors('identitas');
 });
 
 it('tamu yg akses dashboard portal diarahkan ke login portal, bukan login admin/teknisi', function () {
@@ -224,7 +224,7 @@ it('logout portal menghapus sesi customer', function () {
 
 it('aksi Atur Password Portal & Cabut Akses Portal tersedia di tabel admin', function () {
     $admin = ($this->mkAdmin)();
-    $customer = Customer::factory()->create(['email' => 'a@b.com']);
+    $customer = Customer::factory()->create(['email' => 'a@b.com', 'jenis' => CustomerJenis::Company]);
 
     Livewire::actingAs($admin)
         ->test(ListCustomers::class)

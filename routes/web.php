@@ -6,21 +6,27 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\Portal\BerkasController as PortalBerkasController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
 use App\Http\Controllers\TeknisExpenseController;
 use App\Http\Controllers\TemporaryPhotoUploadController;
 use App\Livewire\Auth\Login;
 use App\Livewire\Portal\Dashboard as PortalDashboard;
+use App\Livewire\Portal\Invoice as PortalInvoice;
+use App\Livewire\Portal\InvoiceDetail as PortalInvoiceDetail;
 use App\Livewire\Portal\Login as PortalLogin;
+use App\Livewire\Portal\Pekerjaan as PortalPekerjaan;
+use App\Livewire\Portal\PekerjaanDetail as PortalPekerjaanDetail;
+use App\Livewire\Portal\Unit as PortalUnit;
 use App\Livewire\Teknisi\AbsensiScan;
 use App\Livewire\Teknisi\Akun;
 use App\Livewire\Teknisi\CapaianKerja;
 use App\Livewire\Teknisi\DailyReport;
 use App\Livewire\Teknisi\JadwalHariIni;
 use App\Livewire\Teknisi\Keuangan;
-use App\Livewire\Teknisi\LengkapiLaporan;
 use App\Livewire\Teknisi\LaporanPengeluaran;
+use App\Livewire\Teknisi\LengkapiLaporan;
 use App\Livewire\Teknisi\OrderDetail;
 use App\Livewire\Teknisi\RiwayatAbsensi;
 use App\Livewire\Teknisi\RiwayatPengerjaan;
@@ -93,8 +99,17 @@ Route::post('/portal/logout', function () {
     return redirect()->route('portal.login');
 })->middleware('auth:customer')->name('portal.logout');
 
-Route::middleware('auth:customer')->prefix('portal')->group(function () {
+// Portal Corporate Customer (dev-plan/22) — hanya customer jenis `company`
+// yang aktif (middleware portal.aktif). 1 akun per customer (Plan A).
+Route::middleware(['auth:customer', 'portal.aktif'])->prefix('portal')->group(function () {
     Route::get('/', PortalDashboard::class)->name('portal.dashboard');
+    Route::get('/pekerjaan', PortalPekerjaan::class)->name('portal.pekerjaan');
+    Route::get('/pekerjaan/{order}', PortalPekerjaanDetail::class)->name('portal.pekerjaan.detail');
+    Route::get('/pekerjaan/{order}/laporan.pdf', [PortalBerkasController::class, 'laporan'])->name('portal.laporan.pdf');
+    Route::get('/unit', PortalUnit::class)->name('portal.unit');
+    Route::get('/invoice', PortalInvoice::class)->name('portal.invoice');
+    Route::get('/invoice/{invoice}', PortalInvoiceDetail::class)->name('portal.invoice.detail');
+    Route::get('/invoice/{invoice}/pdf', [PortalBerkasController::class, 'invoice'])->name('portal.invoice.pdf');
 });
 
 // Laporan Pengerjaan (dev-plan/21 §6): preview HTML + PDF per order, unduh

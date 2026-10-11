@@ -7,6 +7,38 @@
         @endif
     </div>
 
+    <div class="grid grid-cols-3 gap-2">
+        <a href="{{ route('portal.pekerjaan') }}" class="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-gray-100">
+            <p class="text-2xl font-extrabold text-blue-700">{{ $orderBulanIni }}</p>
+            <p class="mt-0.5 text-[11px] font-semibold text-gray-500">Order bulan ini</p>
+        </a>
+        <a href="{{ route('portal.unit') }}" class="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-gray-100">
+            <p class="text-2xl font-extrabold text-blue-700">{{ $totalUnit }}</p>
+            <p class="mt-0.5 text-[11px] font-semibold text-gray-500">Unit terdaftar</p>
+        </a>
+        <a href="{{ route('portal.invoice') }}" class="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-gray-100">
+            <p class="truncate text-base font-extrabold {{ $saldoTerbuka > 0 ? 'text-red-600' : 'text-green-600' }}">
+                Rp {{ number_format($saldoTerbuka, 0, ',', '.') }}
+            </p>
+            <p class="mt-0.5 text-[11px] font-semibold text-gray-500">Saldo tagihan</p>
+        </a>
+    </div>
+
+    @if ($jadwalBerikutnya)
+        <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <p class="flex items-center gap-1.5 text-sm font-bold text-gray-700">
+                <x-heroicon-o-calendar-days class="h-4 w-4 text-blue-600" /> Jadwal Pengerjaan Berikutnya
+            </p>
+            <p class="mt-1 text-sm text-gray-600">
+                {{ $jadwalBerikutnya->tanggal_jadwal?->translatedFormat('d F Y') }}
+                @if ($jadwalBerikutnya->jam_jadwal) · {{ $jadwalBerikutnya->jam_jadwal }} @endif
+                @if ($jadwalBerikutnya->customerAddress?->nama_lokasi)
+                    · {{ $jadwalBerikutnya->customerAddress->nama_lokasi }}
+                @endif
+            </p>
+        </div>
+    @endif
+
     @if ($reminder)
         <div class="rounded-2xl bg-blue-50 p-4 ring-1 ring-blue-100">
             <p class="flex items-center gap-1.5 text-sm font-bold text-blue-800">

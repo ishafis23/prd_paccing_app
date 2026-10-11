@@ -10,12 +10,14 @@ use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 /**
- * Login Portal Customer (dev-plan/12 §3.6) — guard terpisah 'customer',
- * 1 akun per customer (keputusan 13 Sept), pakai customers.email/password.
+ * Login Portal Corporate Customer (dev-plan/12 §3.6, dev-plan/22 Plan A) —
+ * guard terpisah 'customer', 1 akun per customer (perusahaan), login pakai
+ * username ATAU email + password (kolom di `customers`). Hanya jenis
+ * `company` yang boleh masuk.
  */
 class Login extends Component
 {
-    public string $email = '';
+    public string $identitas = '';
 
     public string $password = '';
 
@@ -29,22 +31,32 @@ class Login extends Component
     public function login(): void
     {
         $this->validate([
-            'email' => ['required', 'email'],
+            'identitas' => ['required', 'string'],
             'password' => ['required'],
         ]);
 
+        $id = strtolower(trim($this->identitas));
+
         $akun = Customer::query()
-            ->whereRaw('lower(email) = ?', [strtolower(trim($this->email))])
+            ->where(function ($query) use ($id): void {
+                $query->whereRaw('lower(username) = ?', [$id])
+                    ->orWhereRaw('lower(email) = ?', [$id]);
+            })
             ->first();
 
-        if ($akun === null || ! $akun->bisaLoginPortal() || ! Hash::check($this->password, $akun->password)) {
-            $this->addError('email', 'Email atau password salah, atau akses Portal belum diaktifkan. Hubungi admin.');
+        if (
+            $akun === null
+            || ! $akun->isCompany()
+            || ! $akun->bisaLoginPortal()
+            || ! Hash::check($this->password, $akun->password)
+        ) {
+            $this->addError('identitas', 'Username/email atau password salah, atau akses Portal belum diaktifkan. Hubungi admin.');
 
             return;
         }
 
         if ($akun->status === CustomerStatus::Nonaktif) {
-            $this->addError('email', 'Akun Anda dinonaktifkan. Hubungi admin.');
+            $this->addError('identitas', 'Akun Anda dinonaktifkan. Hubungi admin.');
 
             return;
         }

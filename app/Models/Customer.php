@@ -30,6 +30,7 @@ class Customer extends Model implements AuthenticatableContract
         'jenis',
         'no_hp',
         'email',
+        'username',
         'alamat',
         'latitude',
         'longitude',
@@ -55,12 +56,30 @@ class Customer extends Model implements AuthenticatableContract
     }
 
     /**
-     * Portal aktif utk customer ini (dev-plan/12 §3.6) kalau admin sudah
-     * mengatur password lewat CustomerPortalService::aturPassword().
+     * Portal aktif utk customer ini (dev-plan/12 §3.6, dev-plan/22 Plan A)
+     * kalau admin sudah mengatur password + minimal salah satu identitas
+     * login (username atau email) lewat CustomerPortalService.
      */
     public function bisaLoginPortal(): bool
     {
-        return filled($this->email) && filled($this->password);
+        return filled($this->password) && (filled($this->username) || filled($this->email));
+    }
+
+    /**
+     * Portal Corporate (dev-plan/22 §9-7) hanya untuk customer jenis
+     * `company`. Customer perorangan tetap memakai resi publik.
+     */
+    public function isCompany(): bool
+    {
+        return $this->jenis === CustomerJenis::Company;
+    }
+
+    /**
+     * Identitas login yang dipakai PIC (username bila ada, jika tidak email).
+     */
+    public function identitasPortal(): ?string
+    {
+        return $this->username ?: $this->email;
     }
 
     public function orders(): HasMany

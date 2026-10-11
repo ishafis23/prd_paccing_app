@@ -17,12 +17,18 @@
         <p class="text-sm text-gray-500">Portal Customer</p>
     </div>
 
+    @if (session('portal_error'))
+        <div class="mb-4 w-full rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">
+            {{ session('portal_error') }}
+        </div>
+    @endif
+
     <div class="w-full rounded-2xl bg-white p-6 shadow-sm">
         <form wire:submit="login" class="space-y-4">
             <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" wire:model="email" class="w-full rounded-xl border border-gray-300 px-4 py-2.5" autofocus>
-                @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                <label class="mb-1 block text-sm font-medium text-gray-700">Username atau Email</label>
+                <input type="text" wire:model="identitas" class="w-full rounded-xl border border-gray-300 px-4 py-2.5" autofocus>
+                @error('identitas') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">Kata Sandi</label>

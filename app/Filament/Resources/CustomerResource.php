@@ -15,7 +15,6 @@ use App\Support\EnumOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -100,13 +99,18 @@ class CustomerResource extends BaseResource
                 Tables\Actions\EditAction::make(),
 
                 Tables\Actions\Action::make('aturPasswordPortal')
-                    ->label('Atur Password Portal')
+                    ->label('Atur Akses Portal')
                     ->icon('heroicon-o-key')
                     ->color('gray')
-                    ->visible(fn () => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value]))
-                    ->modalHeading('Atur Password Portal Customer')
-                    ->modalDescription('Aktifkan/reset akses login Portal Customer (dev-plan/12 §3.6) — customer login pakai email ini + password yang diatur di sini.')
+                    ->visible(fn (Customer $record) => $record->isCompany()
+                        && auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value]))
+                    ->modalHeading('Atur Akses Portal Customer')
+                    ->modalDescription('Portal Corporate (dev-plan/22) — khusus customer jenis Instansi/Company. Customer login pakai username (atau email) + password yang diatur di sini.')
                     ->form([
+                        Forms\Components\TextInput::make('username')
+                            ->label('Username')
+                            ->helperText('Opsional. Bila dikosongkan, email customer dipakai untuk login.')
+                            ->maxLength(100),
                         Forms\Components\TextInput::make('password')
                             ->label('Password Baru')
                             ->password()
@@ -116,10 +120,15 @@ class CustomerResource extends BaseResource
                     ])
                     ->action(function (Customer $record, array $data) {
                         try {
-                            app(CustomerPortalService::class)->aturPassword($record, $data['password'], auth()->user());
-                            Notification::make()->success()->title('Password Portal diatur')->send();
+                            app(CustomerPortalService::class)->aturAkses(
+                                $record,
+                                $data['username'] ?? null,
+                                $data['password'],
+                                auth()->user(),
+                            );
+                            Notification::make()->success()->title('Akses Portal diatur')->send();
                         } catch (BusinessRuleException $e) {
-                            Notification::make()->danger()->title('Gagal mengatur password')->body($e->getMessage())->send();
+                            Notification::make()->danger()->title('Gagal mengatur akses')->body($e->getMessage())->send();
                         }
                     }),
 
@@ -127,7 +136,7 @@ class CustomerResource extends BaseResource
                     ->label('Cabut Akses Portal')
                     ->icon('heroicon-o-lock-closed')
                     ->color('danger')
-                    ->visible(fn (Customer $record) => $record->bisaLoginPortal()
+                    ->visible(fn (Customer $record) => $record->isCompany() && $record->bisaLoginPortal()
                         && auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value]))
                     ->requiresConfirmation()
                     ->modalDescription('Customer tidak akan bisa login ke Portal lagi sampai diaktifkan ulang. Data customer tidak dihapus.')

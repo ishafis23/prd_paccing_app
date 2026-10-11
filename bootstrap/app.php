@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserAktif;
+use App\Http\Middleware\PortalAktif;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'user.aktif' => EnsureUserAktif::class,
+            'portal.aktif' => PortalAktif::class,
         ]);
 
         // Portal Customer (dev-plan/12 §3.6) pakai guard 'customer' terpisah
