@@ -3,6 +3,7 @@
 namespace App\Livewire\Teknisi;
 
 use App\Enums\OrderStatus;
+use App\Models\DailyAttendance;
 use App\Models\Order;
 use Livewire\Component;
 
@@ -10,7 +11,9 @@ class JadwalHariIni extends Component
 {
     public function render()
     {
-        $orders = Order::query()
+        $hariIni = now()->toDateString();
+
+        $base = Order::query()
             ->untukTeknisi(auth()->id())
             ->whereIn('status', [
                 OrderStatus::Terjadwal->value,
@@ -19,11 +22,31 @@ class JadwalHariIni extends Component
                 OrderStatus::ButuhFollowup->value,
                 OrderStatus::Terkendala->value,
             ])
-            ->with(['customer', 'serviceCatalog', 'orderItems'])
+            ->with(['customer', 'serviceCatalog', 'orderItems']);
+
+        // Order dari hari-hari sebelumnya yang belum selesai/terkendala — dibuat
+        // sekat terpisah supaya teknisi notice & ingatkan admin (masukan client).
+        $ordersSebelumnya = (clone $base)
+            ->whereDate('tanggal_jadwal', '<', $hariIni)
             ->orderBy('tanggal_jadwal')
             ->get();
 
-        return view('livewire.teknisi.jadwal-hari-ini', ['orders' => $orders])
-            ->layout('layouts.teknisi', ['title' => 'Jadwal Saya']);
+        $ordersHariIni = (clone $base)
+            ->whereDate('tanggal_jadwal', '>=', $hariIni)
+            ->orderBy('tanggal_jadwal')
+            ->get();
+
+        // Gating (masukan client): menu orderan hanya bisa dibuka setelah absen datang.
+        $sudahAbsen = DailyAttendance::query()
+            ->where('user_id', auth()->id())
+            ->whereDate('tanggal', $hariIni)
+            ->whereNotNull('jam_datang')
+            ->exists();
+
+        return view('livewire.teknisi.jadwal-hari-ini', [
+            'ordersSebelumnya' => $ordersSebelumnya,
+            'ordersHariIni' => $ordersHariIni,
+            'sudahAbsen' => $sudahAbsen,
+        ])->layout('layouts.teknisi', ['title' => 'Jadwal Saya']);
     }
 }

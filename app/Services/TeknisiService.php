@@ -724,6 +724,27 @@ class TeknisiService
         return $order->fresh();
     }
 
+    /**
+     * Teknisi menandai "customer sudah bayar" (dev-plan/revisiteknisi Poin 6) —
+     * penanda untuk Admin/Finance mencatat pembayaran resmi (PaymentService).
+     */
+    public function laporBayar(Order $order, User $teknisi, bool $sudah): Order
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if ($order->status === OrderStatus::Batal) {
+            throw new BusinessRuleException('Order batal tidak bisa diubah.');
+        }
+
+        $order->bayar_dilaporkan_teknisi = $sudah;
+        $order->bayar_dilaporkan_pada = $sudah ? now() : null;
+        $order->bayar_dilaporkan_oleh = $sudah ? $teknisi->id : null;
+        $order->save();
+
+        return $order->fresh();
+    }
+
     private function pastikanAnggota(Order $order, User $teknisi): void
     {
         if (! $order->diassignkanKe($teknisi)) {

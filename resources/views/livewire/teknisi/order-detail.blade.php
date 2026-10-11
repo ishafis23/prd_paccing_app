@@ -123,6 +123,16 @@
         </div>
     </div>
 
+    {{-- Catatan Admin (masukan client Poin 2): detail pekerjaan/kondisi unit dari admin. --}}
+    @if (filled($order->catatan_admin))
+        <div class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
+            <p class="flex items-center gap-1.5 text-sm font-bold text-amber-800">
+                <x-heroicon-o-clipboard-document-list class="h-4 w-4" /> Catatan Admin
+            </p>
+            <p class="mt-1 whitespace-pre-line text-sm text-amber-900">{{ $order->catatan_admin }}</p>
+        </div>
+    @endif
+
     {{-- Peta lokasi customer (dari koordinat yg diisi Admin di Data Customer) --}}
     @if ($order->customer->latitude !== null && $order->customer->longitude !== null)
         @php
@@ -210,9 +220,9 @@
         @if ($this->butuhFotoTitikPertama)
             <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
                 <p class="mb-1 flex items-center gap-2 text-sm font-semibold text-amber-700">
-                    <x-heroicon-o-camera class="h-5 w-5" /> Titik Pertama Hari Ini (Games 2)
+                    <x-heroicon-o-camera class="h-5 w-5" /> Titik Pertama Hari ini (Games 2)
                 </p>
-                <p class="mb-3 text-xs text-gray-500">Ini check-in pertama Anda hari ini — upload foto bukti (mis. buka cover AC indoor) sebelum geser check-in.</p>
+                <p class="mb-3 text-xs text-gray-500">Check In Pertama — foto bukti sampai lokasi (mis. buka cover AC indoor) sebelum geser check-in.</p>
                 <x-photo-upload-dialog
                     fieldName="fotoTitikPertama"
                     label="Ambil/Pilih Foto"
@@ -937,6 +947,16 @@
                             <p>Sisa tagihan: <b class="text-amber-600">{{ $fmtRp($sisaTagihan) }}</b></p>
                         </div>
                     @endif
+
+                    {{-- (0) Lapor bayar (dev-plan/revisiteknisi Poin 6): sinyal ke Admin. --}}
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl bg-blue-50 p-3 ring-1 ring-blue-100">
+                        <input type="checkbox" wire:model.live="customerSudahBayar"
+                            class="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span>
+                            <span class="block text-sm font-bold text-blue-900">Customer sudah bayar</span>
+                            <span class="block text-xs text-blue-700">Tandai bila customer sudah membayar — admin akan mencatat pembayarannya.</span>
+                        </span>
+                    </label>
 
                     {{-- (1) Metode yang dipilih customer --}}
                     <div>

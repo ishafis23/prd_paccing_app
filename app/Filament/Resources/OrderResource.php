@@ -25,13 +25,16 @@ use App\Models\ServiceCatalog;
 use App\Models\Team;
 use App\Models\Titik;
 use App\Models\User;
+use App\Services\BusinessInfoService;
 use App\Services\CustomerService;
 use App\Services\FinanceService;
 use App\Services\InvoiceService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
+use App\Services\WhatsappService;
 use App\Support\EnumOptions;
 use App\Support\Url;
+use App\Support\WhatsappTemplate;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -580,6 +583,15 @@ class OrderResource extends BaseResource
                 }),
                 Tables\Columns\TextColumn::make('tanggal_jadwal')->date('d M Y')->sortable(),
                 Tables\Columns\TextColumn::make('titik.nama')->label('Titik')->placeholder('—')->sortable(),
+                Tables\Columns\IconColumn::make('bayar_dilaporkan_teknisi')
+                    ->label('Lapor bayar')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-banknotes')
+                    ->falseIcon('heroicon-o-minus')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->tooltip('Ditandai teknisi: customer sudah bayar — perlu dicatat pembayarannya.')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('total')->label('Total')->state(fn (Order $record) => 'Rp'.number_format($record->total(), 0, ',', '.')),
                 Tables\Columns\TextColumn::make('laporan_status')
                     ->label('Laporan')
@@ -601,6 +613,7 @@ class OrderResource extends BaseResource
                 Tables\Filters\SelectFilter::make('teknisi_id')->label('Teknisi')->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id')),
                 Tables\Filters\SelectFilter::make('team_id')->label('Tim')->options(fn () => Team::where('aktif', true)->pluck('nama', 'id')),
                 Tables\Filters\SelectFilter::make('titik_id')->label('Titik')->options(fn () => Titik::orderBy('urutan')->pluck('nama', 'id')),
+                Tables\Filters\TernaryFilter::make('bayar_dilaporkan_teknisi')->label('Lapor bayar teknisi'),
                 Tables\Filters\Filter::make('tanggal_jadwal')
                     ->form([
                         Forms\Components\DatePicker::make('tanggal_jadwal')->label('Tanggal Jadwal'),
@@ -1005,6 +1018,62 @@ class OrderResource extends BaseResource
                                 Notification::make()->success()->title('Order diperbarui')->send();
                             } catch (BusinessRuleException|AuthorizationException $e) {
                                 Notification::make()->danger()->title('Gagal memperbarui order')->body($e->getMessage())->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('kirimResi')
+                        ->label('Kirim Resi (WA)')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('success')
+                        ->visible(fn (Order $record): bool => $record->resi_token !== null
+                            && auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && auth()->user()->waDevice !== null)
+                        ->modalHeading('Kirim Resi ke Customer')
+                        ->modalDescription('Resi (tautan publik) dikirim via WhatsApp gateway.')
+                        ->form([
+                            Forms\Components\TextInput::make('target')
+                                ->label('Nomor Tujuan')
+                                ->tel()
+                                ->required()
+                                ->default(fn (Order $record): string => (string) preg_replace('/\D/', '', (string) $record->customer?->no_hp)),
+                            Forms\Components\Textarea::make('pesan')
+                                ->label('Pesan')
+                                ->rows(8)
+                                ->required()
+                                ->default(fn (Order $record): string => WhatsappTemplate::resi(
+                                    $record,
+                                    app(BusinessInfoService::class)->namaUsaha(),
+                                    Url::absolute('resi.show', ['order' => $record->id, 'token' => $record->resi_token]),
+                                )),
+                        ])
+                        ->action(function (Order $record, array $data): void {
+                            $user = auth()->user();
+                            $device = $user?->waDevice;
+
+                            if (! $device) {
+                                Notification::make()->title('Belum ada device WhatsApp')
+                                    ->body('Sambungkan device di menu WhatsApp → Perangkat & Tes WA.')->danger()->send();
+
+                                return;
+                            }
+
+                            try {
+                                $log = app(WhatsappService::class)->kirimTeks(
+                                    $user,
+                                    $device,
+                                    (string) $data['target'],
+                                    (string) $data['pesan'],
+                                    $record,
+                                    'resi',
+                                );
+
+                                Notification::make()
+                                    ->title($log->sukses() ? 'Resi terkirim' : 'Gagal mengirim resi')
+                                    ->body($log->sukses() ? 'Ke '.$log->target : (string) $log->error_message)
+                                    ->status($log->sukses() ? 'success' : 'danger')
+                                    ->send();
+                            } catch (BusinessRuleException $e) {
+                                Notification::make()->title('Tidak bisa kirim')->body($e->getMessage())->danger()->send();
                             }
                         }),
 

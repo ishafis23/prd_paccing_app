@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class Order extends Model
@@ -34,6 +35,9 @@ class Order extends Model
         'titik_id',
         'status',
         'metode_dipilih',
+        'bayar_dilaporkan_teknisi',
+        'bayar_dilaporkan_pada',
+        'bayar_dilaporkan_oleh',
         'bukti_pembayaran',
         'resi_token',
         'surat_jalan_token',
@@ -57,6 +61,8 @@ class Order extends Model
             'metode_dipilih' => PaymentMethod::class,
             'jumlah_unit' => 'integer',
             'tanggal_jadwal' => 'date:Y-m-d',
+            'bayar_dilaporkan_teknisi' => 'boolean',
+            'bayar_dilaporkan_pada' => 'datetime',
             'ditutup_pada' => 'datetime',
             'perbaikan_menunggu_konfirmasi' => 'boolean',
             'perbaikan_estimasi_harga' => 'decimal:2',
@@ -255,9 +261,9 @@ class Order extends Model
      * Baris item yang dihitung sebagai layanan/unit: bukan dibatalkan dan
      * bukan baris penyesuaian koreksi total.
      *
-     * @return \Illuminate\Support\Collection<int, OrderItem>
+     * @return Collection<int, OrderItem>
      */
-    private function itemsUnitAktif(): \Illuminate\Support\Collection
+    private function itemsUnitAktif(): Collection
     {
         return $this->orderItems->reject(fn (OrderItem $i) => $i->dibatalkan() || $i->penyesuaian);
     }

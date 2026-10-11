@@ -25,6 +25,7 @@ use App\Services\UnitReportService;
 use App\Support\FotoLaporanSlot;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
@@ -111,11 +112,15 @@ class OrderDetail extends Component
     #[Url(as: 'unit')]
     public ?int $unitBuka = null;
 
+    /** Penanda teknisi "customer sudah bayar" (dev-plan/revisiteknisi Poin 6). */
+    public bool $customerSudahBayar = false;
+
     public function mount(Order $order): void
     {
         abort_if(! $order->diassignkanKe(auth()->user()), 403, 'Order ini bukan tugas Anda.');
 
         $this->orderId = $order->id;
+        $this->customerSudahBayar = (bool) $order->bayar_dilaporkan_teknisi;
 
         // Initialize expanded items (all expanded by default)
         foreach ($order->orderItems as $item) {
@@ -724,7 +729,7 @@ class OrderDetail extends Component
         $butuhFotoTitikPertama = $this->butuhFotoTitikPertama;
 
         if ($butuhFotoTitikPertama && $this->fotoTitikPertama === null) {
-            $this->addError('fotoTitikPertama', 'Wajib upload foto bukti (mis. buka cover AC indoor) — ini check-in pertama Anda hari ini (Games 2).');
+            $this->addError('fotoTitikPertama', 'Wajib foto bukti sampai lokasi (mis. buka cover AC indoor) — check in pertama hari ini (Games 2).');
 
             return;
         }
@@ -980,8 +985,23 @@ class OrderDetail extends Component
     }
 
     /**
-     * Slider penutup order (B32): mengunci metode pembayaran & mencatat
-     * waktu penutupan. Hanya tampil saat order selesai & metode sudah dipilih.
+     * Penanda "customer sudah bayar" (dev-plan/revisiteknisi Poin 6) — dipanggil
+     * otomatis saat checkbox diubah. Sinyal ke Admin/Finance untuk mencatat bayar.
+     */
+    public function updatedCustomerSudahBayar(bool $sudah): void
+    {
+        try {
+            app(TeknisiService::class)->laporBayar($this->order, auth()->user(), $sudah);
+            session()->flash('status', $sudah ? 'Ditandai: customer sudah bayar.' : 'Tanda bayar dihapus.');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            $this->customerSudahBayar = ! $sudah;
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Upload/ganti bukti pembayaran (B-bukti-bayar) — wajib utk customer
+     * rumahan sebelum order bisa ditutup, opsional utk instansi.
      */
     public function tutupOrder(): void
     {
@@ -1001,9 +1021,9 @@ class OrderDetail extends Component
      * data unit — order lama tanpa data unit tidak ikut menuntut keterangan.
      * Daftar kosong = bagian ini tidak ditampilkan.
      *
-     * @return \Illuminate\Support\Collection<int, OrderUnitReport>
+     * @return Collection<int, OrderUnitReport>
      */
-    public function unitReports(): \Illuminate\Support\Collection
+    public function unitReports(): Collection
     {
         if (! in_array($this->order->status, [OrderStatus::Dikerjakan, OrderStatus::Selesai, OrderStatus::ButuhFollowup], true)) {
             return collect();
@@ -1019,7 +1039,7 @@ class OrderDetail extends Component
     /**
      * Isi $unitForm untuk unit yang belum punya state (tidak menimpa ketikan).
      *
-     * @param  \Illuminate\Support\Collection<int, OrderUnitReport>  $units
+     * @param  Collection<int, OrderUnitReport>  $units
      */
     private function muatUnitForm($units): void
     {
@@ -1244,8 +1264,8 @@ class OrderDetail extends Component
 
             return [
                 'perUnit' => $unitService->fotoPerUnit($item, $unitItem),
-                'slots' => \App\Support\FotoLaporanSlot::untuk($item->kategori),
-                'slotWajib' => \App\Support\FotoLaporanSlot::wajibUntuk($item->kategori),
+                'slots' => FotoLaporanSlot::untuk($item->kategori),
+                'slotWajib' => FotoLaporanSlot::wajibUntuk($item->kategori),
                 'fotoPerSlot' => $foto->keyBy('slot'),
                 'unit' => $unit,
                 'item' => $item,

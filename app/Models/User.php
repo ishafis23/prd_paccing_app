@@ -25,6 +25,14 @@ class User extends Authenticatable implements FilamentUser
         RoleName::Hr,
     ];
 
+    /**
+     * URL foto profil (dev-plan/revisiteknisi Poin 3), null bila belum diunggah.
+     */
+    public function fotoProfilUrl(): ?string
+    {
+        return $this->foto_profil ? asset('storage/'.ltrim((string) $this->foto_profil, '/')) : null;
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
         if ($this->status !== UserStatus::Aktif) {
@@ -37,6 +45,7 @@ class User extends Authenticatable implements FilamentUser
     protected $fillable = [
         'name',
         'email',
+        'foto_profil',
         'phone',
         'password',
         'status',

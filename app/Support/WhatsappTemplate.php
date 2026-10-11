@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Invoice;
+use App\Models\Order;
 
 /**
  * Penyusun teks/caption WhatsApp (dev-plan/23 §5.6) — satu tempat agar
@@ -52,6 +53,19 @@ class WhatsappTemplate
 
         return $teks."\n\n"
             ."Terima kasih atas kepercayaan Anda.\n\n"
+            ."Hormat kami,\n".$namaUsaha;
+    }
+
+    /** Teks pengantar resi order (dev-plan/revisiteknisi Poin 5). */
+    public static function resi(Order $order, string $namaUsaha, string $tautan): string
+    {
+        $order->loadMissing('customer');
+
+        return "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
+            .'Bapak/Ibu '.($order->customer?->nama ?? 'Pelanggan')."\n\n"
+            .'Terima kasih, pengerjaan '.$order->ringkasanLayanan().' telah selesai dikerjakan oleh '.$namaUsaha.'.'
+            ."\n\nBukti/resi pengerjaan dapat dilihat di tautan berikut:\n".$tautan
+            ."\n\nTerima kasih atas kepercayaan Anda.\n\n"
             ."Hormat kami,\n".$namaUsaha;
     }
 
