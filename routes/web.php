@@ -29,6 +29,7 @@ use App\Livewire\Teknisi\Keuangan;
 use App\Livewire\Teknisi\LaporanPengeluaran;
 use App\Livewire\Teknisi\LengkapiLaporan;
 use App\Livewire\Teknisi\OrderDetail;
+use App\Livewire\Teknisi\PulangCepat;
 use App\Livewire\Teknisi\RiwayatAbsensi;
 use App\Livewire\Teknisi\RiwayatPengerjaan;
 use Illuminate\Support\Facades\Auth;
@@ -53,6 +54,7 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     // langsung dari menu tanpa kode (absen pulang / lihat status hari ini).
     Route::get('/absensi/{kode?}', AbsensiScan::class)->name('teknisi.absensi');
     Route::get('/riwayat-absensi', RiwayatAbsensi::class)->name('teknisi.riwayat-absensi');
+    Route::get('/pulang-cepat', PulangCepat::class)->name('teknisi.pulang-cepat');
     Route::get('/riwayat', RiwayatPengerjaan::class)->name('teknisi.riwayat');
     Route::get('/lengkapi-laporan', LengkapiLaporan::class)->name('teknisi.lengkapi-laporan');
     Route::get('/capaian', CapaianKerja::class)->name('teknisi.capaian');

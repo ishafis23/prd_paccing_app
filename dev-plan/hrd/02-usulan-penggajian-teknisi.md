@@ -173,3 +173,22 @@ Gaji Pokok
   admin input nominal + catatan).
 - **c.** **Jadwal OFF**: diinput lewat kalender per tanggal, atau tabel daftar tanggal per
   teknisi? (usul: tabel daftar tanggal per teknisi + validasi kuota).
+
+---
+
+## 10. Tambahan: Pulang Cepat (setengah hari) — DIEKSEKUSI
+
+Permintaan user: teknisi bisa input **pulang cepat** pada tanggal tertentu, dan HRD punya
+menu baru untuk data ini; penggajian mendeteksinya sebagai **setengah hari**.
+
+- **Tabel** `technician_early_leaves` (user_id, tanggal, jam_pulang, alasan, status, catatan_hrd,
+  diverifikasi_oleh, diverifikasi_pada; unik user+tanggal).
+- **Teknisi**: halaman **"Pulang Cepat"** di portal teknisi (`/teknisi/pulang-cepat`) — isi
+  tanggal + jam pulang + alasan; lihat riwayat & status.
+- **HRD**: menu **SDM/HRD → Pulang Cepat** untuk verifikasi (Setujui/Tolak).
+- **Penggajian**: tiap pulang cepat **disetujui** di periode dihitung **setengah hari** →
+  potongan `0,5 × potongan_off_per_hari` per kejadian (kolom `jumlah_setengah_hari` &
+  `total_potongan_setengah_hari` pada `payroll_runs`, muncul sebagai baris "Pulang cepat /
+  setengah hari" di rincian & slip).
+- Keputusan: butuh **ACC HRD**; hanya yang disetujui memengaruhi gaji; jam/tanggal diisi
+  manual teknisi (tanggal tidak boleh di masa depan).

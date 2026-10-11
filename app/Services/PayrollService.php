@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\DailyAttendanceStatus;
+use App\Enums\EarlyLeaveStatus;
 use App\Enums\IncentiveKategori;
 use App\Enums\IncentiveStatusVerifikasi;
 use App\Enums\IncentiveTipe;
@@ -12,6 +13,7 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\DailyAttendance;
 use App\Models\PayrollRun;
+use App\Models\TechnicianEarlyLeave;
 use App\Models\TechnicianIncentive;
 use App\Models\TechnicianOffDay;
 use App\Models\TechnicianPayrollProfile;
@@ -123,11 +125,22 @@ class PayrollService
         $kelebihanOff = max(0, $jumlahOff - self::KUOTA_OFF);
         $potonganOff = $kelebihanOff * (float) $profil->potongan_off_per_hari;
 
+        // Pulang cepat disetujui (dev-plan/hrd/02) = setengah hari:
+        // potongan 0,5 × potongan OFF/hari tiap kejadian.
+        $jumlahSetengahHari = TechnicianEarlyLeave::query()
+            ->where('user_id', $profil->user_id)
+            ->where('status', EarlyLeaveStatus::Disetujui->value)
+            ->whereBetween('tanggal', [$dari, $sampai])
+            ->count();
+
+        $potonganSetengahHari = $jumlahSetengahHari * 0.5 * (float) $profil->potongan_off_per_hari;
+
         $bonusUmum = (float) ($existing->bonus_umum ?? 0);
 
         return DB::transaction(function () use (
             $existing, $profil, $mulai, $selesai, $actor, $bulananPerKategori, $bonusBulanan,
-            $bonusMingguan, $bonusUmum, $jumlahTelat, $dendaTelat, $jumlahOff, $kelebihanOff, $potonganOff
+            $bonusMingguan, $bonusUmum, $jumlahTelat, $dendaTelat, $jumlahOff, $kelebihanOff,
+            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari
         ): PayrollRun {
             $run = $existing ?? new PayrollRun;
 
@@ -143,6 +156,8 @@ class PayrollService
                 'total_denda_telat' => round($dendaTelat, 2),
                 'jumlah_hari_off' => $jumlahOff,
                 'total_potongan_off' => round($potonganOff, 2),
+                'jumlah_setengah_hari' => $jumlahSetengahHari,
+                'total_potongan_setengah_hari' => round($potonganSetengahHari, 2),
                 'potongan_bpjs_tk' => $profil->potongan_bpjs_tk,
                 'status' => PayrollStatus::Draft,
                 'dihitung_oleh' => $actor->id,
@@ -205,6 +220,16 @@ class PayrollService
                     'kategori' => 'off',
                     'label' => 'Potongan OFF ('.$kelebihanOff.' hari)',
                     'nominal' => round($potonganOff, 2),
+                    'urutan' => ++$urutan,
+                ]);
+            }
+
+            if ($potonganSetengahHari > 0) {
+                $run->items()->create([
+                    'jenis' => PayrollItemJenis::Potongan->value,
+                    'kategori' => 'setengah_hari',
+                    'label' => 'Pulang cepat / setengah hari ('.$jumlahSetengahHari.'×)',
+                    'nominal' => round($potonganSetengahHari, 2),
                     'urutan' => ++$urutan,
                 ]);
             }
@@ -299,6 +324,7 @@ class PayrollService
             - (float) $run->bonus_mingguan // sudah dibayar pekanan
             - (float) $run->total_denda_telat
             - (float) $run->total_potongan_off
+            - (float) $run->total_potongan_setengah_hari
             - (float) $run->potongan_bpjs_tk;
 
         $run->gaji_bersih = round($gaji, 2);
