@@ -44,7 +44,9 @@ class PaymentService
         User $by,
         ?string $tanggalBayar = null,
         ?float $totalTagihanOverride = null,
-        ?string $catatan = null
+        ?string $catatan = null,
+        ?float $omsetJasa = null,
+        ?float $omsetMaterial = null
     ): Payment {
         $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
 
@@ -77,6 +79,9 @@ class PaymentService
             throw new BusinessRuleException('Total tagihan disesuaikan — wajib isi alasan penyesuaian.');
         }
 
+        // Split omset jasa/material (dev-plan/24) — acuan final laporan omset.
+        $split = $this->validasiSplit($omsetJasa, $omsetMaterial, $total, $payment);
+
         $sudahDibayar = (float) ($payment?->jumlah_dibayar ?? 0);
         $sisa = $total - $sudahDibayar;
 
@@ -96,7 +101,7 @@ class PaymentService
         }
 
         // Semua efek (payment, income, reminder, status order) satu transaksi.
-        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar, $catatan): Payment {
+        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar, $catatan, $split): Payment {
             $baruDibayar = $sudahDibayar + $jumlahDibayar;
 
             $payment ??= new Payment(['order_id' => $order->id]);
@@ -104,6 +109,11 @@ class PaymentService
             $payment->total_tagihan = $total;
             $payment->jumlah_dibayar = $baruDibayar;
             $payment->dicatat_oleh = $by->id;
+
+            if ($split !== null) {
+                $payment->omset_jasa = $split['jasa'];
+                $payment->omset_material = $split['material'];
+            }
 
             if ($catatan !== null) {
                 $payment->catatan = $catatan;
@@ -124,6 +134,41 @@ class PaymentService
 
             return $payment->fresh();
         });
+    }
+
+    /**
+     * Validasi & normalisasi split omset jasa/material (dev-plan/24).
+     * - Bila salah satu diisi: keduanya wajib > 0 (tidak negatif) dan
+     *   Σ harus sama dengan Total Tagihan.
+     * - Bila keduanya kosong: pakai split lama (kalau ada), tapi tolak bila
+     *   Total Tagihan sudah berubah sehingga split lama tak lagi cocok.
+     *
+     * @return array{jasa: float, material: float}|null
+     */
+    private function validasiSplit(?float $jasa, ?float $material, float $total, ?Payment $payment): ?array
+    {
+        if ($jasa === null && $material === null) {
+            $lama = $payment?->splitOmset();
+
+            if ($lama !== null && abs(($lama['jasa'] + $lama['material']) - $total) > 0.009) {
+                throw new BusinessRuleException('Total tagihan berubah — isi ulang Omset Jasa & Omset Material.');
+            }
+
+            return $lama;
+        }
+
+        $j = (float) ($jasa ?? 0);
+        $m = (float) ($material ?? 0);
+
+        if ($j < 0 || $m < 0) {
+            throw new BusinessRuleException('Omset Jasa & Omset Material tidak boleh negatif.');
+        }
+
+        if (abs(($j + $m) - $total) > 0.009) {
+            throw new BusinessRuleException('Omset Jasa + Omset Material harus sama dengan Total Tagihan.');
+        }
+
+        return ['jasa' => round($j, 2), 'material' => round($m, 2)];
     }
 
     /**

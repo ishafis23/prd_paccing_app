@@ -2,9 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\OrderStatus;
 use App\Enums\IncomeCategory;
-use App\Enums\PaymentStatus;
 use App\Models\Expense;
 use App\Models\Order;
 use App\Models\TeknisiExpense;
@@ -32,18 +30,25 @@ class AkuntanService
     {
         // Aturan tanggal pendapatan satu pintu di OmsetService (sama dgn dashboard & pimpinan).
         return app(OmsetService::class)->orderSelesai($dari, $sampai)
-            ->with(['customer', 'serviceCatalog', 'orderItems'])
+            ->with(['customer', 'serviceCatalog', 'orderItems', 'payments'])
             ->get()
             ->map(function (Order $order): array {
                 $items = $order->orderItems->sortBy('id')->values();
                 $utama = $items->first();
-                $total = $order->total();
 
-                // Omset dipisah per komponen baris (jasa/material). Order tanpa
-                // item (data sangat lama) jatuh ke aturan lama per katalog.
-                if ($items->isNotEmpty()) {
+                // Acuan final (dev-plan/24): split omset jasa/material dari
+                // pembayaran bila ada. Bila tidak, turunkan dari komponen baris;
+                // order tanpa item jatuh ke aturan lama per katalog.
+                $splitPembayaran = $order->payments->first()?->splitOmset();
+
+                if ($splitPembayaran !== null) {
+                    $split = $splitPembayaran;
+                    $total = $split['jasa'] + $split['material'];
+                } elseif ($items->isNotEmpty()) {
                     $split = $order->totalPerKomponen();
+                    $total = $order->total();
                 } else {
+                    $total = $order->total();
                     $kategoriLama = IncomeCategory::untukLayanan($order->serviceCatalog?->jenis_layanan);
                     $split = ['jasa' => 0.0, 'material' => 0.0, $kategoriLama->value => $total];
                 }

@@ -540,6 +540,108 @@ class OrderService
     }
 
     /**
+     * Edit penugasan order sekaligus (dev-plan/25): ganti PIC dan/atau atur
+     * pendamping (anggota tim). Anggota yang tidak lagi dipilih otomatis
+     * dikeluarkan dari `order_technicians`; PIC baru otomatis menjadi anggota.
+     * Admin/Owner; order selesai/batal tidak bisa diubah.
+     *
+     * @param  array<int, int|string>  $pendampingIds
+     */
+    public function ubahPenugasan(Order $order, User $picBaru, array $pendampingIds, User $actor, ?string $alasan = null): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+        $this->assertRole($picBaru, [RoleName::Teknisi]);
+
+        if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
+            throw new BusinessRuleException('Order selesai/batal tidak bisa diubah penugasannya.');
+        }
+
+        $pendampingIds = collect($pendampingIds)
+            ->map(fn ($id): int => (int) $id)
+            ->reject(fn (int $id): bool => $id === (int) $picBaru->id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return DB::transaction(function () use ($order, $picBaru, $pendampingIds, $alasan): Order {
+            $picLamaId = $order->teknisi_id;
+
+            if ((int) $picLamaId !== (int) $picBaru->id) {
+                if ($picLamaId !== null) {
+                    // Attendance terbuka PIC lama (kalau sempat check-in) ditutup.
+                    $order->attendances()
+                        ->where('user_id', $picLamaId)
+                        ->whereNull('jam_keluar')
+                        ->update(['jam_keluar' => now()]);
+                }
+
+                $order->teknisi_id = $picBaru->id;
+
+                if ($order->status === OrderStatus::Baru) {
+                    $order->status = OrderStatus::Terjadwal;
+                }
+            }
+
+            $diinginkan = array_values(array_unique(array_merge([(int) $picBaru->id], $pendampingIds)));
+
+            OrderTechnician::where('order_id', $order->id)
+                ->whereNotIn('teknisi_id', $diinginkan)
+                ->delete();
+
+            foreach ($diinginkan as $id) {
+                OrderTechnician::firstOrCreate(['order_id' => $order->id, 'teknisi_id' => $id]);
+            }
+
+            $nama = User::whereIn('id', $pendampingIds)->pluck('name', 'id');
+            $pendampingLabel = collect($pendampingIds)->map(fn (int $id): string => $nama[$id] ?? "#{$id}")->implode(', ');
+
+            $order->catatan_admin = trim(($order->catatan_admin ?? '')
+                ."\n[EDIT ORDER] PIC: {$picBaru->name}"
+                .($pendampingIds !== [] ? " · Pendamping: {$pendampingLabel}" : ' · tanpa pendamping')
+                .(filled($alasan) ? ': '.trim($alasan) : ''));
+            $order->save();
+
+            return $order->fresh();
+        });
+    }
+
+    /**
+     * Ubah titik (slot/jam kunjungan) order dari master Titik (dev-plan/25).
+     * `$titikId` null = kosongkan; `jam_jadwal` mengikuti `titik.jam`.
+     * Admin/Owner; order selesai/batal tidak bisa diubah.
+     */
+    public function ubahTitik(Order $order, ?int $titikId, User $actor, ?string $alasan = null): Order
+    {
+        $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
+
+        if (in_array($order->status, [OrderStatus::Selesai, OrderStatus::Batal], true)) {
+            throw new BusinessRuleException('Order selesai/batal tidak bisa diubah titiknya.');
+        }
+
+        $titik = null;
+        if ($titikId !== null) {
+            $titik = Titik::find($titikId);
+
+            if ($titik === null) {
+                throw new BusinessRuleException('Titik tidak ditemukan.');
+            }
+        }
+
+        if ((int) $order->titik_id === (int) ($titik?->id)) {
+            return $order;
+        }
+
+        $order->titik_id = $titik?->id;
+        $order->jam_jadwal = $titik?->jam;
+        $order->catatan_admin = trim(($order->catatan_admin ?? '')
+            ."\n[UBAH TITIK] ".($titik !== null ? $titik->nama : 'dikosongkan')
+            .(filled($alasan) ? ': '.trim($alasan) : ''));
+        $order->save();
+
+        return $order->fresh();
+    }
+
+    /**
      * Admin menambah baris layanan ke order (dev-plan/13 §1/§2 "Ada
      * Perbaikan") — mis. sparepart pengganti yg disepakati dgn customer
      * setelah teknisi lapor kebutuhan perbaikan. Harga SELALU diisi

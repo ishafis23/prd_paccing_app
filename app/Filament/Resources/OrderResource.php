@@ -13,6 +13,7 @@ use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Enums\UnitType;
 use App\Exceptions\BusinessRuleException;
+use App\Filament\Resources\OrderResource\LaporanPengerjaanTab;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Customer;
 use App\Models\CustomerAcUnit;
@@ -30,6 +31,7 @@ use App\Services\InvoiceService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Support\EnumOptions;
+use App\Support\Url;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -41,6 +43,7 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\Tabs;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\View;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Support\Exceptions\Halt;
@@ -89,7 +92,7 @@ class OrderResource extends BaseResource
                     ->required(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->visible(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->live()
-                    ->afterStateUpdated(function (Forms\Set $set, $state) {
+                    ->afterStateUpdated(function (Set $set, $state) {
                         $customer = Customer::find($state);
                         $set('alamat_pengerjaan', $customer?->alamat);
                         $set('jenis_pelanggan', $customer?->jenis?->value);
@@ -106,7 +109,7 @@ class OrderResource extends BaseResource
                     ->searchable()
                     ->visible(fn (Get $get): bool => ($get('mode_pelanggan') ?? 'terdaftar') !== 'baru')
                     ->live()
-                    ->afterStateUpdated(function (Forms\Set $set, $state) {
+                    ->afterStateUpdated(function (Set $set, $state) {
                         $alamat = CustomerAddress::find($state);
                         $set('alamat_pengerjaan', $alamat?->alamat);
                         $set('customer_ac_unit_id', null);
@@ -144,7 +147,7 @@ class OrderResource extends BaseResource
                             ->options(EnumOptions::for(CustomerJenis::class))
                             ->default(CustomerJenis::Perorangan->value)
                             ->live()
-                            ->afterStateUpdated(fn (Forms\Set $set, $state) => $set('jenis_pelanggan', $state)),
+                            ->afterStateUpdated(fn (Set $set, $state) => $set('jenis_pelanggan', $state)),
                         Forms\Components\Select::make('pelanggan_baru_area')
                             ->label('Area')
                             ->options(EnumOptions::for(CustomerArea::class))
@@ -229,7 +232,7 @@ class OrderResource extends BaseResource
                             ->schema([
                                 Section::make()
                                     ->schema([
-                                        \Filament\Infolists\Components\View::make('order.info-table')
+                                        View::make('order.info-table')
                                             ->state(fn (Order $record): Order => $record),
                                     ]),
                             ]),
@@ -241,23 +244,25 @@ class OrderResource extends BaseResource
                                     ->columnSpanFull()
                                     ->visible(function (Order $record): bool {
                                         $calculated = $record->orderItems->reject(fn (OrderItem $i) => $i->dibatalkan())->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
+
                                         return $calculated != $record->total();
                                     })
                                     ->state(function (Order $record): string {
                                         $calculated = $record->orderItems->reject(fn (OrderItem $i) => $i->dibatalkan())->sum(fn (OrderItem $i) => (float) $i->harga * $i->jumlah);
                                         $actual = $record->total();
                                         $diff = abs($actual - $calculated);
-                                        return "Total yang dihitung dari item (Rp".number_format($calculated, 0, ',', '.')
-                                            .") tidak sama dengan Total Tagihan (Rp".number_format($actual, 0, ',', '.')
-                                            ."). Selisih: Rp".number_format($diff, 0, ',', '.')
-                                            .". Periksa nilai Jumlah di item layanan di atas.";
+
+                                        return 'Total yang dihitung dari item (Rp'.number_format($calculated, 0, ',', '.')
+                                            .') tidak sama dengan Total Tagihan (Rp'.number_format($actual, 0, ',', '.')
+                                            .'). Selisih: Rp'.number_format($diff, 0, ',', '.')
+                                            .'. Periksa nilai Jumlah di item layanan di atas.';
                                     })
                                     ->color('danger'),
 
                                 Section::make('Daftar Layanan')
                                     ->description('Baris pertama otomatis dari Jenis Layanan di atas. Tambah baris baru lewat aksi "Tambah Layanan".')
                                     ->schema([
-                                        \Filament\Infolists\Components\View::make('components.order-items-table')
+                                        View::make('components.order-items-table')
                                             ->state(fn (Order $record) => $record->orderItems),
                                     ]),
                                 Section::make('Total Tagihan')
@@ -270,59 +275,59 @@ class OrderResource extends BaseResource
                                             ->extraAttributes(['class' => 'font-bold text-success']),
                                         Actions::make([
                                             InfolistAction::make('koreksiTotal')
-                                            ->label('Koreksi Total')
-                                            ->icon('heroicon-o-pencil-square')
-                                            ->color('warning')
-                                            ->iconButton()
-                                            ->tooltip('Koreksi Total')
-                                            ->form([
-                                                Forms\Components\TextInput::make('total_terkoreksi')
-                                                    ->label('Total Terkoreksi')
-                                                    ->numeric()
-                                                    ->prefix('Rp')
-                                                    ->required()
-                                                    ->minValue(0)
-                                                    ->default(fn (Order $record) => $record->total()),
-                                                Forms\Components\Textarea::make('alasan')
-                                                    ->label('Alasan Koreksi')
-                                                    ->required()
-                                                    ->maxLength(500),
-                                            ])
-                                            ->action(function (array $data, Order $record): void {
-                                                try {
-                                                    $totalBaru = (float) $data['total_terkoreksi'];
-                                                    $alasan = $data['alasan'];
-                                                    $totalLama = $record->total();
+                                                ->label('Koreksi Total')
+                                                ->icon('heroicon-o-pencil-square')
+                                                ->color('warning')
+                                                ->iconButton()
+                                                ->tooltip('Koreksi Total')
+                                                ->form([
+                                                    Forms\Components\TextInput::make('total_terkoreksi')
+                                                        ->label('Total Terkoreksi')
+                                                        ->numeric()
+                                                        ->prefix('Rp')
+                                                        ->required()
+                                                        ->minValue(0)
+                                                        ->default(fn (Order $record) => $record->total()),
+                                                    Forms\Components\Textarea::make('alasan')
+                                                        ->label('Alasan Koreksi')
+                                                        ->required()
+                                                        ->maxLength(500),
+                                                ])
+                                                ->action(function (array $data, Order $record): void {
+                                                    try {
+                                                        $totalBaru = (float) $data['total_terkoreksi'];
+                                                        $alasan = $data['alasan'];
+                                                        $totalLama = $record->total();
 
-                                                    app(OrderService::class)->koreksiTotal(
-                                                        $record,
-                                                        $totalBaru,
-                                                        $alasan,
-                                                        auth()->user()
-                                                    );
+                                                        app(OrderService::class)->koreksiTotal(
+                                                            $record,
+                                                            $totalBaru,
+                                                            $alasan,
+                                                            auth()->user()
+                                                        );
 
-                                                    Notification::make()
-                                                        ->success()
-                                                        ->title('Total berhasil dikoreksi')
-                                                        ->body("Total lama: Rp".number_format($totalLama, 0, ',', '.')." → Total baru: Rp".number_format($totalBaru, 0, ',', '.'))
-                                                        ->send();
+                                                        Notification::make()
+                                                            ->success()
+                                                            ->title('Total berhasil dikoreksi')
+                                                            ->body('Total lama: Rp'.number_format($totalLama, 0, ',', '.').' → Total baru: Rp'.number_format($totalBaru, 0, ',', '.'))
+                                                            ->send();
 
-                                                    $record->refresh();
-                                                } catch (\Exception $e) {
-                                                    Notification::make()
-                                                        ->danger()
-                                                        ->title('Gagal mengkoreksi total')
-                                                        ->body($e->getMessage())
-                                                        ->send();
+                                                        $record->refresh();
+                                                    } catch (\Exception $e) {
+                                                        Notification::make()
+                                                            ->danger()
+                                                            ->title('Gagal mengkoreksi total')
+                                                            ->body($e->getMessage())
+                                                            ->send();
 
-                                                    throw new Halt();
-                                                }
-                                            }),
+                                                        throw new Halt;
+                                                    }
+                                                }),
                                         ]),
                                     ]),
                             ]),
 
-                        OrderResource\LaporanPengerjaanTab::tab(),
+                        LaporanPengerjaanTab::tab(),
 
                         Tabs\Tab::make('Pembayaran')
                             ->schema([
@@ -369,7 +374,7 @@ class OrderResource extends BaseResource
                                                     ->minValue(1)
                                                     ->required()
                                                     ->live()
-                                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
+                                                    ->afterStateUpdated(fn (Set $set, Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
                                                 Forms\Components\TextInput::make('harga')
                                                     ->label('Harga Satuan')
                                                     ->numeric()
@@ -377,7 +382,7 @@ class OrderResource extends BaseResource
                                                     ->minValue(0)
                                                     ->required()
                                                     ->live()
-                                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
+                                                    ->afterStateUpdated(fn (Set $set, Get $get) => $set('nominal', round((float) $get('qty') * (float) $get('harga'), 2))),
                                                 Forms\Components\TextInput::make('nominal')
                                                     ->label('Total')
                                                     ->numeric()
@@ -404,12 +409,12 @@ class OrderResource extends BaseResource
                                                     $record->unsetRelation('expenses');
                                                 } catch (\Exception $e) {
                                                     Notification::make()->danger()->title('Gagal menambah pengeluaran')->body($e->getMessage())->send();
-                                                    throw new Halt();
+                                                    throw new Halt;
                                                 }
                                             }),
                                     ])
                                     ->schema([
-                                        \Filament\Infolists\Components\View::make('components.expense-table')
+                                        View::make('components.expense-table')
                                             ->state(fn (Order $record) => $record->expenses)
                                             ->default([]),
                                     ]),
@@ -626,9 +631,9 @@ class OrderResource extends BaseResource
                         ->label('Preview Laporan')
                         ->icon('heroicon-o-document-magnifying-glass')
                         ->color('gray')
-                        ->visible(fn (Order $record) => \App\Filament\Resources\OrderResource\LaporanPengerjaanTab::boleh()
+                        ->visible(fn (Order $record) => LaporanPengerjaanTab::boleh()
                             && $record->status !== OrderStatus::Batal)
-                        ->url(fn (Order $record) => \App\Support\Url::absolute('laporan.preview', ['order' => $record->id]))
+                        ->url(fn (Order $record) => Url::absolute('laporan.preview', ['order' => $record->id]))
                         ->openUrlInNewTab(),
 
                     Tables\Actions\Action::make('buatInvoice')
@@ -947,6 +952,62 @@ class OrderResource extends BaseResource
                             }
                         }),
 
+                    Tables\Actions\Action::make('editOrder')
+                        ->label('Edit Order')
+                        ->icon('heroicon-o-pencil-square')
+                        ->color('primary')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                            && ! in_array($record->status, [OrderStatus::Selesai, OrderStatus::Batal]))
+                        ->modalHeading('Edit Order')
+                        ->modalDescription('Ganti teknisi utama (PIC), atur pendamping, dan ubah titik kunjungan. Order selesai/batal tidak bisa diubah.')
+                        ->form([
+                            Forms\Components\Select::make('teknisi_id')
+                                ->label('Teknisi Utama (PIC)')
+                                ->options(fn () => User::role(RoleName::Teknisi->value)->pluck('name', 'id'))
+                                ->searchable()
+                                ->required()
+                                ->default(fn (Order $record) => $record->teknisi_id),
+                            Forms\Components\Select::make('pendamping_ids')
+                                ->label('Pendamping')
+                                ->options(fn (Get $get) => User::role(RoleName::Teknisi->value)
+                                    ->where('id', '!=', $get('teknisi_id'))
+                                    ->pluck('name', 'id'))
+                                ->multiple()
+                                ->searchable()
+                                ->helperText('Pendamping tidak boleh sama dengan teknisi utama.')
+                                ->default(fn (Order $record) => $record->timTeknisi
+                                    ->pluck('id')
+                                    ->reject(fn ($id): bool => (int) $id === (int) $record->teknisi_id)
+                                    ->values()
+                                    ->all()),
+                            Forms\Components\Select::make('titik_id')
+                                ->label('Titik/Jam Kunjungan')
+                                ->options(fn () => Titik::where('aktif', true)->orderBy('urutan')->get()
+                                    ->mapWithKeys(fn (Titik $t) => [$t->id => $t->nama.' ('.Carbon::parse($t->jam)->format('H:i').')']))
+                                ->searchable()
+                                ->default(fn (Order $record) => $record->titik_id),
+                            Forms\Components\Textarea::make('alasan')
+                                ->label('Alasan Perubahan (opsional)')
+                                ->columnSpanFull(),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                $actor = auth()->user();
+                                app(OrderService::class)->ubahPenugasan(
+                                    $record,
+                                    User::findOrFail($data['teknisi_id']),
+                                    $data['pendamping_ids'] ?? [],
+                                    $actor,
+                                    $data['alasan'] ?? null,
+                                );
+                                app(OrderService::class)->ubahTitik($record, $data['titik_id'] ?? null, $actor, $data['alasan'] ?? null);
+
+                                Notification::make()->success()->title('Order diperbarui')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal memperbarui order')->body($e->getMessage())->send();
+                            }
+                        }),
+
                     Tables\Actions\Action::make('verifikasiLaporan')
                         ->label('Verifikasi Laporan')
                         ->icon('heroicon-o-check-badge')
@@ -993,6 +1054,22 @@ class OrderResource extends BaseResource
                                 ->prefix('Rp')
                                 ->required()
                                 ->minValue(1),
+                            Forms\Components\TextInput::make('omset_jasa')
+                                ->label('Omset Jasa')
+                                ->helperText('Terisi otomatis dari rincian layanan. Jasa + Material harus = Total Tagihan.')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->minValue(0)
+                                ->live(onBlur: true)
+                                ->default(fn (Order $record) => $record->latestPayment?->omset_jasa ?? $record->totalPerKomponen()['jasa']),
+                            Forms\Components\TextInput::make('omset_material')
+                                ->label('Omset Material')
+                                ->helperText('Sesuaikan bila satu layanan campur jasa+material (mis. isi freon).')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->minValue(0)
+                                ->live(onBlur: true)
+                                ->default(fn (Order $record) => $record->latestPayment?->omset_material ?? $record->totalPerKomponen()['material']),
                             Forms\Components\Textarea::make('catatan')
                                 ->label('Alasan Penyesuaian')
                                 ->helperText('Wajib diisi karena Total Tagihan diubah dari nilai sebelumnya.')
@@ -1011,6 +1088,8 @@ class OrderResource extends BaseResource
                                     $data['tanggal_bayar'] ?? null,
                                     isset($data['total_tagihan']) ? (float) $data['total_tagihan'] : null,
                                     filled($data['catatan'] ?? null) ? $data['catatan'] : null,
+                                    isset($data['omset_jasa']) ? (float) $data['omset_jasa'] : null,
+                                    isset($data['omset_material']) ? (float) $data['omset_material'] : null,
                                 );
                                 Notification::make()->success()->title('Pembayaran tercatat')->body("Status: {$payment->status->value}")->send();
                             } catch (BusinessRuleException|AuthorizationException $e) {

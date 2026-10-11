@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\IncomeCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ServiceType;
@@ -77,15 +78,26 @@ class OmsetService
         $hasil = collect();
 
         $this->orderSelesai($dari, $sampai)
-            ->with(['orderItems', 'serviceCatalog'])
+            ->with(['orderItems', 'serviceCatalog', 'payments'])
             ->get()
             ->each(function (Order $order) use ($hasil): void {
                 $tanggal = (string) $order->getAttribute('tanggal_pendapatan');
 
+                // Acuan final (dev-plan/24): split omset jasa/material dari
+                // pembayaran bila ada; fallback ke rincian order_items.
+                $split = $order->payments->first()?->splitOmset();
+                if ($split !== null) {
+                    foreach ($this->barisDariSplit($order, $split, $tanggal) as $baris) {
+                        $hasil->push($baris);
+                    }
+
+                    return;
+                }
+
                 if ($order->orderItems->isEmpty()) {
                     $jenis = $order->serviceCatalog?->jenis_layanan;
                     $komponen = $order->serviceCatalog?->komponenOmset()
-                        ?? \App\Enums\IncomeCategory::untukLayanan($jenis);
+                        ?? IncomeCategory::untukLayanan($jenis);
                     $unit = max(1, (int) $order->jumlah_unit);
 
                     $hasil->push([
@@ -118,6 +130,62 @@ class OmsetService
                     ]);
                 }
             });
+
+        return $hasil;
+    }
+
+    /**
+     * Baris omset dari split pembayaran (dev-plan/24) — satu order bisa jadi
+     * dua baris (jasa & material). Kategori/nama mengikuti baris layanan utama
+     * order; unit dilekatkan pada baris pertama supaya tidak terhitung ganda.
+     *
+     * @param  array{jasa: float, material: float}  $split
+     * @return array<int, array<string, mixed>>
+     */
+    private function barisDariSplit(Order $order, array $split, string $tanggal): array
+    {
+        $items = $order->orderItems
+            ->reject(fn (OrderItem $i): bool => $i->dibatalkan() || $i->penyesuaian)
+            ->values();
+        $utama = $items->first();
+
+        $kategori = $utama?->kategori instanceof ServiceType
+            ? $utama->kategori->value
+            : ($order->serviceCatalog?->jenis_layanan?->value ?? 'lainnya');
+        $nama = $utama !== null ? $this->namaBaris($utama) : 'Layanan';
+
+        $unit = $order->jumlahUnit();
+        $hasil = [];
+
+        foreach (['jasa' => (float) $split['jasa'], 'material' => (float) $split['material']] as $komponen => $nilai) {
+            if (abs($nilai) < 0.005) {
+                continue;
+            }
+
+            $hasil[] = [
+                'order_id' => $order->id,
+                'tanggal' => $tanggal,
+                'kategori' => $kategori,
+                'nama' => $nama,
+                'komponen' => $komponen,
+                'unit' => $unit,
+                'subtotal' => $nilai,
+            ];
+
+            $unit = 0;
+        }
+
+        if ($hasil === []) {
+            $hasil[] = [
+                'order_id' => $order->id,
+                'tanggal' => $tanggal,
+                'kategori' => $kategori,
+                'nama' => $nama,
+                'komponen' => 'jasa',
+                'unit' => $order->jumlahUnit(),
+                'subtotal' => 0.0,
+            ];
+        }
 
         return $hasil;
     }
@@ -206,7 +274,7 @@ class OmsetService
      * Input tidak valid jatuh ke bulan ini.
      *
      * @param  array<string, mixed>|null  $filters
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}  [dari, sampai, label]
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string} [dari, sampai, label]
      */
     public function rentangDariFilter(?array $filters): array
     {
