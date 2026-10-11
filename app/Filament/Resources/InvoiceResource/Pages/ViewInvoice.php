@@ -3,13 +3,19 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Enums\InvoiceStatus;
+use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\InvoiceResource;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\BusinessInfoService;
+use App\Services\InvoicePdfService;
 use App\Services\InvoiceService;
+use App\Services\WhatsappService;
 use App\Support\Url;
+use App\Support\WhatsappTemplate;
 use Filament\Actions;
 use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewInvoice extends ViewRecord
@@ -100,6 +106,69 @@ class ViewInvoice extends ViewRecord
                 ->label('Kirim via WA')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('success')
+                ->modalHeading('Kirim Invoice via WhatsApp')
+                ->modalDescription('PDF invoice dibuat & dikirim sebagai dokumen. Nomor tujuan boleh diedit untuk tes atau nomor lain.')
+                ->visible(fn (Invoice $record): bool => in_array($record->status, [InvoiceStatus::Terkirim, InvoiceStatus::Lunas], true))
+                ->form([
+                    Forms\Components\TextInput::make('target')
+                        ->label('Nomor Tujuan')
+                        ->tel()
+                        ->required()
+                        ->default(fn (Invoice $record): string => (string) preg_replace('/\D/', '', (string) $record->customer?->no_hp))
+                        ->helperText('Terisi dari nomor customer — boleh diganti (tes / nomor lain).'),
+                    Forms\Components\Textarea::make('pesan')
+                        ->label('Caption')
+                        ->rows(8)
+                        ->required()
+                        ->default(fn (Invoice $record): string => WhatsappTemplate::invoice(
+                            $record,
+                            app(BusinessInfoService::class)->namaUsaha(),
+                            app(InvoiceService::class)->urlPublik($record),
+                        )),
+                ])
+                ->action(function (Invoice $record, array $data): void {
+                    $user = auth()->user();
+                    $device = $user?->waDevice;
+
+                    if (! $device) {
+                        Notification::make()
+                            ->title('Belum ada device WhatsApp')
+                            ->body('Sambungkan device dulu di menu WhatsApp → Perangkat & Tes WA.')
+                            ->danger()->send();
+
+                        return;
+                    }
+
+                    try {
+                        $pdf = app(InvoicePdfService::class)->render($record, false);
+                        $namafile = InvoicePdfService::namaFile($record, false);
+                        $path = app(WhatsappService::class)->simpanSnapshot($pdf, $namafile);
+
+                        $log = app(WhatsappService::class)->kirimDokumen(
+                            $user,
+                            $device,
+                            (string) $data['target'],
+                            $path,
+                            (string) $data['pesan'],
+                            $namafile,
+                            $record,
+                            'invoice',
+                        );
+
+                        Notification::make()
+                            ->title($log->sukses() ? 'Invoice terkirim' : 'Gagal mengirim invoice')
+                            ->body($log->sukses() ? 'Ke '.$log->target.' — tercatat di Riwayat Kirim WA.' : (string) $log->error_message)
+                            ->status($log->sukses() ? 'success' : 'danger')
+                            ->send();
+                    } catch (BusinessRuleException $e) {
+                        Notification::make()->title('Tidak bisa kirim')->body($e->getMessage())->danger()->send();
+                    }
+                }),
+
+            Actions\Action::make('bukaWhatsapp')
+                ->label('Buka WhatsApp (manual)')
+                ->icon('heroicon-o-arrow-top-right-on-square')
+                ->color('gray')
                 ->visible(fn (Invoice $record): bool => in_array($record->status, [InvoiceStatus::Terkirim, InvoiceStatus::Lunas], true))
                 ->url(fn (Invoice $record): string => app(InvoiceService::class)->urlWa($record))
                 ->openUrlInNewTab(),

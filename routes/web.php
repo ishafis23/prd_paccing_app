@@ -7,6 +7,7 @@ use App\Http\Controllers\LandingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\Portal\BerkasController as PortalBerkasController;
+use App\Http\Controllers\PublicBerkasController;
 use App\Http\Controllers\ResiController;
 use App\Http\Controllers\SuratJalanController;
 use App\Http\Controllers\TeknisExpenseController;
@@ -125,6 +126,11 @@ Route::middleware(['auth', 'user.aktif'])->prefix('laporan')->group(function () 
 Route::middleware(['auth', 'user.aktif'])->get('/faktur/{invoice}/pdf', [InvoiceController::class, 'pdfAdmin'])->name('invoice.pdf');
 Route::get('/invoice/{invoice}/{token}', [InvoiceController::class, 'publik'])->name('invoice.publik');
 Route::get('/invoice/{invoice}/{token}/pdf', [InvoiceController::class, 'publikPdf'])->name('invoice.publik.pdf');
+
+// Snapshot PDF lampiran WA (dev-plan/23 §5.4) — PUBLIK tanpa login karena
+// server gateway WhatsApp yang mengunduhnya; dilindungi tanda tangan HMAC +
+// kedaluwarsa (WA_PDF_SECRET) & whitelist folder snapshot.
+Route::get('/berkas/publik', [PublicBerkasController::class, 'tampil'])->name('berkas.publik');
 
 // Order Item endpoints
 Route::middleware('auth')->group(function () {

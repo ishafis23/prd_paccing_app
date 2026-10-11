@@ -7,6 +7,7 @@ use App\Enums\UserStatus;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -39,6 +40,7 @@ class User extends Authenticatable implements FilamentUser
         'phone',
         'password',
         'status',
+        'wa_device_id',
         'last_latitude',
         'last_longitude',
         'last_location_at',
@@ -94,6 +96,11 @@ class User extends Authenticatable implements FilamentUser
     public function recordedStockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class, 'dicatat_oleh');
+    }
+
+    public function waDevice(): BelongsTo
+    {
+        return $this->belongsTo(WaDevice::class, 'wa_device_id');
     }
 
     public function isOwner(): bool
