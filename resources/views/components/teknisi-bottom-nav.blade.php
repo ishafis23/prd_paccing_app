@@ -13,15 +13,15 @@
 
 <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur"
     style="max-width: 480px; margin: 0 auto;">
-    <div class="grid h-[68px] grid-cols-8">
+    <div class="flex h-[68px]">
         @foreach ($tabs as $tab)
             @php $active = request()->routeIs($tab['route']); @endphp
             <a href="{{ \App\Support\Url::absolute($tab['route']) }}" wire:navigate
-                class="flex flex-col items-center justify-center gap-0.5 {{ $active ? 'text-blue-600' : 'text-gray-400 transition hover:text-gray-600' }}">
+                class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 {{ $active ? 'text-blue-600' : 'text-gray-400 transition hover:text-gray-600' }}">
                 <span class="flex h-8 w-14 items-center justify-center rounded-full {{ $active ? 'bg-blue-100' : '' }}">
                     <x-dynamic-component :component="'heroicon-' . ($active ? 's' : 'o') . '-' . $tab['icon']" class="h-6 w-6" />
                 </span>
-                <span class="truncate text-[10px] font-semibold {{ $active ? 'text-blue-700' : '' }}">
+                <span class="truncate text-[11px] font-semibold {{ $active ? 'text-blue-700' : '' }}">
                     {{ $tab['label'] }}
                 </span>
             </a>
