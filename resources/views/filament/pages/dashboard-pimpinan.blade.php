@@ -409,14 +409,16 @@
 
         {{-- Modal detail omset (klik baris tabel Omset Jasa/Material) --}}
         @if ($detailOmsetKey !== null)
-            <div class="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
-                <div class="flex min-h-full items-center justify-center py-8" wire:click.self="tutupDetailOmset">
-                    <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h3 class="text-base font-bold text-gray-800">Detail Order — {{ $bulanLabel }}</h3>
-                            <button type="button" wire:click="tutupDetailOmset" class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100" aria-label="Tutup">✕</button>
-                        </div>
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:click.self="tutupDetailOmset">
+                <div class="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl">
+                    {{-- Header tetap diam, tidak ikut scroll --}}
+                    <div class="flex items-center justify-between border-b border-gray-100 p-5">
+                        <h3 class="text-base font-bold text-gray-800">Detail Order — {{ $bulanLabel }}</h3>
+                        <button type="button" wire:click="tutupDetailOmset" class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100" aria-label="Tutup">✕</button>
+                    </div>
 
+                    {{-- Hanya daftar order yang discroll --}}
+                    <div class="overflow-y-auto p-5">
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
                                 <thead class="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
