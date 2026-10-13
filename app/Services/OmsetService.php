@@ -15,10 +15,14 @@ use Illuminate\Support\Collection;
 /**
  * Satu sumber kebenaran omset jasa/material (dev-plan/21 §4).
  *
- * Aturan tunggal "tanggal pendapatan" order selesai = tanggal bayar lunas
- * terakhir, fallback tanggal order diperbarui. Dipakai AkuntanService
- * (→ FinanceService), DashboardPimpinanService, dan widget dashboard supaya
- * angka ketiganya sama untuk periode yang sama.
+ * Aturan tunggal "tanggal pendapatan" order selesai = tanggal jadwal
+ * (tanggal order dikerjakan), fallback tanggal bayar lunas terakhir, lalu
+ * tanggal order diperbarui (untuk order lama yang tidak punya tanggal
+ * jadwal). Permintaan client (Okt 2026): omset dihitung pada hari order
+ * DIKERJAKAN, bukan hari admin memverifikasi laporan/mencatat pembayaran
+ * (yang bisa beda hari, mis. dikerjakan tgl 12, dicatat besoknya tgl 13).
+ * Dipakai AkuntanService (→ FinanceService), DashboardPimpinanService, dan
+ * widget dashboard supaya angka ketiganya sama untuk periode yang sama.
  */
 class OmsetService
 {
@@ -46,7 +50,7 @@ class OmsetService
     {
         $lunas = PaymentStatus::Lunas->value;
 
-        return "COALESCE((SELECT MAX(p.tanggal_bayar) FROM payments p WHERE p.order_id = orders.id AND p.status = '{$lunas}' AND p.deleted_at IS NULL), DATE(orders.updated_at))";
+        return "COALESCE(orders.tanggal_jadwal, (SELECT MAX(p.tanggal_bayar) FROM payments p WHERE p.order_id = orders.id AND p.status = '{$lunas}' AND p.deleted_at IS NULL), DATE(orders.updated_at))";
     }
 
     /**

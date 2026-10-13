@@ -29,13 +29,17 @@ function omUser(string $role): User
     return $user;
 }
 
-/** Order selesai (Cuci AC) lunas pada tanggal tsb. */
+/**
+ * Order selesai (Cuci AC), dikerjakan (tanggal_jadwal) & lunas pada tanggal
+ * tsb — tanggal_jadwal adalah acuan utama "tanggal pendapatan" (OmsetService).
+ */
 function omOrder(string $tanggal, int $harga, int $unit = 1, array $extraItems = []): Order
 {
     $order = Order::factory()->create([
         'service_catalog_id' => ServiceCatalog::factory()->create(['harga' => $harga, 'jenis_layanan' => ServiceType::CuciAc])->id,
         'status' => OrderStatus::Selesai,
         'jumlah_unit' => $unit,
+        'tanggal_jadwal' => $tanggal,
     ]);
     $order->orderItems()->update(['jumlah' => $unit]);
 
@@ -118,10 +122,13 @@ it('angka OmsetService = akuntan = pimpinan = finance untuk periode yang sama', 
         ->and($klas['pemasangan']['items'][0])->toHaveKeys(['jasa', 'material']);
 });
 
-it('tanggal pendapatan satu aturan: klasifikasi pimpinan memakai tanggal bayar, bukan updated_at', function () {
+it('tanggal pendapatan satu aturan: klasifikasi pimpinan memakai tanggal jadwal (dikerjakan), bukan tanggal bayar atau updated_at', function () {
+    // Dikerjakan (tanggal_jadwal) Agustus, tapi baru diverifikasi & dicatat
+    // pembayarannya belakangan (tanggal_bayar + updated_at September) —
+    // permintaan client: omset tetap terhitung di bulan order DIKERJAKAN.
     $order = omOrder('2026-08-15', 100000);
-    // updated_at order dipindah ke September, tetapi dibayar Agustus
     Order::query()->whereKey($order->id)->update(['updated_at' => '2026-09-10 10:00:00']);
+    Payment::query()->where('order_id', $order->id)->update(['tanggal_bayar' => '2026-09-10']);
 
     $pimpinan = app(DashboardPimpinanService::class);
     $agustus = $pimpinan->klasifikasiPengerjaan(CarbonImmutable::parse('2026-08-01'), CarbonImmutable::parse('2026-08-31'));
@@ -129,6 +136,26 @@ it('tanggal pendapatan satu aturan: klasifikasi pimpinan memakai tanggal bayar, 
 
     expect($agustus['cuci']['rupiah'])->toBe(100000.0)
         ->and($september['cuci']['rupiah'])->toBe(0.0);
+});
+
+it('order lama tanpa tanggal_jadwal jatuh ke tanggal bayar, lalu updated_at', function () {
+    $order = omOrder('2026-08-15', 100000);
+    // Order lama: tanggal_jadwal kosong -> fallback ke tanggal bayar lunas.
+    Order::query()->whereKey($order->id)->update(['tanggal_jadwal' => null]);
+
+    $pimpinan = app(DashboardPimpinanService::class);
+    expect($pimpinan->klasifikasiPengerjaan(CarbonImmutable::parse('2026-08-01'), CarbonImmutable::parse('2026-08-31'))['cuci']['rupiah'])->toBe(100000.0);
+
+    // Tanpa tanggal_jadwal maupun pembayaran lunas -> fallback terakhir updated_at.
+    $order2 = Order::factory()->create([
+        'service_catalog_id' => ServiceCatalog::factory()->create(['harga' => 50000, 'jenis_layanan' => ServiceType::CuciAc])->id,
+        'status' => OrderStatus::Selesai,
+        'tanggal_jadwal' => null,
+    ]);
+    Order::query()->whereKey($order2->id)->update(['updated_at' => '2026-07-20 10:00:00']);
+
+    $juli = $pimpinan->klasifikasiPengerjaan(CarbonImmutable::parse('2026-07-01'), CarbonImmutable::parse('2026-07-31'));
+    expect($juli['cuci']['rupiah'])->toBe(50000.0);
 });
 
 it('filter bulan vs rentang tanggal mengembalikan angka yang benar', function () {

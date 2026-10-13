@@ -82,6 +82,7 @@ function orderLunasUntukLaba(ServiceCatalog $katalog, string $tanggal): Order
     $order = Order::factory()->create([
         'service_catalog_id' => $katalog->id,
         'status' => OrderStatus::Selesai,
+        'tanggal_jadwal' => $tanggal,
     ]);
 
     Payment::factory()->lunas()->create([

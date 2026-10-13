@@ -33,12 +33,16 @@ function dpUser(string $role): User
     return $user;
 }
 
-/** Order selesai dgn harga layanan utama tertentu, lunas pada tanggal tsb. */
+/**
+ * Order selesai dgn harga layanan utama tertentu, dikerjakan & lunas pada
+ * tanggal tsb — tanggal_jadwal adalah acuan "tanggal pendapatan" (OmsetService).
+ */
 function dpOrderLunas(string $tanggal, int $harga, array $extra = []): Order
 {
     $order = Order::factory()->create(array_merge([
         'service_catalog_id' => ServiceCatalog::factory()->create(['harga' => $harga])->id,
         'status' => OrderStatus::Selesai,
+        'tanggal_jadwal' => $tanggal,
     ], $extra));
 
     Payment::factory()->lunas()->create([

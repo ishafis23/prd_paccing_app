@@ -15,7 +15,8 @@ use Illuminate\Support\Collection;
  *
  * Pendapatan = order berstatus selesai, nominal = Order::total() (layanan
  * utama + item tambahan), tanggal = OmsetService::tanggalPendapatanSql()
- * (tanggal bayar lunas, fallback tanggal order diperbarui terakhir).
+ * (tanggal jadwal/dikerjakan, fallback tanggal bayar lunas, lalu tanggal
+ * order diperbarui terakhir).
  *
  * Pengeluaran = expenses (admin) + teknisi_expenses. Teknisi: hanya
  * `approved` yang dihitung ke total; `pending` ditampilkan terpisah;

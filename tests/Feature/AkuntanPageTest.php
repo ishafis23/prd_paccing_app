@@ -30,13 +30,17 @@ function akUser(string $role): User
     return $user;
 }
 
-/** Order selesai dgn harga layanan utama tertentu, lunas pada tanggal tsb. */
+/**
+ * Order selesai dgn harga layanan utama tertentu, dikerjakan & lunas pada
+ * tanggal tsb — tanggal_jadwal adalah acuan "tanggal pendapatan" (OmsetService).
+ */
 function akOrderLunas(string $tanggal, int $harga, string $nama = 'Budi'): Order
 {
     $order = Order::factory()->create([
         'customer_id' => Customer::factory()->create(['nama' => $nama])->id,
         'service_catalog_id' => ServiceCatalog::factory()->create(['harga' => $harga])->id,
         'status' => OrderStatus::Selesai,
+        'tanggal_jadwal' => $tanggal,
     ]);
 
     Payment::factory()->lunas()->create([
@@ -77,7 +81,7 @@ it('halaman Akuntan menampilkan tombol menuju ACC Pengeluaran Teknisi', function
         ->assertSee('/admin/pengeluaran-teknisi', false);
 });
 
-it('pendapatan menghitung order selesai termasuk item tambahan, per tanggal bayar', function () {
+it('pendapatan menghitung order selesai termasuk item tambahan, per tanggal jadwal (dikerjakan)', function () {
     $order = akOrderLunas('2026-10-02', 100000);
     OrderItem::factory()->create(['order_id' => $order->id, 'harga' => 50000, 'jumlah' => 2, 'nama_layanan' => 'Ganti Kapasitor']);
 
