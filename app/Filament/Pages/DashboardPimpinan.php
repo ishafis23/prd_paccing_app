@@ -168,6 +168,7 @@ class DashboardPimpinan extends Page
         $omsetRows = [];
         $omsetTotal = ['unit' => 0, 'jasa' => 0.0, 'material' => 0.0, 'total' => 0.0];
         $omsetDetail = collect();
+        $omsetDetailLabel = '';
 
         if ($this->keuangan === 'omset') {
             $omset = app(OmsetService::class);
@@ -179,6 +180,7 @@ class DashboardPimpinan extends Page
                     ? explode('|', $this->detailOmsetKey, 2)
                     : [$this->detailOmsetKey, null];
                 $omsetDetail = $omset->detailOrder($awal, $akhir, $kategori, $nama);
+                $omsetDetailLabel = collect($omsetRows)->firstWhere('key', $this->detailOmsetKey)['label'] ?? $kategori;
             }
         }
 
@@ -187,6 +189,7 @@ class DashboardPimpinan extends Page
             'omsetRows' => $omsetRows,
             'omsetTotal' => $omsetTotal,
             'omsetDetail' => $omsetDetail,
+            'omsetDetailLabel' => $omsetDetailLabel,
             'customer' => $service->ringkasanCustomer($awal, $akhir),
             'unit' => $service->unitPerCustomer(),
             'followUp' => $service->followUp($awal, $akhir),

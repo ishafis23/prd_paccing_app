@@ -282,10 +282,16 @@ it('tab omset jasa/material: tabel, toggle rinci, klik baris buka detail order, 
 
     $lw->call('bukaDetailOmset', 'cuci_ac')
         ->assertSet('detailOmsetKey', 'cuci_ac')
+        ->assertSee('Detail Order: Cuci AC')
+        ->assertSee('Kembali ke ringkasan')
         ->assertSee('Budi Pimpinan')
-        ->assertSee('#'.$order->id);
+        ->assertSee('#'.$order->id)
+        ->assertDontSee('Rinci per transaksi'); // mode ringkasan hilang saat detail tampil
 
-    $lw->call('tutupDetailOmset')->assertSet('detailOmsetKey', null);
+    $lw->call('tutupDetailOmset')
+        ->assertSet('detailOmsetKey', null)
+        ->assertSee('Rinci per transaksi')
+        ->assertDontSee('Kembali ke ringkasan');
 
     $lw->call('exportOmsetCsv')->assertFileDownloaded("omset-pimpinan-{$awal}_{$akhir}.csv");
 });
