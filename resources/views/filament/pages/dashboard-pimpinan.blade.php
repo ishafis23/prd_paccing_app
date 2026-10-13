@@ -119,8 +119,12 @@
             <div class="space-y-4">
                 <div class="flex flex-wrap gap-2">
                     @foreach (['pendapatan' => '2.1 Pendapatan', 'pengeluaran' => '2.2 Pengeluaran', 'laba_rugi' => '2.3 Laba/Rugi', 'neraca' => '2.4 Neraca', 'arus_kas' => '2.5 Arus Kas', 'omset' => '2.6 Omset Jasa/Material'] as $key => $label)
+                        @php
+                            $aktifKeu = $keuangan === $key;
+                        @endphp
                         <button type="button" wire:click="setKeuangan('{{ $key }}')"
-                            class="{{ $tabSub }} {{ $keuangan === $key ? 'bg-gray-800 text-white ring-gray-800' : 'bg-white text-gray-600 ring-gray-200 hover:bg-gray-50' }}">
+                            class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                            style="background-color:{{ $aktifKeu ? '#1f2937' : '#ffffff' }};color:{{ $aktifKeu ? '#ffffff' : '#4b5563' }};border:1px solid {{ $aktifKeu ? '#1f2937' : '#e5e7eb' }};">
                             {{ $label }}
                         </button>
                     @endforeach
