@@ -409,43 +409,45 @@
 
         {{-- Modal detail omset (klik baris tabel Omset Jasa/Material) --}}
         @if ($detailOmsetKey !== null)
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:click.self="tutupDetailOmset">
-                <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h3 class="text-base font-bold text-gray-800">Detail Order — {{ $bulanLabel }}</h3>
-                        <button type="button" wire:click="tutupDetailOmset" class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100" aria-label="Tutup">✕</button>
-                    </div>
+            <div class="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+                <div class="flex min-h-full items-center justify-center py-8" wire:click.self="tutupDetailOmset">
+                    <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+                        <div class="mb-4 flex items-center justify-between">
+                            <h3 class="text-base font-bold text-gray-800">Detail Order — {{ $bulanLabel }}</h3>
+                            <button type="button" wire:click="tutupDetailOmset" class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100" aria-label="Tutup">✕</button>
+                        </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                <tr>
-                                    <th class="{{ $th }}">Tanggal</th>
-                                    <th class="{{ $th }}">Order</th>
-                                    <th class="{{ $th }}">Pekerjaan</th>
-                                    <th class="{{ $th }} text-right">Jasa</th>
-                                    <th class="{{ $th }} text-right">Material</th>
-                                    <th class="{{ $th }} text-right">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                @forelse ($omsetDetail as $o)
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                                     <tr>
-                                        <td class="{{ $th }} whitespace-nowrap text-gray-500">{{ $tgl($o['tanggal']) }}</td>
-                                        <td class="{{ $th }}">
-                                            <a class="font-semibold text-primary-600 hover:underline" href="{{ \App\Filament\Resources\OrderResource::getUrl('view', ['record' => $o['order_id']]) }}">#{{ $o['order_id'] }}</a>
-                                            <span class="block text-xs text-gray-400">{{ $o['customer'] }}</span>
-                                        </td>
-                                        <td class="{{ $th }}">{{ $o['nama'] }} <span class="text-xs text-gray-400">({{ $o['unit'] }} unit)</span></td>
-                                        <td class="{{ $th }} text-right">{{ $rp($o['jasa']) }}</td>
-                                        <td class="{{ $th }} text-right">{{ $rp($o['material']) }}</td>
-                                        <td class="{{ $th }} text-right font-semibold">{{ $rp($o['total']) }}</td>
+                                        <th class="{{ $th }}">Tanggal</th>
+                                        <th class="{{ $th }}">Order</th>
+                                        <th class="{{ $th }}">Pekerjaan</th>
+                                        <th class="{{ $th }} text-right">Jasa</th>
+                                        <th class="{{ $th }} text-right">Material</th>
+                                        <th class="{{ $th }} text-right">Total</th>
                                     </tr>
-                                @empty
-                                    <tr><td colspan="6" class="p-4 text-center text-gray-400">Tidak ada data.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    @forelse ($omsetDetail as $o)
+                                        <tr>
+                                            <td class="{{ $th }} whitespace-nowrap text-gray-500">{{ $tgl($o['tanggal']) }}</td>
+                                            <td class="{{ $th }}">
+                                                <a class="font-semibold text-primary-600 hover:underline" href="{{ \App\Filament\Resources\OrderResource::getUrl('view', ['record' => $o['order_id']]) }}">#{{ $o['order_id'] }}</a>
+                                                <span class="block text-xs text-gray-400">{{ $o['customer'] }}</span>
+                                            </td>
+                                            <td class="{{ $th }}">{{ $o['nama'] }} <span class="text-xs text-gray-400">({{ $o['unit'] }} unit)</span></td>
+                                            <td class="{{ $th }} text-right">{{ $rp($o['jasa']) }}</td>
+                                            <td class="{{ $th }} text-right">{{ $rp($o['material']) }}</td>
+                                            <td class="{{ $th }} text-right font-semibold">{{ $rp($o['total']) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="6" class="p-4 text-center text-gray-400">Tidak ada data.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
