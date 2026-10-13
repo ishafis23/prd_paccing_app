@@ -11,6 +11,9 @@ class TeknisiExpense extends Model
 {
     use HasFactory;
 
+    /** Katalog kategori pengeluaran teknisi — satu sumber, dipakai form teknisi & admin (tambah manual). */
+    public const KATEGORI = ['bensin', 'makan', 'material', 'transport', 'lainnya'];
+
     protected $fillable = [
         'teknisi_id',
         'order_id',
@@ -79,5 +82,17 @@ class TeknisiExpense extends Model
     {
         return $query->whereMonth('tanggal_input', substr($month, 5, 2))
                     ->whereYear('tanggal_input', substr($month, 0, 4));
+    }
+
+    public static function kategoriLabel(string $kategori): string
+    {
+        return match ($kategori) {
+            'bensin' => '⛽ Bensin',
+            'makan' => '🍜 Makan',
+            'material' => '🔧 Material',
+            'transport' => '🚗 Transport',
+            'lainnya' => '📦 Lainnya',
+            default => $kategori,
+        };
     }
 }

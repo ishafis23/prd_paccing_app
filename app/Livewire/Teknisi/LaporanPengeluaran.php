@@ -17,7 +17,7 @@ class LaporanPengeluaran extends Component
     #[Validate('required|date|before_or_equal:today')]
     public string $tanggal_input = '';
 
-    #[Validate('required|in:bensin,makan,material,transport,lainnya')]
+    #[Validate('required|in:bensin,makan,material,transport,lainnya')] // TeknisiExpense::KATEGORI (atribut tidak bisa baca const)
     public string $kategori = '';
 
     // CATATAN: properti angka di bawah sengaja TIDAK diketik (bukan `int`).
@@ -144,10 +144,9 @@ class LaporanPengeluaran extends Component
             ->byMonth($this->filterBulan)
             ->get();
 
-        $kategoris = ['bensin', 'makan', 'material', 'transport', 'lainnya'];
         $result = [];
 
-        foreach ($kategoris as $kat) {
+        foreach (TeknisiExpense::KATEGORI as $kat) {
             $filtered = $expenses->where('kategori', $kat);
             $result[$kat] = [
                 'pending' => $filtered->where('status', 'pending')->sum('nominal'),
@@ -257,14 +256,7 @@ class LaporanPengeluaran extends Component
      */
     public function getKategoriLabel(string $kategori): string
     {
-        return match ($kategori) {
-            'bensin' => '⛽ Bensin',
-            'makan' => '🍜 Makan',
-            'material' => '🔧 Material',
-            'transport' => '🚗 Transport',
-            'lainnya' => '📦 Lainnya',
-            default => $kategori,
-        };
+        return TeknisiExpense::kategoriLabel($kategori);
     }
 
     /**

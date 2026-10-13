@@ -253,6 +253,52 @@ it('ACC: halaman menampilkan daftar teknisi di filter & nama pelapor', function 
         ->assertSee($e->teknisi->name);
 });
 
+it('Tambah Manual: admin mencatat pengeluaran atas nama teknisi, langsung approved', function () {
+    $teknisi = akUser('teknisi');
+    $admin = akUser('admin');
+
+    Livewire::actingAs($admin)->test(ManajemenPengeluaranTeknisi::class)
+        ->call('bukaTambah')
+        ->assertSet('showTambah', true)
+        ->set('formTeknisiId', $teknisi->id)
+        ->set('formTanggal', today()->format('Y-m-d'))
+        ->set('formKategori', 'bensin')
+        ->set('formQty', 2)
+        ->set('formHarga', 15000)
+        ->assertSet('formNominal', 30000)
+        ->set('formKeterangan', 'Isi bensin motor dinas')
+        ->call('simpanManual')
+        ->assertHasNoErrors()
+        ->assertSet('showTambah', false);
+
+    $expense = TeknisiExpense::where('teknisi_id', $teknisi->id)->first();
+    expect($expense)->not->toBeNull()
+        ->and($expense->status)->toBe('approved')
+        ->and($expense->approved_by)->toBe($admin->id)
+        ->and($expense->nominal)->toBe(30000)
+        ->and($expense->kategori)->toBe('bensin');
+});
+
+it('Tambah Manual: wajib pilih teknisi & kategori valid', function () {
+    Livewire::actingAs(akUser('finance'))->test(ManajemenPengeluaranTeknisi::class)
+        ->call('bukaTambah')
+        ->set('formTanggal', today()->format('Y-m-d'))
+        ->set('formQty', 1)
+        ->set('formHarga', 10000)
+        ->call('simpanManual')
+        ->assertHasErrors(['formTeknisiId', 'formKategori']);
+
+    expect(TeknisiExpense::count())->toBe(0);
+});
+
+it('Tambah Manual: teknisi/hr tidak boleh mencatat pengeluaran manual', function (string $role) {
+    Livewire::actingAs(akUser($role))->test(ManajemenPengeluaranTeknisi::class)
+        ->call('bukaTambah')
+        ->assertForbidden();
+
+    expect(TeknisiExpense::count())->toBe(0);
+})->with(['teknisi', 'hr']);
+
 it('ACC: tab Rekap Kategori menjumlah menunggu+disetujui tanpa yang ditolak, filter lewat modal', function () {
     akExpense('pending', 20000);
     akExpense('approved', 10000);

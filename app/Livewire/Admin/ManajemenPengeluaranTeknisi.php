@@ -37,6 +37,32 @@ class ManajemenPengeluaranTeknisi extends Component
     #[Validate('nullable|string|max:500')]
     public string $approvalCatatan = '';
 
+    // Form "tambah manual" — admin mencatatkan pengeluaran atas nama teknisi
+    // tertentu (mis. kasbon/uang jalan yg dibayar di muka), langsung approved
+    // karena admin sendiri yg mencatat (bukan klaim teknisi yg perlu diverifikasi).
+    public bool $showTambah = false;
+
+    #[Validate('required|exists:users,id')]
+    public ?int $formTeknisiId = null;
+
+    #[Validate('required|date|before_or_equal:today')]
+    public string $formTanggal = '';
+
+    #[Validate('required|in:bensin,makan,material,transport,lainnya')] // TeknisiExpense::KATEGORI
+    public string $formKategori = '';
+
+    #[Validate('required|integer|min:1|max:100000')]
+    public $formQty = 1;
+
+    #[Validate('required|integer|min:0|max:5000000')]
+    public $formHarga = 0;
+
+    #[Validate('required|integer|min:1000|max:5000000')]
+    public $formNominal = 0;
+
+    #[Validate('nullable|string|max:255')]
+    public string $formKeterangan = '';
+
     private const NOMINAL_RULE = 'required|integer|min:1000|max:5000000';
 
     /**
@@ -240,6 +266,76 @@ class ManajemenPengeluaranTeknisi extends Component
         session()->flash('status', 'Pengeluaran disetujui.');
     }
 
+    public function updatedFormQty(): void
+    {
+        $this->recalcFormNominal();
+    }
+
+    public function updatedFormHarga(): void
+    {
+        $this->recalcFormNominal();
+    }
+
+    private function recalcFormNominal(): void
+    {
+        $this->formNominal = ((int) $this->formQty) * ((int) $this->formHarga);
+    }
+
+    /**
+     * Buka form tambah manual (reset ke default).
+     */
+    public function bukaTambah(): void
+    {
+        $this->authorizeAcc();
+
+        $this->reset(['formTeknisiId', 'formKategori', 'formKeterangan']);
+        $this->formTanggal = today()->format('Y-m-d');
+        $this->formQty = 1;
+        $this->formHarga = 0;
+        $this->formNominal = 0;
+        $this->showTambah = true;
+    }
+
+    public function tutupTambah(): void
+    {
+        $this->showTambah = false;
+    }
+
+    /**
+     * Simpan pengeluaran teknisi yang dicatat manual oleh admin — langsung
+     * berstatus approved, karena admin/finance/owner yg mencatat sudah
+     * bertindak sbg pihak yg memverifikasi (bukan klaim teknisi).
+     */
+    public function simpanManual(): void
+    {
+        $this->authorizeAcc();
+
+        $this->validate([
+            'formTeknisiId' => 'required|exists:users,id',
+            'formTanggal' => 'required|date|before_or_equal:today',
+            'formKategori' => 'required|in:bensin,makan,material,transport,lainnya',
+            'formQty' => 'required|integer|min:1|max:100000',
+            'formHarga' => 'required|integer|min:0|max:5000000',
+            'formNominal' => self::NOMINAL_RULE,
+            'formKeterangan' => 'nullable|string|max:255',
+        ]);
+
+        TeknisiExpense::create([
+            'teknisi_id' => $this->formTeknisiId,
+            'tanggal_input' => $this->formTanggal,
+            'kategori' => $this->formKategori,
+            'qty' => $this->formQty,
+            'harga' => $this->formHarga,
+            'nominal' => $this->formNominal,
+            'keterangan' => $this->formKeterangan,
+            'status' => 'approved',
+            'approved_by' => auth()->id(),
+        ]);
+
+        session()->flash('status', 'Pengeluaran manual berhasil dicatat.');
+        $this->tutupTambah();
+    }
+
     /**
      * Get kategori breakdown
      */
@@ -254,10 +350,9 @@ class ManajemenPengeluaranTeknisi extends Component
 
         $expenses = $query->get();
 
-        $kategoris = ['bensin', 'makan', 'material', 'transport', 'lainnya'];
         $result = [];
 
-        foreach ($kategoris as $kat) {
+        foreach (TeknisiExpense::KATEGORI as $kat) {
             $filtered = $expenses->where('kategori', $kat);
             $result[$kat] = [
                 'pending' => $filtered->where('status', 'pending')->sum('nominal'),
@@ -284,14 +379,7 @@ class ManajemenPengeluaranTeknisi extends Component
      */
     public function getKategoriLabel(string $kategori): string
     {
-        return match ($kategori) {
-            'bensin' => '⛽ Bensin',
-            'makan' => '🍜 Makan',
-            'material' => '🔧 Material',
-            'transport' => '🚗 Transport',
-            'lainnya' => '📦 Lainnya',
-            default => $kategori,
-        };
+        return TeknisiExpense::kategoriLabel($kategori);
     }
 
     /**

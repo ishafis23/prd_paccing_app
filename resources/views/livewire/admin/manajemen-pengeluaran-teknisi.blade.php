@@ -65,9 +65,16 @@
 
         <button
             type="button"
+            wire:click="bukaTambah"
+            class="ml-auto rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-500">
+            + Tambah Manual
+        </button>
+
+        <button
+            type="button"
             wire:click="$set('tampilFilter', true)"
             title="Filter"
-            class="relative ml-auto rounded-lg bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 hover:bg-gray-50">
+            class="relative rounded-lg bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 hover:bg-gray-50">
             <x-heroicon-o-funnel class="h-5 w-5" />
             @if ($this->jumlahFilterAktif > 0)
                 <span class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white">{{ $this->jumlahFilterAktif }}</span>
@@ -154,11 +161,9 @@
                     <label class="block text-xs font-medium text-gray-600">Kategori</label>
                     <select wire:model.live="filterKategori" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm">
                         <option value="">Semua</option>
-                        <option value="bensin">⛽ Bensin</option>
-                        <option value="makan">🍜 Makan</option>
-                        <option value="material">🔧 Material</option>
-                        <option value="transport">🚗 Transport</option>
-                        <option value="lainnya">📦 Lainnya</option>
+                        @foreach (\App\Models\TeknisiExpense::KATEGORI as $kat)
+                            <option value="{{ $kat }}">{{ \App\Models\TeknisiExpense::kategoriLabel($kat) }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -344,6 +349,86 @@
                             class="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
                             Batal
                         </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal tambah manual --}}
+    @if ($showTambah)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h2 class="font-bold text-gray-900">Tambah Pengeluaran Manual</h2>
+                        <p class="text-xs text-gray-500">Langsung tercatat disetujui (dicatat oleh admin).</p>
+                    </div>
+                    <button type="button" wire:click="tutupTambah" class="text-gray-400 hover:text-gray-600">
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form wire:submit="simpanManual" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">Teknisi</label>
+                        <select wire:model="formTeknisiId" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <option value="">— Pilih teknisi —</option>
+                            @foreach ($this->teknisList as $tech)
+                                <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('formTeknisiId') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">Tanggal</label>
+                            <input type="date" wire:model="formTanggal" max="{{ today()->format('Y-m-d') }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            @error('formTanggal') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">Kategori</label>
+                            <select wire:model="formKategori" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option value="">— Pilih —</option>
+                                @foreach (\App\Models\TeknisiExpense::KATEGORI as $kat)
+                                    <option value="{{ $kat }}">{{ \App\Models\TeknisiExpense::kategoriLabel($kat) }}</option>
+                                @endforeach
+                            </select>
+                            @error('formKategori') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">Qty</label>
+                            <input type="number" wire:model.live="formQty" min="1" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            @error('formQty') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">Harga satuan</label>
+                            <input type="number" wire:model.live="formHarga" min="0" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            @error('formHarga') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg bg-gray-50 p-3">
+                        <span class="text-xs text-gray-600">Nominal:</span>
+                        <p class="text-lg font-bold text-gray-900">{{ $this->formatRupiah((int) $formNominal) }}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">Keterangan (opsional)</label>
+                        <textarea wire:model="formKeterangan" rows="2" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                        @error('formKeterangan') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button type="submit" wire:loading.attr="disabled" class="flex-1 rounded-lg bg-primary-600 py-2 font-semibold text-white disabled:opacity-50">
+                            <span wire:loading.remove wire:target="simpanManual">Simpan</span>
+                            <span wire:loading wire:target="simpanManual"><x-heroicon-o-arrow-path class="inline h-4 w-4 animate-spin" /></span>
+                        </button>
+                        <button type="button" wire:click="tutupTambah" class="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">Batal</button>
                     </div>
                 </form>
             </div>
