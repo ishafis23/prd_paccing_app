@@ -260,6 +260,36 @@ it('arus kas menghitung masuk, keluar, dan saldo', function () {
         ->and($data['saldo_akhir'])->toBe(70000.0);
 });
 
+it('tab omset jasa/material: tabel, toggle rinci, klik baris buka detail order, ekspor CSV', function () {
+    $admin = dpUser(RoleName::Admin->value);
+    $hari = CarbonImmutable::now()->toDateString();
+    $awal = CarbonImmutable::now()->startOfMonth()->toDateString();
+    $akhir = CarbonImmutable::now()->endOfMonth()->toDateString();
+
+    $customer = Customer::factory()->create(['nama' => 'Budi Pimpinan']);
+    $order = dpOrderLunas($hari, 100000, ['customer_id' => $customer->id]);
+
+    $lw = Livewire\Livewire::actingAs($admin)->test(DashboardPimpinan::class)
+        ->call('setTab', 'keuangan')
+        ->call('setKeuangan', 'omset')
+        ->assertSet('keuangan', 'omset')
+        ->assertSee('Omset Jasa & Material')
+        ->assertSee('Cuci AC')
+        ->assertSee('Rp 100.000');
+
+    $lw->call('toggleRinciOmset')->assertSet('rinciOmset', true)
+        ->call('toggleRinciOmset')->assertSet('rinciOmset', false);
+
+    $lw->call('bukaDetailOmset', 'cuci_ac')
+        ->assertSet('detailOmsetKey', 'cuci_ac')
+        ->assertSee('Budi Pimpinan')
+        ->assertSee('#'.$order->id);
+
+    $lw->call('tutupDetailOmset')->assertSet('detailOmsetKey', null);
+
+    $lw->call('exportOmsetCsv')->assertFileDownloaded("omset-pimpinan-{$awal}_{$akhir}.csv");
+});
+
 it('halaman menampilkan tab aspek dan sub-tab keuangan', function () {
     $admin = dpUser(RoleName::Admin->value);
     dpOrderLunas(CarbonImmutable::now()->toDateString(), 100000);

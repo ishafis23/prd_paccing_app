@@ -118,7 +118,7 @@
         @if ($tab === 'keuangan')
             <div class="space-y-4">
                 <div class="flex flex-wrap gap-2">
-                    @foreach (['pendapatan' => '2.1 Pendapatan', 'pengeluaran' => '2.2 Pengeluaran', 'laba_rugi' => '2.3 Laba/Rugi', 'neraca' => '2.4 Neraca', 'arus_kas' => '2.5 Arus Kas'] as $key => $label)
+                    @foreach (['pendapatan' => '2.1 Pendapatan', 'pengeluaran' => '2.2 Pengeluaran', 'laba_rugi' => '2.3 Laba/Rugi', 'neraca' => '2.4 Neraca', 'arus_kas' => '2.5 Arus Kas', 'omset' => '2.6 Omset Jasa/Material'] as $key => $label)
                         <button type="button" wire:click="setKeuangan('{{ $key }}')"
                             class="{{ $tabSub }} {{ $keuangan === $key ? 'bg-gray-800 text-white ring-gray-800' : 'bg-white text-gray-600 ring-gray-200 hover:bg-gray-50' }}">
                             {{ $label }}
@@ -227,6 +227,58 @@
                                 <tr class="bg-gray-50/60"><td class="{{ $th }} font-bold text-gray-800">Saldo Akhir</td><td class="{{ $th }} text-right font-bold text-primary-700">{{ $rp($arusKas['saldo_akhir']) }}</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                @endif
+
+                {{-- 2.6 Omset Jasa/Material --}}
+                @if ($keuangan === 'omset')
+                    <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-3">
+                            <h3 class="text-sm font-bold text-gray-700">Omset Jasa &amp; Material — {{ $bulanLabel }}</h3>
+                            <div class="flex gap-2">
+                                <button type="button" wire:click="toggleRinciOmset"
+                                    class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50">
+                                    {{ $rinciOmset ? 'Per kategori' : 'Rinci per transaksi' }}
+                                </button>
+                                <button type="button" wire:click="exportOmsetCsv"
+                                    class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50">
+                                    Ekspor CSV
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead>
+                                    <tr class="border-b border-gray-100 text-gray-500">
+                                        <th class="{{ $th }}">Pekerjaan</th>
+                                        <th class="{{ $th }} text-right">Omset Jasa</th>
+                                        <th class="{{ $th }} text-right">Omset Material</th>
+                                        <th class="{{ $th }} text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    @forelse ($omsetRows as $r)
+                                        <tr class="cursor-pointer hover:bg-gray-50" wire:click="bukaDetailOmset('{{ $r['key'] }}')" title="Klik untuk lihat daftar order/transaksinya">
+                                            <td class="{{ $th }}">{{ $r['label'] }} <span class="text-xs text-gray-400">({{ $r['unit'] }} unit)</span></td>
+                                            <td class="{{ $th }} text-right">{{ $rp($r['jasa']) }}</td>
+                                            <td class="{{ $th }} text-right">{{ $rp($r['material']) }}</td>
+                                            <td class="{{ $th }} text-right font-semibold">{{ $rp($r['total']) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Belum ada omset pada periode ini.</td></tr>
+                                    @endforelse
+                                </tbody>
+                                <tfoot>
+                                    <tr class="bg-gray-50/60 font-bold text-gray-800">
+                                        <td class="{{ $th }}">Total ({{ $omsetTotal['unit'] }} unit)</td>
+                                        <td class="{{ $th }} text-right">{{ $rp($omsetTotal['jasa']) }}</td>
+                                        <td class="{{ $th }} text-right">{{ $rp($omsetTotal['material']) }}</td>
+                                        <td class="{{ $th }} text-right">{{ $rp($omsetTotal['total']) }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <p class="px-4 py-2 text-xs text-gray-400">Klik salah satu baris utk lihat daftar order/transaksi di baliknya.</p>
                     </div>
                 @endif
             </div>
@@ -352,6 +404,50 @@
                         @endforeach
                     </div>
                 @endif
+            </div>
+        @endif
+
+        {{-- Modal detail omset (klik baris tabel Omset Jasa/Material) --}}
+        @if ($detailOmsetKey !== null)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:click.self="tutupDetailOmset">
+                <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-gray-800">Detail Order — {{ $bulanLabel }}</h3>
+                        <button type="button" wire:click="tutupDetailOmset" class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100" aria-label="Tutup">✕</button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                <tr>
+                                    <th class="{{ $th }}">Tanggal</th>
+                                    <th class="{{ $th }}">Order</th>
+                                    <th class="{{ $th }}">Pekerjaan</th>
+                                    <th class="{{ $th }} text-right">Jasa</th>
+                                    <th class="{{ $th }} text-right">Material</th>
+                                    <th class="{{ $th }} text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @forelse ($omsetDetail as $o)
+                                    <tr>
+                                        <td class="{{ $th }} whitespace-nowrap text-gray-500">{{ $tgl($o['tanggal']) }}</td>
+                                        <td class="{{ $th }}">
+                                            <a class="font-semibold text-primary-600 hover:underline" href="{{ \App\Filament\Resources\OrderResource::getUrl('view', ['record' => $o['order_id']]) }}">#{{ $o['order_id'] }}</a>
+                                            <span class="block text-xs text-gray-400">{{ $o['customer'] }}</span>
+                                        </td>
+                                        <td class="{{ $th }}">{{ $o['nama'] }} <span class="text-xs text-gray-400">({{ $o['unit'] }} unit)</span></td>
+                                        <td class="{{ $th }} text-right">{{ $rp($o['jasa']) }}</td>
+                                        <td class="{{ $th }} text-right">{{ $rp($o['material']) }}</td>
+                                        <td class="{{ $th }} text-right font-semibold">{{ $rp($o['total']) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="p-4 text-center text-gray-400">Tidak ada data.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         @endif
     </div>

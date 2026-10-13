@@ -74,23 +74,24 @@ class OmsetService
      * Satu baris per item layanan aktif (bukan dibatalkan) pada order selesai
      * di periode. Order tanpa item (data sangat lama) jatuh ke harga katalog.
      *
-     * @return Collection<int, array{order_id: int, tanggal: string, kategori: string, nama: string, komponen: string, unit: int, subtotal: float}>
+     * @return Collection<int, array{order_id: int, tanggal: string, customer: string, kategori: string, nama: string, komponen: string, unit: int, subtotal: float}>
      */
     public function baris(CarbonInterface $dari, CarbonInterface $sampai): Collection
     {
         $hasil = collect();
 
         $this->orderSelesai($dari, $sampai)
-            ->with(['orderItems', 'serviceCatalog', 'payments'])
+            ->with(['orderItems', 'serviceCatalog', 'payments', 'customer'])
             ->get()
             ->each(function (Order $order) use ($hasil): void {
                 $tanggal = (string) $order->getAttribute('tanggal_pendapatan');
+                $customer = $order->customer?->nama ?? 'Tanpa nama';
 
                 // Acuan final (dev-plan/24): split omset jasa/material dari
                 // pembayaran bila ada; fallback ke rincian order_items.
                 $split = $order->payments->first()?->splitOmset();
                 if ($split !== null) {
-                    foreach ($this->barisDariSplit($order, $split, $tanggal) as $baris) {
+                    foreach ($this->barisDariSplit($order, $split, $tanggal, $customer) as $baris) {
                         $hasil->push($baris);
                     }
 
@@ -106,6 +107,7 @@ class OmsetService
                     $hasil->push([
                         'order_id' => $order->id,
                         'tanggal' => $tanggal,
+                        'customer' => $customer,
                         'kategori' => $jenis?->value ?? 'lainnya',
                         'nama' => $jenis !== null ? self::label($jenis->value) : 'Layanan',
                         'komponen' => $komponen->value,
@@ -125,6 +127,7 @@ class OmsetService
                     $hasil->push([
                         'order_id' => $order->id,
                         'tanggal' => $tanggal,
+                        'customer' => $customer,
                         'kategori' => ServiceTypeResolver::kode($item->kategori) ?? 'lainnya',
                         'nama' => $this->namaBaris($item),
                         'komponen' => $item->komponenOmset()->value,
@@ -145,7 +148,7 @@ class OmsetService
      * @param  array{jasa: float, material: float}  $split
      * @return array<int, array<string, mixed>>
      */
-    private function barisDariSplit(Order $order, array $split, string $tanggal): array
+    private function barisDariSplit(Order $order, array $split, string $tanggal, string $customer): array
     {
         $items = $order->orderItems
             ->reject(fn (OrderItem $i): bool => $i->dibatalkan() || $i->penyesuaian)
@@ -167,6 +170,7 @@ class OmsetService
             $hasil[] = [
                 'order_id' => $order->id,
                 'tanggal' => $tanggal,
+                'customer' => $customer,
                 'kategori' => $kategori,
                 'nama' => $nama,
                 'komponen' => $komponen,
@@ -181,6 +185,7 @@ class OmsetService
             $hasil[] = [
                 'order_id' => $order->id,
                 'tanggal' => $tanggal,
+                'customer' => $customer,
                 'kategori' => $kategori,
                 'nama' => $nama,
                 'komponen' => 'jasa',
@@ -190,6 +195,39 @@ class OmsetService
         }
 
         return $hasil;
+    }
+
+    /**
+     * Rincian per order di balik satu baris `ringkasan()` (drill-down
+     * dashboard) — kunci `$kategori`/`$nama` sama dgn pengelompokan
+     * `ringkasan()` (mode 'kategori' hanya kategori, mode 'transaksi' ikut
+     * nama). Satu order = satu baris (jasa & material digabung per order).
+     *
+     * @return Collection<int, array{order_id: int, tanggal: string, customer: string, nama: string, unit: int, jasa: float, material: float, total: float}>
+     */
+    public function detailOrder(CarbonInterface $dari, CarbonInterface $sampai, string $kategori, ?string $nama = null): Collection
+    {
+        return $this->baris($dari, $sampai)
+            ->filter(fn (array $b): bool => $b['kategori'] === $kategori && ($nama === null || $b['nama'] === $nama))
+            ->groupBy('order_id')
+            ->map(function (Collection $grup, int $orderId): array {
+                $pertama = $grup->first();
+                $jasa = (float) $grup->where('komponen', 'jasa')->sum('subtotal');
+                $material = (float) $grup->where('komponen', 'material')->sum('subtotal');
+
+                return [
+                    'order_id' => $orderId,
+                    'tanggal' => $pertama['tanggal'],
+                    'customer' => $pertama['customer'],
+                    'nama' => $pertama['nama'],
+                    'unit' => (int) $grup->sum('unit'),
+                    'jasa' => $jasa,
+                    'material' => $material,
+                    'total' => $jasa + $material,
+                ];
+            })
+            ->sortByDesc('tanggal')
+            ->values();
     }
 
     /**
