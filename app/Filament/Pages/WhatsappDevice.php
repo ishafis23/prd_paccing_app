@@ -48,7 +48,12 @@ class WhatsappDevice extends Page
     // --- Uji kirim teks (fase 23-B) ---
     public ?int $tesDeviceId = null;
 
+    /** Jenis tujuan uji: 'pribadi' (nomor) atau 'grup' (JID grup). */
+    public string $tesJenis = 'pribadi';
+
     public string $tesTarget = '';
+
+    public string $tesGrup = '120363023284398181@g.us';
 
     public string $tesPesan = '';
 
@@ -186,12 +191,16 @@ class WhatsappDevice extends Page
         $this->muatDevices();
     }
 
-    /** Uji kirim pesan teks ke nomor yang diketik bebas (default nomor device). */
+    /** Uji kirim pesan teks ke nomor/grup yang dipilih bebas (default nomor device). */
     public function kirimTes(): void
     {
+        $keGrup = $this->tesJenis === 'grup';
+
         $this->validate([
             'tesDeviceId' => ['required', 'integer'],
-            'tesTarget' => ['required', 'string'],
+            'tesJenis' => ['required', 'in:pribadi,grup'],
+            'tesTarget' => [$keGrup ? 'nullable' : 'required', 'string'],
+            'tesGrup' => [$keGrup ? 'required' : 'nullable', 'string'],
             'tesPesan' => ['required', 'string', 'max:4000'],
         ]);
 
@@ -203,14 +212,11 @@ class WhatsappDevice extends Page
         }
 
         try {
-            $log = app(WhatsappService::class)->kirimTeks(
-                auth()->user(),
-                $device,
-                $this->tesTarget,
-                $this->tesPesan,
-                null,
-                'tes',
-            );
+            // Radio "Grup" → kirimGrup (JID apa adanya); "Nomor Pribadi" →
+            // kirimTeks (nomor dinormalisasi).
+            $log = $keGrup
+                ? app(WhatsappService::class)->kirimGrup(auth()->user(), $device, $this->tesGrup, $this->tesPesan, null, 'tes')
+                : app(WhatsappService::class)->kirimTeks(auth()->user(), $device, $this->tesTarget, $this->tesPesan, null, 'tes');
 
             Notification::make()
                 ->title($log->sukses() ? 'Pesan tes terkirim' : 'Gagal mengirim')

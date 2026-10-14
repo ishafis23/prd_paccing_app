@@ -21,6 +21,7 @@ beforeEach(function () {
         'wa.document_token' => 'tok123',
         'wa.pdf_secret' => 'rahasia',
         'wa.rate_limit' => 0,
+        'wa.base_url.group' => null,
     ]);
 
     $this->provider = ProviderAccount::factory()->create([
@@ -73,6 +74,58 @@ it('menegakkan rate limit per menit', function () {
 
     expect(fn () => app(WhatsappService::class)->kirimTeks($this->user, $this->device, '6281111111113', 'c'))
         ->toThrow(BusinessRuleException::class, 'Terlalu banyak kirim');
+});
+
+it('kirimGrup mempertahankan JID grup apa adanya + menulis wa_logs', function () {
+    $jid = '120363023284398181@g.us';
+
+    $log = app(WhatsappService::class)->kirimGrup(
+        $this->user, $this->device, $jid, 'Halo grup',
+    );
+
+    expect($log->status)->toBe(WaLog::STATUS_SUKSES)
+        ->and($log->target)->toBe($jid)
+        ->and($log->action)->toBe('send-grup')
+        ->and($log->jenis_kirim)->toBe('grup');
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/send/')
+        && $request['target'] === $jid
+        && $request['jenis'] === 'teks');
+});
+
+it('kirimGrup memakai base URL grup bila dikonfigurasi', function () {
+    $this->provider->update(['base_url_group' => 'https://grup.test']);
+    Http::fake([
+        'https://gw.test/api/qr/*' => fn () => Http::response(['status' => 'ok'], 200),
+        'https://grup.test/api/send/*' => Http::response(['status' => 'terkirim'], 200),
+    ]);
+
+    $log = app(WhatsappService::class)->kirimGrup($this->user, $this->device, '1234567890@g.us', 'x');
+
+    expect($log->status)->toBe(WaLog::STATUS_SUKSES);
+    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://grup.test/api/send/'));
+});
+
+it('kirimUlang log grup tetap memakai JID grup apa adanya', function () {
+    $jid = '120363023284398181@g.us';
+    $asal = WaLog::create([
+        'user_id' => $this->user->id,
+        'wa_device_id' => $this->device->id,
+        'action' => 'send-grup',
+        'target' => $jid,
+        'jenis_kirim' => 'grup',
+        'pesan' => 'Pesan grup yang gagal',
+        'status' => WaLog::STATUS_GAGAL,
+        'error_message' => 'timeout',
+        'percobaan' => 1,
+    ]);
+
+    $baru = app(WhatsappService::class)->kirimUlang($asal);
+
+    expect($baru->status)->toBe(WaLog::STATUS_SUKSES)
+        ->and($baru->action)->toBe('send-grup')
+        ->and($baru->target)->toBe($jid)
+        ->and($baru->log_asal_id)->toBe($asal->id);
 });
 
 it('kirimDokumen menyimpan snapshot + mengirim URL bertanda tangan dengan Bearer', function () {

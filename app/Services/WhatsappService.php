@@ -150,6 +150,39 @@ class WhatsappService
     }
 
     /**
+     * Kirim satu pesan teks ke GRUP WhatsApp. Berbeda dari kirimTeks(),
+     * target TIDAK dinormalisasi sebagai nomor — JID grup (mis.
+     * `120363023284398181@g.us`) dipakai apa adanya karena normalisasi nomor
+     * akan merusaknya. Pre-flight + rate limit + wa_logs tetap sama.
+     */
+    public function kirimGrup(
+        User $user,
+        WaDevice $device,
+        string $grup,
+        string $pesan,
+        ?Model $related = null,
+        string $jenisKirim = 'grup',
+        int $percobaan = 1,
+        ?int $logAsalId = null
+    ): WaLog {
+        $this->pastikanBolehKirim($user, $device);
+        $grup = $this->targetGrupValid($grup);
+
+        $resp = $this->sendGrup($device, $grup, $pesan);
+
+        return $this->catat($user, $device, [
+            'action' => 'send-grup',
+            'target' => $grup,
+            'jenis_kirim' => $jenisKirim,
+            'pesan' => $pesan,
+            'related' => $related,
+            'percobaan' => $percobaan,
+            'log_asal_id' => $logAsalId,
+            'request' => ['target' => $grup, 'jenis' => 'teks', 'tujuan' => 'grup'],
+        ], $resp);
+    }
+
+    /**
      * Kirim satu dokumen (PDF snapshot) lewat bridge JSON + URL publik
      * bertanda tangan. `dokumen_path` disimpan ke log → kirim ulang tidak
      * render ulang.
@@ -208,6 +241,19 @@ class WhatsappService
         }
 
         $target = $target !== null && trim($target) !== '' ? $target : $log->target;
+
+        if ($log->action === 'send-grup') {
+            return $this->kirimGrup(
+                $user,
+                $device,
+                (string) $target,
+                (string) $log->pesan,
+                $log->related,
+                (string) ($log->jenis_kirim ?: 'grup'),
+                $log->percobaan + 1,
+                $log->id,
+            );
+        }
 
         if ($log->action === 'send-document' && filled($log->dokumen_path)) {
             if (! Storage::disk('local')->exists($log->dokumen_path)) {
@@ -298,6 +344,27 @@ class WhatsappService
             'jenis' => 'teks',
             'pesan' => $pesan,
             'target' => $target,
+        ]);
+    }
+
+    /**
+     * POST form ke endpoint kirim untuk GRUP. Memakai base URL grup bila
+     * dikonfigurasi (kolom ProviderAccount `base_url_group` / WA_BASE_URL_GROUP),
+     * jika tidak ada fallback ke base URL kirim. `target` = JID grup apa adanya.
+     *
+     * @return array{ok:bool,status_code:int,body:string,parsed:mixed,error:?string}
+     */
+    public function sendGrup(WaDevice $device, string $grup, string $pesan): array
+    {
+        $base = $this->baseUrl($device, 'group') ?? $this->baseUrl($device, 'send');
+        if ($base === null) {
+            return $this->gagalHttp('Base URL grup belum dikonfigurasi (WA_BASE_URL_GROUP / WA_BASE_URL_SEND).');
+        }
+
+        return $this->call($base.'/api/send/', $this->params($device) + [
+            'jenis' => 'teks',
+            'pesan' => $pesan,
+            'target' => $grup,
         ]);
     }
 
@@ -401,6 +468,20 @@ class WhatsappService
         $target = $this->normalizeNumber($target);
         if (strlen($target) < 10) {
             throw new BusinessRuleException('Nomor tujuan WA tidak valid (minimal 10 digit, format 62812xxxx).');
+        }
+
+        return $target;
+    }
+
+    /**
+     * Validasi target GRUP: dipakai apa adanya (TIDAK lewat normalizeNumber)
+     * supaya JID `120363023284398181@g.us` tidak rusak jadi nomor.
+     */
+    private function targetGrupValid(string $target): string
+    {
+        $target = trim($target);
+        if ($target === '') {
+            throw new BusinessRuleException('Target grup WA tidak valid (contoh: 120363023284398181@g.us).');
         }
 
         return $target;

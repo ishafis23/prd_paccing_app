@@ -95,6 +95,7 @@ class WaLogResource extends BaseResource
                     ->label('Jenis')
                     ->options([
                         'teks' => 'Teks',
+                        'grup' => 'Grup',
                         'tes' => 'Tes',
                         'invoice' => 'Invoice',
                         'laporan' => 'Laporan',
@@ -137,11 +138,11 @@ class WaLogResource extends BaseResource
                     ->visible(fn (WaLog $record): bool => $record->bisaDikirimUlang())
                     ->form([
                         Forms\Components\TextInput::make('target')
-                            ->label('Nomor Tujuan')
-                            ->tel()
+                            ->label(fn (WaLog $record): string => $record->action === 'send-grup' ? 'ID Grup Tujuan' : 'Nomor Tujuan')
+                            ->tel(fn (WaLog $record): bool => $record->action !== 'send-grup')
                             ->required()
                             ->default(fn (WaLog $record): string => (string) $record->target)
-                            ->helperText('Boleh diganti — mis. kirim ke nomor lain.'),
+                            ->helperText('Boleh diganti — mis. kirim ke nomor/grup lain.'),
                     ])
                     ->action(function (WaLog $record, array $data): void {
                         try {

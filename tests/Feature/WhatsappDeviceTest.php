@@ -6,6 +6,7 @@ use App\Filament\Resources\WaDeviceResource;
 use App\Models\ProviderAccount;
 use App\Models\User;
 use App\Models\WaDevice;
+use App\Models\WaLog;
 use App\Services\WhatsappService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\Http;
@@ -173,4 +174,74 @@ it('resource Perangkat WhatsApp bisa dilihat Owner/Admin', function () {
     $this->actingAs($admin);
 
     expect(WaDeviceResource::canViewAny())->toBeTrue();
+});
+
+it('kirimTes dengan radio "grup" mengirim ke JID grup apa adanya', function () {
+    config(['wa.aktif' => true]);
+
+    $provider = ProviderAccount::factory()->create([
+        'base_url_qr' => 'https://gw.test',
+        'base_url_send' => 'https://gw.test',
+    ]);
+    $device = WaDevice::factory()->for($provider, 'providerAccount')->create([
+        'connection_status' => WaDevice::KONEKSI_TERHUBUNG,
+    ]);
+
+    Http::fake([
+        'https://gw.test/api/qr/*' => Http::response(['status' => 'ok'], 200),
+        'https://gw.test/api/send/*' => Http::response(['status' => 'terkirim'], 200),
+    ]);
+
+    $admin = ($this->mkUser)(RoleName::Admin->value);
+    $this->actingAs($admin);
+
+    $jid = '120363023284398181@g.us';
+
+    Livewire::test(WhatsappDevice::class)
+        ->set('tesDeviceId', $device->id)
+        ->set('tesJenis', 'grup')
+        ->set('tesGrup', $jid)
+        ->set('tesPesan', 'Halo grup')
+        ->call('kirimTes')
+        ->assertHasNoErrors();
+
+    $log = WaLog::query()->latest('id')->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->action)->toBe('send-grup')
+        ->and($log->target)->toBe($jid);
+});
+
+it('kirimTes dengan radio "pribadi" menormalkan nomor tujuan', function () {
+    config(['wa.aktif' => true]);
+
+    $provider = ProviderAccount::factory()->create([
+        'base_url_qr' => 'https://gw.test',
+        'base_url_send' => 'https://gw.test',
+    ]);
+    $device = WaDevice::factory()->for($provider, 'providerAccount')->create([
+        'connection_status' => WaDevice::KONEKSI_TERHUBUNG,
+    ]);
+
+    Http::fake([
+        'https://gw.test/api/qr/*' => Http::response(['status' => 'ok'], 200),
+        'https://gw.test/api/send/*' => Http::response(['status' => 'terkirim'], 200),
+    ]);
+
+    $admin = ($this->mkUser)(RoleName::Admin->value);
+    $this->actingAs($admin);
+
+    Livewire::test(WhatsappDevice::class)
+        ->set('tesDeviceId', $device->id)
+        ->set('tesJenis', 'pribadi')
+        ->set('tesTarget', '0812-3456-7890')
+        ->set('tesPesan', 'Halo')
+        ->call('kirimTes')
+        ->assertHasNoErrors();
+
+    $log = WaLog::query()->latest('id')->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->action)->toBe('send-teks')
+        ->and($log->target)->toBe('6281234567890');
 });
