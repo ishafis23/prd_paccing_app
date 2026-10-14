@@ -73,6 +73,10 @@ class WaDeviceResource extends BaseResource
                     ->searchable()
                     ->preload()
                     ->placeholder('-- Belum ditugaskan --'),
+                Forms\Components\Toggle::make('notif_default')
+                    ->label('Device Notifikasi Otomatis')
+                    ->helperText('Dipakai mengirim notifikasi otomatis ke customer (berangkat/pembayaran). Hanya satu device.')
+                    ->columnSpanFull(),
             ])
             ->columns(2);
     }
@@ -107,6 +111,8 @@ class WaDeviceResource extends BaseResource
                 Tables\Columns\TextColumn::make('assignedUser.name')
                     ->label('Pemakai')
                     ->placeholder('-'),
+                Tables\Columns\ToggleColumn::make('notif_default')
+                    ->label('Notif Otomatis'),
                 Tables\Columns\TextColumn::make('last_checked_at')
                     ->label('Cek Terakhir')
                     ->since()

@@ -97,6 +97,8 @@ class WaLogResource extends BaseResource
                         'teks' => 'Teks',
                         'grup' => 'Grup',
                         'tes' => 'Tes',
+                        'berangkat' => 'Notif Berangkat',
+                        'pembayaran' => 'Notif Pembayaran',
                         'invoice' => 'Invoice',
                         'laporan' => 'Laporan',
                         'resi' => 'Resi',

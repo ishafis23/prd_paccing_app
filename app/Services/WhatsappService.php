@@ -183,6 +183,55 @@ class WhatsappService
     }
 
     /**
+     * Kirim pesan teks atas nama SISTEM (notifikasi otomatis ke customer —
+     * dev-plan/27). Beda dari kirimTeks(): tidak memakai rate limit per-user,
+     * melainkan rate limit global (config `wa.rate_limit_sistem`), dan
+     * `wa_logs.user_id` boleh null (dari pemilik device bila ada).
+     */
+    public function kirimTeksSistem(
+        WaDevice $device,
+        string $target,
+        string $pesan,
+        ?Model $related = null,
+        string $jenisKirim = 'notif',
+        ?User $user = null,
+    ): WaLog {
+        if (! $this->aktif()) {
+            throw new BusinessRuleException('Fitur kirim WA sedang nonaktif (WA_AKTIF=false).');
+        }
+
+        $status = $this->status($device);
+        if (empty($status['terhubung'])) {
+            throw new BusinessRuleException('Device WA belum terhubung (dicek real-time).');
+        }
+
+        $limit = (int) config('wa.rate_limit_sistem', 0);
+        if ($limit > 0) {
+            $n = WaLog::query()
+                ->where('action', 'like', 'send%')
+                ->where('created_at', '>=', now()->subMinute())
+                ->count();
+
+            if ($n >= $limit) {
+                throw new BusinessRuleException('Rate limit notifikasi sistem tercapai. Coba lagi sebentar.');
+            }
+        }
+
+        $target = $this->targetValid($target);
+
+        $resp = $this->sendText($device, $target, $pesan);
+
+        return $this->catat($user, $device, [
+            'action' => 'send-teks',
+            'target' => $target,
+            'jenis_kirim' => $jenisKirim,
+            'pesan' => $pesan,
+            'related' => $related,
+            'request' => ['target' => $target, 'jenis' => 'teks', 'sistem' => true],
+        ], $resp);
+    }
+
+    /**
      * Kirim satu dokumen (PDF snapshot) lewat bridge JSON + URL publik
      * bertanda tangan. `dokumen_path` disimpan ke log → kirim ulang tidak
      * render ulang.
@@ -493,13 +542,13 @@ class WhatsappService
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $resp
      */
-    private function catat(User $user, WaDevice $device, array $data, array $resp): WaLog
+    private function catat(?User $user, WaDevice $device, array $data, array $resp): WaLog
     {
         $sukses = ! empty($resp['ok']);
         $related = $data['related'] ?? null;
 
         return WaLog::create([
-            'user_id' => $user->id,
+            'user_id' => $user?->id,
             'wa_device_id' => $device->id,
             'action' => $data['action'],
             'target' => $data['target'],

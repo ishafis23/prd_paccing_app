@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             ServiceCatalogSeeder::class,
             LandingPageSeeder::class,
+            WaTemplateSeeder::class,
         ]);
 
         $owner = User::updateOrCreate(
@@ -44,8 +45,8 @@ class DatabaseSeeder extends Seeder
 
         foreach (['Teknisi Andi', 'Teknisi Budi'] as $i => $nama) {
             $teknisi = User::updateOrCreate(
-                ['email' => 'teknisi' . ($i + 1) . '@paccing.test'],
-                ['name' => $nama, 'phone' => '08110000000' . (3 + $i), 'password' => 'password']
+                ['email' => 'teknisi'.($i + 1).'@paccing.test'],
+                ['name' => $nama, 'phone' => '08110000000'.(3 + $i), 'password' => 'password']
             );
             $teknisi->syncRoles([RoleName::Teknisi->value]);
         }

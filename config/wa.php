@@ -18,6 +18,13 @@ return [
     // Batas kirim per menit per user (0 = tanpa batas). Dipakai fase 23-B.
     'rate_limit' => (int) env('WA_RATE_LIMIT_SEND', 10),
 
+    // dev-plan/27: batas kirim notifikasi OTOMATIS (sistem) per menit.
+    'rate_limit_sistem' => (int) env('WA_RATE_LIMIT_SISTEM', 20),
+
+    // dev-plan/27: pemicu notifikasi otomatis ke customer.
+    'notif_berangkat' => (bool) env('WA_NOTIF_BERANGKAT', true),
+    'notif_lunas' => (bool) env('WA_NOTIF_LUNAS', false),
+
     // Secret untuk menandatangani URL publik PDF lampiran (fase 23-C).
     'pdf_secret' => env('WA_PDF_SECRET'),
 

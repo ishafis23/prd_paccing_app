@@ -33,6 +33,7 @@ class WaDevice extends Model
         'nomor_wa',
         'status',
         'connection_status',
+        'notif_default',
         'assigned_user_id',
         'last_checked_at',
     ];
@@ -41,6 +42,7 @@ class WaDevice extends Model
     {
         return [
             'last_checked_at' => 'datetime',
+            'notif_default' => 'boolean',
         ];
     }
 
@@ -58,6 +60,11 @@ class WaDevice extends Model
                 ->where('wa_device_id', $device->id)
                 ->when($device->assigned_user_id, fn ($q) => $q->whereKeyNot($device->assigned_user_id))
                 ->update(['wa_device_id' => null]);
+
+            // Hanya satu device yang boleh jadi pengirim notifikasi default.
+            if ($device->notif_default) {
+                static::query()->whereKeyNot($device->id)->update(['notif_default' => false]);
+            }
         });
 
         static::deleted(function (WaDevice $device): void {

@@ -10,6 +10,7 @@ use App\Models\InvoiceItem;
 use App\Services\BusinessInfoService;
 use App\Services\InvoicePdfService;
 use App\Services\InvoiceService;
+use App\Services\NotifikasiWaService;
 use App\Services\WhatsappService;
 use App\Support\Url;
 use App\Support\WhatsappTemplate;
@@ -157,6 +158,27 @@ class ViewInvoice extends ViewRecord
 
                         Notification::make()
                             ->title($log->sukses() ? 'Invoice terkirim' : 'Gagal mengirim invoice')
+                            ->body($log->sukses() ? 'Ke '.$log->target.' — tercatat di Riwayat Kirim WA.' : (string) $log->error_message)
+                            ->status($log->sukses() ? 'success' : 'danger')
+                            ->send();
+                    } catch (BusinessRuleException $e) {
+                        Notification::make()->title('Tidak bisa kirim')->body($e->getMessage())->danger()->send();
+                    }
+                }),
+
+            Actions\Action::make('kirimNotifLunas')
+                ->label('Kirim Notif Pembayaran')
+                ->icon('heroicon-o-banknotes')
+                ->color('success')
+                ->modalHeading('Kirim Notifikasi Pembayaran + Invoice')
+                ->modalDescription('Kirim pesan "pembayaran diterima" beserta PDF invoice ke customer.')
+                ->visible(fn (Invoice $record): bool => $record->status === InvoiceStatus::Lunas)
+                ->action(function (Invoice $record): void {
+                    try {
+                        $log = app(NotifikasiWaService::class)->kirimPembayaranLunas($record, auth()->user());
+
+                        Notification::make()
+                            ->title($log->sukses() ? 'Notifikasi pembayaran terkirim' : 'Gagal mengirim notifikasi')
                             ->body($log->sukses() ? 'Ke '.$log->target.' — tercatat di Riwayat Kirim WA.' : (string) $log->error_message)
                             ->status($log->sukses() ? 'success' : 'danger')
                             ->send();

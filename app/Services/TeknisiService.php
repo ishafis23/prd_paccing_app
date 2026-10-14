@@ -10,6 +10,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
+use App\Jobs\KirimNotifWaJob;
 use App\Models\Attendance;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -61,6 +62,12 @@ class TeknisiService
 
         $order->status = OrderStatus::MenujuLokasi;
         $order->save();
+
+        // dev-plan/27: notifikasi otomatis ke customer (di antrean; kegagalan
+        // notif tidak menggagalkan keberangkatan).
+        if (config('wa.notif_berangkat', true)) {
+            KirimNotifWaJob::dispatch($order->id, $teknisi->id);
+        }
 
         return $order->fresh();
     }
