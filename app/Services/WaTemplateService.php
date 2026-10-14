@@ -33,6 +33,22 @@ class WaTemplateService
         ."Terima kasih atas kepercayaan Anda.\n\n"
         ."Hormat kami,\n{nama_usaha}";
 
+    /** Contoh notifikasi "pengerjaan selesai" (fase lanjut — belum terpicu otomatis). */
+    public const DEFAULT_SELESAI_PENGERJAAN = "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
+        ."Bapak/Ibu {nama}\n\n"
+        .'Pengerjaan {layanan} di {alamat} telah selesai dikerjakan oleh {teknisi}.'
+        ." Dokumen/bukti pengerjaan menyusul bila diperlukan.\n\n"
+        ."Terima kasih atas kepercayaan Anda.\n\n"
+        ."Hormat kami,\n{nama_usaha}";
+
+    /** Contoh pengingat tagihan (fase lanjut — belum terpicu otomatis). */
+    public const DEFAULT_REMINDER_TAGIHAN = "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
+        ."Bapak/Ibu {nama}\n\n"
+        .'Kami mengingatkan invoice {nomor_invoice} sebesar {total} belum kami terima pembayarannya.'
+        ." Mohon konfirmasi pembayaran melalui tautan berikut:\n{tautan_invoice}\n\n"
+        ."Terima kasih.\n\n"
+        ."Hormat kami,\n{nama_usaha}";
+
     /** Katalog default: kode => [nama, isi] — dipakai seeder & fallback. */
     public const DEFAULTS = [
         'berangkat' => [
@@ -42,6 +58,14 @@ class WaTemplateService
         'pembayaran_lunas' => [
             'nama' => 'Notifikasi Pembayaran + Invoice',
             'isi' => self::DEFAULT_PEMBAYARAN_LUNAS,
+        ],
+        'selesai_pengerjaan' => [
+            'nama' => 'Notifikasi Pengerjaan Selesai',
+            'isi' => self::DEFAULT_SELESAI_PENGERJAAN,
+        ],
+        'reminder_tagihan' => [
+            'nama' => 'Pengingat Tagihan',
+            'isi' => self::DEFAULT_REMINDER_TAGIHAN,
         ],
     ];
 

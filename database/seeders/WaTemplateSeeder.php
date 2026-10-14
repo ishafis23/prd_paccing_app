@@ -16,7 +16,9 @@ class WaTemplateSeeder extends Seeder
     public function run(): void
     {
         foreach (WaTemplateService::DEFAULTS as $kode => $default) {
-            WaTemplate::updateOrCreate(
+            // firstOrCreate (BUKAN updateOrCreate): aman dijalankan ulang —
+            // baris yang sudah ada (mungkin sudah diedit admin) TIDAK ditimpa.
+            WaTemplate::firstOrCreate(
                 ['kode' => $kode],
                 ['nama' => $default['nama'], 'isi' => $default['isi']],
             );
