@@ -25,6 +25,10 @@ return [
     'notif_berangkat' => (bool) env('WA_NOTIF_BERANGKAT', true),
     'notif_lunas' => (bool) env('WA_NOTIF_LUNAS', false),
 
+    // MODE UJI: bila diisi, SEMUA notifikasi otomatis ke customer diarahkan
+    // ke nomor ini (mis. nomor admin) — untuk uji coba. Kosongkan di produksi.
+    'test_target' => env('WA_TEST_TARGET'),
+
     // Secret untuk menandatangani URL publik PDF lampiran (fase 23-C).
     'pdf_secret' => env('WA_PDF_SECRET'),
 

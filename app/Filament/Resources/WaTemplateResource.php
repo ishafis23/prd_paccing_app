@@ -3,11 +3,16 @@
 namespace App\Filament\Resources;
 
 use App\Enums\RoleName;
+use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\WaTemplateResource\Pages;
 use App\Models\WaTemplate;
+use App\Services\BusinessInfoService;
+use App\Services\NotifikasiWaService;
 use App\Services\WaTemplateService;
+use App\Services\WhatsappService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -91,8 +96,76 @@ class WaTemplateResource extends BaseResource
             ])
             ->defaultSort('kode')
             ->actions([
+                Tables\Actions\Action::make('tesKirim')
+                    ->label('Tes Kirim')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('success')
+                    ->modalHeading('Tes Kirim Template')
+                    ->modalDescription('Kirim contoh pesan template ini ke nomor yang diisi. Hasil tercatat di Riwayat Kirim WA.')
+                    ->form([
+                        Forms\Components\TextInput::make('target')
+                            ->label('Nomor Tujuan')
+                            ->tel()
+                            ->required()
+                            ->default(fn (): string => (string) preg_replace('/\D/', '', (string) config('wa.test_target')))
+                            ->helperText('Terisi dari WA_TEST_TARGET bila ada. Boleh diganti.'),
+                        Forms\Components\Textarea::make('pesan')
+                            ->label('Isi Pesan (contoh — boleh diedit)')
+                            ->rows(11)
+                            ->required()
+                            ->default(fn (WaTemplate $record): string => app(WaTemplateService::class)->render($record->isi, self::contohData())),
+                    ])
+                    ->action(function (array $data): void {
+                        $user = auth()->user();
+                        $device = $user?->waDevice;
+
+                        if ($device === null || ! $device->terhubung()) {
+                            $device = app(NotifikasiWaService::class)->deviceNotifikasi();
+                        }
+
+                        if ($device === null) {
+                            Notification::make()
+                                ->title('Belum ada device WA')
+                                ->body('Sambungkan device atau tandai "Device Notifikasi Otomatis" dulu.')
+                                ->danger()->send();
+
+                            return;
+                        }
+
+                        try {
+                            $log = app(WhatsappService::class)->kirimTeks(
+                                $user, $device, (string) $data['target'], (string) $data['pesan'], null, 'tes',
+                            );
+
+                            Notification::make()
+                                ->title($log->sukses() ? 'Pesan tes terkirim' : 'Gagal mengirim')
+                                ->body($log->sukses()
+                                    ? 'Ke '.$log->target.' — tercatat di Riwayat Kirim WA.'
+                                    : (string) $log->error_message)
+                                ->status($log->sukses() ? 'success' : 'danger')
+                                ->send();
+                        } catch (BusinessRuleException $e) {
+                            Notification::make()->title('Tidak bisa kirim')->body($e->getMessage())->danger()->send();
+                        }
+                    }),
                 Tables\Actions\EditAction::make(),
             ]);
+    }
+
+    /** Contoh nilai placeholder untuk pratinjau "Tes Kirim". */
+    public static function contohData(): array
+    {
+        return [
+            'nama' => 'Budi Santoso',
+            'nama_usaha' => app(BusinessInfoService::class)->namaUsaha(),
+            'layanan' => 'Cuci AC · 1 unit',
+            'alamat' => 'Jl. Contoh No. 1, Makassar',
+            'teknisi' => 'Teknisi Andi',
+            'jadwal' => now()->addMinutes(30)->format('d M Y H:i'),
+            'nomor_invoice' => 'INV-202610-0001',
+            'total' => 'Rp 150.000',
+            'tautan_invoice' => 'https://contoh.tld/lihat-invoice',
+        ];
     }
 
     public static function getPages(): array

@@ -51,7 +51,7 @@ class NotifikasiWaService
 
         $order->loadMissing(['customer', 'customerAddress']);
         $customer = $order->customer;
-        $target = trim((string) ($customer?->no_hp ?? ''));
+        $target = $this->targetUji((string) ($customer?->no_hp ?? ''));
 
         if ($target === '') {
             return null;
@@ -94,7 +94,7 @@ class NotifikasiWaService
         $invoice->loadMissing('customer');
         $customer = $invoice->customer;
 
-        $target = trim((string) ($customer?->no_hp ?? ''));
+        $target = $this->targetUji((string) ($customer?->no_hp ?? ''));
         if ($target === '') {
             throw new BusinessRuleException('Customer belum punya nomor WhatsApp.');
         }
@@ -131,6 +131,17 @@ class NotifikasiWaService
         }
 
         return $this->deviceNotifikasi();
+    }
+
+    /**
+     * MODE UJI: bila `wa.test_target` diisi, SEMUA notifikasi otomatis
+     * diarahkan ke nomor itu (mengabaikan nomor customer). Kosong = nomor asli.
+     */
+    private function targetUji(string $nomorCustomer): string
+    {
+        $uji = trim((string) config('wa.test_target'));
+
+        return $uji !== '' ? $uji : trim($nomorCustomer);
     }
 
     /** Sudah pernah dikirim SUKSES untuk dokumen + jenis ini? (idempoten) */

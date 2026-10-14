@@ -116,3 +116,17 @@ it('template berangkat nonaktif -> notifikasi dilewati', function () {
     expect(WaLog::query()->where('jenis_kirim', 'berangkat')->count())->toBe(0)
         ->and($order->fresh()->status)->toBe(OrderStatus::MenujuLokasi);
 });
+
+it('mode uji: semua notifikasi diarahkan ke WA_TEST_TARGET', function () {
+    config(['wa.test_target' => '082393151414']);
+
+    // Customer tanpa nomor pun tetap terkirim saat mode uji aktif.
+    $order = orderBerangkat($this->teknisi, '');
+
+    $this->teknisiService->berangkat($order, $this->teknisi);
+
+    $log = WaLog::query()->where('jenis_kirim', 'berangkat')->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->target)->toBe('6282393151414');
+});
