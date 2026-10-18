@@ -84,6 +84,11 @@ class OmsetService
             ->with(['orderItems', 'serviceCatalog', 'payments', 'customer'])
             ->get()
             ->each(function (Order $order) use ($hasil): void {
+                // Misi/operasional (cari part, antar barang, dll.) bukan omset & bukan unit.
+                if (ServiceTypeResolver::bukanOmset($order->serviceCatalog?->jenis_layanan)) {
+                    return;
+                }
+
                 $tanggal = (string) $order->getAttribute('tanggal_pendapatan');
                 $customer = $order->customer?->nama ?? 'Tanpa nama';
 

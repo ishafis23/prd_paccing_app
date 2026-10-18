@@ -67,6 +67,10 @@ class ServiceTypeOptionResource extends BaseResource
                 ])
                 ->default(IncomeCategory::Jasa->value)
                 ->required(),
+            Forms\Components\Toggle::make('bukan_omset')
+                ->label('Misi / bukan omset')
+                ->helperText('Untuk misi non-AC (cari part, antar barang, dll.): tampil di jadwal teknisi tapi tidak dihitung ke omset maupun unit. Pakai customer "Internal / Operasional" saat membuat order.')
+                ->default(false),
             Forms\Components\TextInput::make('urutan')
                 ->numeric()
                 ->default(0),
@@ -85,6 +89,7 @@ class ServiceTypeOptionResource extends BaseResource
                 Tables\Columns\TextColumn::make('komponen')
                     ->badge()
                     ->color(fn (IncomeCategory $state): string => $state === IncomeCategory::Jasa ? 'info' : 'warning'),
+                Tables\Columns\IconColumn::make('bukan_omset')->label('Misi')->boolean(),
                 Tables\Columns\TextColumn::make('urutan')->sortable(),
                 Tables\Columns\ToggleColumn::make('aktif'),
             ])

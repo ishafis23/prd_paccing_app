@@ -70,6 +70,21 @@ class ServiceTypeResolver
     }
 
     /**
+     * Jenis layanan berupa misi/operasional yang dikecualikan dari omset & unit
+     * (hanya jenis tambahan yang bisa ditandai begini).
+     */
+    public static function bukanOmset(ServiceType|ServiceTypeValue|string|null $jenis): bool
+    {
+        $kode = self::kode($jenis);
+
+        if ($kode === null || ServiceType::tryFrom($kode) !== null) {
+            return false;
+        }
+
+        return ServiceTypeOption::query()->where('kode', $kode)->where('bukan_omset', true)->exists();
+    }
+
+    /**
      * Kode jenis layanan valid (bawaan atau tambahan aktif)?
      */
     public static function valid(string $kode): bool

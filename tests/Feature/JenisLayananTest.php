@@ -81,3 +81,39 @@ it('laporan omset mengenali jenis layanan tambahan', function () {
     expect($rows->firstWhere('kategori', 'ganti_kompresor'))->not->toBeNull();
     expect($omset->total($rows->all())['material'])->toBeGreaterThanOrEqual(500000.0);
 });
+
+it('jenis layanan misi (bukan omset) tidak dihitung ke omset & unit', function () {
+    ServiceTypeOption::create(['kode' => 'cari_part', 'label' => 'Cari Part', 'komponen' => 'jasa', 'bukan_omset' => true, 'aktif' => true]);
+    ServiceTypeOption::create(['kode' => 'ganti_kompresor', 'label' => 'Ganti Kompresor', 'komponen' => 'material', 'aktif' => true]);
+
+    expect(ServiceTypeResolver::bukanOmset('cari_part'))->toBeTrue();
+    expect(ServiceTypeResolver::bukanOmset('ganti_kompresor'))->toBeFalse();
+    expect(ServiceTypeResolver::bukanOmset(ServiceType::CuciAc))->toBeFalse();
+
+    $misi = ServiceCatalog::factory()->create(['jenis_layanan' => 'cari_part', 'harga' => 0]);
+    Order::factory()->create([
+        'service_catalog_id' => $misi->id, 'status' => OrderStatus::Selesai,
+        'tanggal_jadwal' => now()->toDateString(), 'jumlah_unit' => 3,
+    ]);
+
+    $biasa = ServiceCatalog::factory()->create(['jenis_layanan' => ServiceType::CuciAc, 'harga' => 100000]);
+    Order::factory()->create([
+        'service_catalog_id' => $biasa->id, 'status' => OrderStatus::Selesai,
+        'tanggal_jadwal' => now()->toDateString(), 'jumlah_unit' => 1,
+    ]);
+
+    $baris = app(OmsetService::class)->baris(Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth());
+
+    expect($baris->where('kategori', 'cari_part'))->toHaveCount(0);
+    expect($baris->where('kategori', 'cuci_ac'))->not->toBeEmpty();
+});
+
+it('seeder customer internal idempoten & tanpa nomor WA', function () {
+    $this->seed(\Database\Seeders\InternalCustomerSeeder::class);
+    $this->seed(\Database\Seeders\InternalCustomerSeeder::class);
+
+    $internal = \App\Models\Customer::where('nama', \Database\Seeders\InternalCustomerSeeder::NAMA)->get();
+
+    expect($internal)->toHaveCount(1);
+    expect($internal->first()->no_hp)->toBe('');
+});

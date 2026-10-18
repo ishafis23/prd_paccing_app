@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             ServiceCatalogSeeder::class,
             LandingPageSeeder::class,
             WaTemplateSeeder::class,
+            InternalCustomerSeeder::class,
         ]);
 
         $owner = User::updateOrCreate(

@@ -18,6 +18,7 @@ class ServiceTypeOption extends Model
         'kode',
         'label',
         'komponen',
+        'bukan_omset',
         'urutan',
         'aktif',
     ];
@@ -26,6 +27,7 @@ class ServiceTypeOption extends Model
     {
         return [
             'komponen' => IncomeCategory::class,
+            'bukan_omset' => 'boolean',
             'urutan' => 'integer',
             'aktif' => 'boolean',
         ];
