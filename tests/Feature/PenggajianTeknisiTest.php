@@ -93,6 +93,29 @@ it('hitung: gaji bersih = pokok + bonus bulanan + bonus umum + bonus mingguan âˆ
     expect($run->items->where('kategori', 'dibayar_mingguan')->count())->toBe(1);
 });
 
+it('hitung: bonus Games 1,2,3 berfoto yang masih menunggu verifikasi tetap masuk gaji', function () {
+    $admin = ($this->mkUser)(RoleName::Admin);
+    $teknisi = ($this->mkUser)(RoleName::Teknisi);
+    $profil = ($this->siapkanProfil)($teknisi);
+
+    foreach ([
+        ['2026-06-20', IncentiveKategori::Games1Hadir, 20000],
+        ['2026-06-21', IncentiveKategori::Games2TitikPertama, 15000],
+        ['2026-06-22', IncentiveKategori::Games3CuciMotor, 10000],
+    ] as [$tgl, $kategori, $nominal]) {
+        TechnicianIncentive::create([
+            'user_id' => $teknisi->id, 'tanggal' => $tgl, 'kategori' => $kategori,
+            'tipe' => IncentiveTipe::Bonus, 'nominal' => $nominal, 'sumber' => 'otomatis',
+            'foto_bukti' => 'absensi/foto.jpg', 'status_verifikasi' => IncentiveStatusVerifikasi::Menunggu,
+        ]);
+    }
+
+    $run = app(PayrollService::class)->hitung($profil, Carbon::parse('2026-06-15'), $admin);
+
+    expect((float) $run->bonus_bulanan)->toBe(45000.0);
+    expect($run->items->where('jenis', 'bonus')->count())->toBe(3);
+});
+
 it('bonus umum diubah admin & dihitung ulang', function () {
     $admin = ($this->mkUser)(RoleName::Admin);
     $teknisi = ($this->mkUser)(RoleName::Teknisi);

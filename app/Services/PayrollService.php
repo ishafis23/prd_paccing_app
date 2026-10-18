@@ -80,11 +80,13 @@ class PayrollService
         $dari = $mulai->toDateString();
         $sampai = $selesai->toDateString();
 
-        // Bonus dari ledger insentif (hanya yang sudah disetujui).
+        // Bonus dari ledger insentif: semua kecuali yang ditolak. Entri berfoto
+        // (Games 1/2/3/4) berstatus `menunggu` sampai diverifikasi, tapi tetap
+        // harus masuk gaji — hanya yang ditolak Admin/HR yang dikeluarkan.
         $ledger = TechnicianIncentive::query()
             ->where('user_id', $profil->user_id)
             ->where('tipe', IncentiveTipe::Bonus->value)
-            ->where('status_verifikasi', IncentiveStatusVerifikasi::Disetujui->value)
+            ->where('status_verifikasi', '!=', IncentiveStatusVerifikasi::Ditolak->value)
             ->whereBetween('tanggal', [$dari, $sampai])
             ->get();
 

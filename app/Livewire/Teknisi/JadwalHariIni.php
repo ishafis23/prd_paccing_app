@@ -22,18 +22,22 @@ class JadwalHariIni extends Component
                 OrderStatus::ButuhFollowup->value,
                 OrderStatus::Terkendala->value,
             ])
-            ->with(['customer', 'serviceCatalog', 'orderItems']);
+            ->with(['customer', 'serviceCatalog', 'orderItems', 'titik'])
+            // Urut tanggal lalu jam kunjungan (tanpa jam di akhir) — id sebagai
+            // pemutus seri supaya order yang diedit tidak pindah ke posisi terakhir.
+            ->orderBy('tanggal_jadwal')
+            ->orderByRaw('jam_jadwal is null')
+            ->orderBy('jam_jadwal')
+            ->orderBy('id');
 
         // Order dari hari-hari sebelumnya yang belum selesai/terkendala — dibuat
         // sekat terpisah supaya teknisi notice & ingatkan admin (masukan client).
         $ordersSebelumnya = (clone $base)
             ->whereDate('tanggal_jadwal', '<', $hariIni)
-            ->orderBy('tanggal_jadwal')
             ->get();
 
         $ordersHariIni = (clone $base)
             ->whereDate('tanggal_jadwal', '>=', $hariIni)
-            ->orderBy('tanggal_jadwal')
             ->get();
 
         // Gating (masukan client): menu orderan hanya bisa dibuka setelah absen datang.

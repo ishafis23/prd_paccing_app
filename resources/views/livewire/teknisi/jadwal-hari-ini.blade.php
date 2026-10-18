@@ -71,6 +71,9 @@
                                     <p class="mt-1 flex items-center gap-1 text-xs {{ $g['nyala'] ? 'font-bold text-red-600' : 'text-gray-400' }}">
                                         <x-heroicon-o-calendar-days class="h-3.5 w-3.5" />
                                         {{ $order->tanggal_jadwal?->format('d M Y') }} &middot; {{ $order->jam_jadwal }}
+                                        @if ($order->titik)
+                                            <span class="rounded bg-blue-600 px-1.5 py-0.5 text-[11px] font-extrabold uppercase text-white">{{ $order->titik->nama }}</span>
+                                        @endif
                                     </p>
                                 </div>
                                 @if ($sudahAbsen)

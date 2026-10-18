@@ -40,6 +40,25 @@ it('jadwal memisahkan order kemarin belum selesai dari order hari ini', function
         ->assertSee($hariIni->customer->nama);
 });
 
+it('jadwal diurutkan menurut jam kunjungan & menampilkan label TITIK', function () {
+    $titik2 = \App\Models\Titik::create(['nama' => 'Titik 2', 'jam' => '09:30', 'urutan' => 2, 'aktif' => true]);
+
+    // Dibuat lebih dulu tapi jamnya paling akhir; yang diedit belakangan jamnya paling awal.
+    $siang = Order::factory()->create([
+        'teknisi_id' => $this->teknisi->id, 'status' => OrderStatus::Terjadwal,
+        'tanggal_jadwal' => now()->toDateString(), 'jam_jadwal' => '13:00',
+    ]);
+    $pagi = Order::factory()->create([
+        'teknisi_id' => $this->teknisi->id, 'status' => OrderStatus::Terjadwal,
+        'tanggal_jadwal' => now()->toDateString(), 'jam_jadwal' => '09:30', 'titik_id' => $titik2->id,
+    ]);
+    $siang->touch();
+
+    Livewire::actingAs($this->teknisi)->test(JadwalHariIni::class)
+        ->assertSeeInOrder([$pagi->customer->nama, $siang->customer->nama])
+        ->assertSee('Titik 2');
+});
+
 it('order tidak bisa dibuka sebelum absen, bisa setelah absen', function () {
     $order = Order::factory()->create([
         'teknisi_id' => $this->teknisi->id,
