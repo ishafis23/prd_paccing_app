@@ -56,6 +56,7 @@
     <script>
         window.photoUploadConfig = {
             store: @json(\App\Support\Url::absolute('teknisi.temp-photo.store', ['order' => '__ORDER__'])),
+            index: @json(\App\Support\Url::absolute('teknisi.temp-photo.index', ['order' => '__ORDER__'])),
             destroy: @json(\App\Support\Url::absolute('teknisi.temp-photo.destroy', ['tempPhoto' => '__ID__'])),
         };
     </script>

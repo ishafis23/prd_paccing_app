@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\TemporaryPhotoUpload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TemporaryPhotoUploadController extends Controller
 {
@@ -22,6 +23,18 @@ class TemporaryPhotoUploadController extends Controller
 
         $order = Order::findOrFail($request->order_id);
         abort_if(! $order->diassignkanKe(auth()->user()), 403);
+
+        // Satu slot satu foto: unggahan baru menggantikan draft lama slot itu
+        // (file lama ikut dihapus supaya tidak menumpuk di storage).
+        TemporaryPhotoUpload::query()
+            ->where('user_id', auth()->id())
+            ->where('order_id', $order->id)
+            ->where('field_name', $request->field_name)
+            ->get()
+            ->each(function (TemporaryPhotoUpload $lama): void {
+                $lama->deleteFile();
+                $lama->forceDelete();
+            });
 
         // Upload file ke temporary folder
         $file = $request->file('file');
@@ -45,6 +58,7 @@ class TemporaryPhotoUploadController extends Controller
                 'id' => $tempPhoto->id,
                 'file_path' => $filePath,
                 'file_name' => $tempPhoto->file_name,
+                'url' => asset('storage/'.ltrim($filePath, '/')),
             ],
         ], 201);
     }
@@ -61,10 +75,12 @@ class TemporaryPhotoUploadController extends Controller
             ->where('user_id', auth()->id())
             ->where('order_id', $order->id)
             ->get()
-            ->mapWithKeys(fn ($photo) => [$photo->field_name => [
+            ->filter(fn (TemporaryPhotoUpload $photo): bool => filled($photo->file_path) && Storage::disk('public')->exists($photo->file_path))
+            ->mapWithKeys(fn (TemporaryPhotoUpload $photo) => [$photo->field_name => [
                 'id' => $photo->id,
                 'file_path' => $photo->file_path,
                 'file_name' => $photo->file_name,
+                'url' => asset('storage/'.ltrim($photo->file_path, '/')),
             ]]);
 
         return response()->json([
@@ -78,7 +94,7 @@ class TemporaryPhotoUploadController extends Controller
      */
     public function destroy(TemporaryPhotoUpload $tempPhoto): JsonResponse
     {
-        abort_if(! $tempPhoto->user_id === auth()->id(), 403);
+        abort_if($tempPhoto->user_id !== auth()->id(), 403);
 
         $tempPhoto->deleteFile();
         $tempPhoto->delete();

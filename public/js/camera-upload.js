@@ -84,6 +84,43 @@ function fotoUploadSelesai(store) {
     }
 }
 
+/**
+ * Auto-save foto (dev-plan/28): foto laporan yang dipilih langsung disimpan
+ * ke server sebagai draft per slot, supaya tidak hilang saat halaman
+ * di-refresh / tertutup. Hanya slot laporan yang dibaca server dari draft
+ * (lihat OrderDetail::fotoTempTersedia) yang dipersist.
+ */
+const SLOT_AUTOSAVE = /^(fotoSebelum$|fotoSesudah$|fotoKategori\.|fotoUnit\.|fotoLengkapi\.)/;
+
+const draftFotoCache = {};
+
+/** Ambil draft foto order ini sekali per halaman: {fieldName: {id, url, ...}}. */
+function muatDraftFoto(orderId) {
+    if (!draftFotoCache[orderId]) {
+        draftFotoCache[orderId] = (async () => {
+            const tpl = window.photoUploadConfig?.index;
+            if (!tpl) return {};
+
+            try {
+                const response = await fetch(tpl.replace('__ORDER__', orderId), {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return {};
+
+                const json = await response.json();
+                const data = json.data;
+
+                return Array.isArray(data) ? {} : data || {};
+            } catch (err) {
+                return {};
+            }
+        })();
+    }
+
+    return draftFotoCache[orderId];
+}
+
 function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId = null) {
     return {
         fieldName,
@@ -97,7 +134,29 @@ function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId
         progress: 0,
         error: null,
         tempPhotoId: null,
+        tersimpanOtomatis: false,
         stream: null, // Untuk menyimpan camera stream
+
+        /** Autosave hanya utk slot laporan & bukan alur "simpan langsung". */
+        get autosave() {
+            return !this.afterUploadMethod && SLOT_AUTOSAVE.test(this.fieldName);
+        },
+
+        /**
+         * Pulihkan foto draft (hasil auto-save) saat halaman dibuka lagi:
+         * refresh / keluar-masuk tidak menghilangkan foto yang sudah dipilih.
+         */
+        async init() {
+            if (!this.autosave || !this.orderId) return;
+
+            const draft = (await muatDraftFoto(this.orderId))[this.fieldName];
+            if (draft && !this.preview) {
+                this.preview = draft.url;
+                this.nama = draft.file_name || '';
+                this.tempPhotoId = draft.id;
+                this.tersimpanOtomatis = true;
+            }
+        },
 
         /**
          * Buka dialog pilihan kamera/gallery
@@ -233,6 +292,16 @@ function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId
             this.error = null;
             this.progress = 0;
 
+            // Auto-save draft ke server (tetap ada walau halaman di-refresh).
+            let draftTersimpan = false;
+            const simpanDraft = this.autosave
+                ? this.uploadToLegacy(file).then((ok) => {
+                      draftTersimpan = ok;
+                      this.tersimpanOtomatis = ok;
+                      return ok;
+                  })
+                : Promise.resolve(false);
+
             // Upload lewat Livewire supaya property di server menjadi
             // UploadedFile yang valid (dipakai saat submit: ->store(),
             // ->getSize(), validasi 'image', dll). Endpoint temp-photo
@@ -243,7 +312,9 @@ function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId
                 this.$wire.upload(
                     this.fieldName,
                     file,
-                    () => {
+                    async () => {
+                        // Tunggu draft server selesai juga sebelum submit dibuka.
+                        await simpanDraft;
                         fotoUploadSelesai(store);
                         this.uploading = false;
 
@@ -263,7 +334,8 @@ function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId
                         // upload tidak terjangkau di subfolder), simpan lewat
                         // endpoint temp-photo lama. Server akan mengambil foto dari
                         // record `temporary_photo_uploads` saat tombol simpan ditekan.
-                        this.uploadToLegacy(file).then((ok) => {
+                        simpanDraft.then(async (tersimpan) => {
+                            const ok = tersimpan || draftTersimpan || (!this.autosave && (await this.uploadToLegacy(file)));
                             fotoUploadSelesai(store);
                             this.uploading = false;
                             if (ok) {
@@ -315,10 +387,41 @@ function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId
                     body: formData,
                 });
 
-                return response.ok;
+                if (!response.ok) return false;
+
+                const json = await response.json().catch(() => null);
+                this.tempPhotoId = json?.data?.id ?? this.tempPhotoId;
+
+                // Cache draft ikut diperbarui supaya komponen yang dirender
+                // ulang (Livewire morph) langsung memulihkan foto terbaru.
+                const cache = await muatDraftFoto(this.orderId);
+                if (json?.data) cache[this.fieldName] = json.data;
+
+                return true;
             } catch (err) {
                 return false;
             }
+        },
+
+        /** Hapus draft di server (foto dibuang teknisi). */
+        async hapusDraft() {
+            if (!this.tempPhotoId || !window.photoUploadConfig?.destroy) return;
+
+            try {
+                await fetch(window.photoUploadConfig.destroy.replace('__ID__', this.tempPhotoId), {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        Accept: 'application/json',
+                    },
+                });
+            } catch (err) {
+                // Draft yatim tidak berbahaya; dibersihkan saat laporan terkirim.
+            }
+
+            const cache = await muatDraftFoto(this.orderId);
+            delete cache[this.fieldName];
+            this.tersimpanOtomatis = false;
         },
 
         /**
@@ -326,6 +429,8 @@ function photoUpload(fieldName, orderId, afterUploadMethod = null, afterUploadId
          */
         async removePhoto() {
             if (!confirm('Hapus foto ini?')) return;
+
+            await this.hapusDraft();
 
             this.$wire.set(this.fieldName, null);
             this.preview = null;

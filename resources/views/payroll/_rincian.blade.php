@@ -50,12 +50,19 @@
                 <td class="muted">{{ $run->jumlah_setengah_hari }}×</td>
                 <td class="angka potongan">− {{ $rp($run->total_potongan_setengah_hari) }}</td>
             </tr>
+            @if ((float) $run->total_potongan_kasbon > 0)
+                <tr>
+                    <td>Potongan Kasbon</td>
+                    <td class="muted">—</td>
+                    <td class="angka potongan">− {{ $rp($run->total_potongan_kasbon) }}</td>
+                </tr>
+            @endif
             <tr>
                 <td>BPJS TK</td>
                 <td class="muted">—</td>
                 <td class="angka potongan">− {{ $rp($run->potongan_bpjs_tk) }}</td>
             </tr>
-            <tr class="sub"><td colspan="2">Total Potongan</td><td class="angka">− {{ $rp((float) $run->total_denda_telat + (float) $run->total_potongan_off + (float) $run->total_potongan_setengah_hari + (float) $run->potongan_bpjs_tk) }}</td></tr>
+            <tr class="sub"><td colspan="2">Total Potongan</td><td class="angka">− {{ $rp((float) $run->total_denda_telat + (float) $run->total_potongan_off + (float) $run->total_potongan_setengah_hari + (float) $run->total_potongan_kasbon + (float) $run->potongan_bpjs_tk) }}</td></tr>
 
             @if ($mingguan)
                 <tr class="grup"><td colspan="3">BONUS MINGGUAN (SUDAH DIBAYAR PEKANAN)</td></tr>

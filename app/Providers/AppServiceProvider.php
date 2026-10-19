@@ -40,6 +40,13 @@ class AppServiceProvider extends ServiceProvider
             $model::deleted($segarkan);
         }
 
+        // Kasbon (dev-plan/28): kasbon lama tetap ikut dipotong di periode
+        // berikutnya, jadi segarkan semua draft yang berakhir setelah tanggalnya.
+        $segarkanKasbon = fn ($m) => app(\App\Services\PayrollService::class)
+            ->segarkanDraftSejak((int) $m->user_id, $m->tanggal);
+        \App\Models\TechnicianAdvance::saved($segarkanKasbon);
+        \App\Models\TechnicianAdvance::deleted($segarkanKasbon);
+
         // dev-plan/17 insiden 18 Sep: URL::forceRootUrl(config('app.url'))
         // sempat dipasang di sini utk perbaiki redirect login di hosting
         // subfolder (domain.com/paccing/public) — TAPI merusak SEMUA upload

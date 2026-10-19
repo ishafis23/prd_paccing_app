@@ -77,6 +77,7 @@ class PayrollRunResource extends BaseResource
                 Tables\Columns\TextColumn::make('total_denda_telat')->label('Denda Telat')->money('IDR')->toggleable(),
                 Tables\Columns\TextColumn::make('total_potongan_off')->label('Potongan OFF')->money('IDR')->toggleable(),
                 Tables\Columns\TextColumn::make('total_potongan_setengah_hari')->label('Pulang Cepat')->money('IDR')->toggleable(),
+                Tables\Columns\TextColumn::make('total_potongan_kasbon')->label('Kasbon')->money('IDR')->toggleable(),
                 Tables\Columns\TextColumn::make('potongan_bpjs_tk')->label('BPJS TK')->money('IDR')->toggleable(),
                 Tables\Columns\TextColumn::make('gaji_bersih')->label('Gaji Bersih')->money('IDR')->weight('bold')->sortable(),
                 Tables\Columns\TextColumn::make('status')

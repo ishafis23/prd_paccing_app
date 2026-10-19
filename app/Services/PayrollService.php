@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AdvanceStatus;
 use App\Enums\DailyAttendanceStatus;
 use App\Enums\EarlyLeaveStatus;
 use App\Enums\IncentiveKategori;
@@ -13,6 +14,8 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\DailyAttendance;
 use App\Models\PayrollRun;
+use App\Models\TechnicianAdvance;
+use App\Models\TechnicianAdvanceRepayment;
 use App\Models\TechnicianEarlyLeave;
 use App\Models\TechnicianIncentive;
 use App\Models\TechnicianOffDay;
@@ -28,7 +31,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Gaji bersih = Gaji Pokok + Bonus Bulanan + Bonus Umum + Bonus Mingguan
  *               − Bonus Mingguan (sudah dibayar pekanan) − Denda Telat
- *               − Potongan OFF (kelebihan kuota) − BPJS TK.
+ *               − Potongan OFF (kelebihan kuota) − BPJS TK − Kasbon.
  */
 class PayrollService
 {
@@ -93,6 +96,67 @@ class PayrollService
         if ($run !== null && $profil !== null) {
             $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh);
         }
+    }
+
+    /**
+     * Segarkan semua draft gaji teknisi yang periodenya berakhir pada/setelah
+     * $tanggal — dipakai saat kasbon berubah (kasbon lama tetap ikut dipotong
+     * di periode berikutnya, jadi tidak cukup mencari periode yang memuat
+     * tanggalnya saja).
+     */
+    public function segarkanDraftSejak(int $userId, CarbonInterface|string|null $tanggal): void
+    {
+        if ($tanggal === null) {
+            return;
+        }
+
+        $profil = TechnicianPayrollProfile::where('user_id', $userId)->first();
+
+        if ($profil === null) {
+            return;
+        }
+
+        PayrollRun::query()
+            ->where('user_id', $userId)
+            ->where('status', PayrollStatus::Draft->value)
+            ->whereDate('periode_selesai', '>=', CarbonImmutable::parse($tanggal)->toDateString())
+            ->get()
+            ->each(fn (PayrollRun $run) => $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh));
+    }
+
+    /**
+     * Alokasi potongan kasbon aktif teknisi untuk gaji yang periodenya
+     * berakhir $selesai: tiap kasbon dipotong min(sisa, cicilan/periode),
+     * tanpa cicilan = lunas sekaligus. Total dibatasi $batas supaya gaji
+     * tidak jadi negatif; sisanya terbawa ke periode berikutnya.
+     *
+     * @return array<int, array{advance: TechnicianAdvance, nominal: float}>
+     */
+    private function alokasiKasbon(int $userId, string $selesai, float $batas): array
+    {
+        $alokasi = [];
+        $tersisa = max(0.0, $batas);
+
+        $kasbon = TechnicianAdvance::query()
+            ->where('user_id', $userId)
+            ->where('status', AdvanceStatus::Aktif->value)
+            ->whereDate('tanggal', '<=', $selesai)
+            ->orderBy('tanggal')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($kasbon as $k) {
+            $cicilan = (float) $k->cicilan_per_periode;
+            $sisa = $k->sisa();
+            $potong = min($sisa, $cicilan > 0 ? $cicilan : $sisa, $tersisa);
+
+            if ($potong > 0) {
+                $alokasi[] = ['advance' => $k, 'nominal' => round($potong, 2)];
+                $tersisa -= $potong;
+            }
+        }
+
+        return $alokasi;
     }
 
     private function proses(TechnicianPayrollProfile $profil, CarbonInterface $mulaiAwal, ?int $actorId): PayrollRun
@@ -171,10 +235,18 @@ class PayrollService
 
         $bonusUmum = (float) ($existing->bonus_umum ?? 0);
 
+        // Kasbon dipotong setelah semua komponen lain (gaji tidak sampai negatif).
+        $sebelumKasbon = (float) $profil->gaji_pokok + $bonusBulanan + $bonusUmum
+            - $dendaTelat - $potonganOff - $potonganSetengahHari - (float) $profil->potongan_bpjs_tk;
+        $potonganKasbon = round(array_sum(array_column(
+            $this->alokasiKasbon($profil->user_id, $selesai->toDateString(), $sebelumKasbon),
+            'nominal'
+        )), 2);
+
         return DB::transaction(function () use (
             $existing, $profil, $mulai, $selesai, $actorId, $bulananPerKategori, $bonusBulanan,
             $bonusMingguan, $bonusUmum, $jumlahTelat, $dendaTelat, $jumlahOff, $kelebihanOff,
-            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari
+            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari, $potonganKasbon
         ): PayrollRun {
             $run = $existing ?? new PayrollRun;
 
@@ -192,6 +264,7 @@ class PayrollService
                 'total_potongan_off' => round($potonganOff, 2),
                 'jumlah_setengah_hari' => $jumlahSetengahHari,
                 'total_potongan_setengah_hari' => round($potonganSetengahHari, 2),
+                'total_potongan_kasbon' => $potonganKasbon,
                 'potongan_bpjs_tk' => $profil->potongan_bpjs_tk,
                 'status' => PayrollStatus::Draft,
                 'dihitung_oleh' => $actorId,
@@ -268,6 +341,16 @@ class PayrollService
                 ]);
             }
 
+            if ($potonganKasbon > 0) {
+                $run->items()->create([
+                    'jenis' => PayrollItemJenis::Potongan->value,
+                    'kategori' => 'kasbon',
+                    'label' => 'Potongan Kasbon',
+                    'nominal' => $potonganKasbon,
+                    'urutan' => ++$urutan,
+                ]);
+            }
+
             if ((float) $profil->potongan_bpjs_tk > 0) {
                 $run->items()->create([
                     'jenis' => PayrollItemJenis::Potongan->value,
@@ -326,12 +409,44 @@ class PayrollService
             throw new BusinessRuleException('Hanya gaji berstatus draft yang bisa di-ACC.');
         }
 
-        $run->status = PayrollStatus::Disetujui;
-        $run->disetujui_oleh = $actor->id;
-        $run->disetujui_pada = now();
-        $run->save();
+        DB::transaction(function () use ($run, $actor): void {
+            $this->catatPelunasanKasbon($run);
+
+            $run->status = PayrollStatus::Disetujui;
+            $run->disetujui_oleh = $actor->id;
+            $run->disetujui_pada = now();
+            $run->save();
+        });
 
         return $run->fresh();
+    }
+
+    /**
+     * Saat ACC: potongan kasbon pada gaji dikunci jadi pelunasan; kasbon yang
+     * sisanya habis ditandai lunas. Bila kasbon berubah sejak gaji dihitung,
+     * ACC ditolak supaya gaji dihitung ulang dulu.
+     */
+    private function catatPelunasanKasbon(PayrollRun $run): void
+    {
+        $batas = (float) $run->gaji_bersih + (float) $run->total_potongan_kasbon;
+        $alokasi = $this->alokasiKasbon($run->user_id, $run->periode_selesai->toDateString(), $batas);
+
+        $total = round(array_sum(array_column($alokasi, 'nominal')), 2);
+
+        if (abs($total - (float) $run->total_potongan_kasbon) > 0.005) {
+            throw new BusinessRuleException('Data kasbon berubah sejak gaji dihitung — hitung ulang gaji dulu sebelum ACC.');
+        }
+
+        foreach ($alokasi as $a) {
+            TechnicianAdvanceRepayment::updateOrCreate(
+                ['technician_advance_id' => $a['advance']->id, 'payroll_run_id' => $run->id],
+                ['nominal' => $a['nominal']]
+            );
+
+            if ($a['advance']->sisa() <= 0) {
+                $a['advance']->update(['status' => AdvanceStatus::Lunas]);
+            }
+        }
     }
 
     public function bayar(PayrollRun $run, User $actor): PayrollRun
@@ -359,6 +474,7 @@ class PayrollService
             - (float) $run->total_denda_telat
             - (float) $run->total_potongan_off
             - (float) $run->total_potongan_setengah_hari
+            - (float) $run->total_potongan_kasbon
             - (float) $run->potongan_bpjs_tk;
 
         $run->gaji_bersih = round($gaji, 2);

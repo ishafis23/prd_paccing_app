@@ -1206,9 +1206,36 @@ class OrderDetail extends Component
             return true;
         }
 
-        $uploadedSlots = array_keys(array_filter($this->fotoKategori[$itemId] ?? []));
+        $uploadedSlots = $this->slotFotoKategoriTerunggah($itemId);
 
         return count(array_intersect($fotoWajib, $uploadedSlots)) === count($fotoWajib);
+    }
+
+    /** @var array<int, string>|null Cache nama slot draft foto selama satu request. */
+    private ?array $namaDraftFoto = null;
+
+    /**
+     * Slot foto kategori item yang sudah terisi: file di state Livewire +
+     * draft auto-save di server (tetap ada setelah refresh).
+     *
+     * @return array<int, string>
+     */
+    private function slotFotoKategoriTerunggah(int $itemId): array
+    {
+        $this->namaDraftFoto ??= array_keys($this->fotoTempTersedia());
+
+        $prefix = "fotoKategori.{$itemId}.";
+        $dariDraft = [];
+        foreach ($this->namaDraftFoto as $nama) {
+            if (str_starts_with($nama, $prefix) && count(explode('.', $nama)) === 3) {
+                $dariDraft[] = explode('.', $nama)[2];
+            }
+        }
+
+        return array_values(array_unique([
+            ...array_map('strval', array_keys(array_filter($this->fotoKategori[$itemId] ?? []))),
+            ...$dariDraft,
+        ]));
     }
 
     /**
@@ -1216,7 +1243,7 @@ class OrderDetail extends Component
      */
     public function countUploadedFotoForItem(int $itemId): int
     {
-        return count(array_filter($this->fotoKategori[$itemId] ?? []));
+        return count($this->slotFotoKategoriTerunggah($itemId));
     }
 
     /**
