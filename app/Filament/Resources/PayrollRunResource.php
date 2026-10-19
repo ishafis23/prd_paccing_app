@@ -220,26 +220,13 @@ class PayrollRunResource extends BaseResource
                     Infolists\Components\TextEntry::make('status')->badge(),
                     Infolists\Components\TextEntry::make('periode')
                         ->state(fn (PayrollRun $r): string => $r->periode_mulai->format('d M Y').' – '.$r->periode_selesai->format('d M Y')),
-                    Infolists\Components\TextEntry::make('gaji_pokok')->money('IDR'),
-                    Infolists\Components\TextEntry::make('bonus_bulanan')->label('Bonus Bulanan')->money('IDR'),
-                    Infolists\Components\TextEntry::make('bonus_umum')->label('Bonus Umum')->money('IDR'),
-                    Infolists\Components\TextEntry::make('bonus_mingguan')->label('Bonus Mingguan (info)')->money('IDR'),
-                    Infolists\Components\TextEntry::make('total_denda_telat')->label('Denda Telat')->money('IDR'),
-                    Infolists\Components\TextEntry::make('total_potongan_off')->label('Potongan OFF')->money('IDR'),
-                    Infolists\Components\TextEntry::make('total_potongan_setengah_hari')->label('Pulang Cepat (setengah hari)')->money('IDR'),
-                    Infolists\Components\TextEntry::make('potongan_bpjs_tk')->label('BPJS TK')->money('IDR'),
-                    Infolists\Components\TextEntry::make('gaji_bersih')->label('Gaji Bersih')->money('IDR')->weight('bold'),
                 ]),
-            Infolists\Components\Section::make('Rincian')
+            Infolists\Components\Section::make('Rincian Gaji')
                 ->schema([
-                    Infolists\Components\RepeatableEntry::make('items')
+                    Infolists\Components\ViewEntry::make('rincian')
                         ->hiddenLabel()
-                        ->schema([
-                            Infolists\Components\TextEntry::make('jenis')->badge()
-                                ->color(fn (PayrollItemJenis $state): string => $state === PayrollItemJenis::Bonus ? 'success' : 'danger'),
-                            Infolists\Components\TextEntry::make('label'),
-                            Infolists\Components\TextEntry::make('nominal')->money('IDR'),
-                        ])->columns(3),
+                        ->view('payroll._rincian')
+                        ->columnSpanFull(),
                 ]),
         ]);
     }

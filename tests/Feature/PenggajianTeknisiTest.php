@@ -211,3 +211,15 @@ it('draft gaji otomatis ikut berubah saat OFF & pulang cepat disetujui sesudah d
         ->and($run->jumlah_setengah_hari)->toBe(1)
         ->and((float) $run->total_potongan_setengah_hari)->toBe(50000.0);
 });
+
+it('halaman lihat gaji menampilkan rincian 3 kolom', function () {
+    $admin = ($this->mkUser)(RoleName::Admin);
+    $teknisi = ($this->mkUser)(RoleName::Teknisi);
+    $run = app(PayrollService::class)->hitung(($this->siapkanProfil)($teknisi), Carbon::parse('2026-06-15'), $admin);
+
+    $this->actingAs($admin)
+        ->get(\App\Filament\Resources\PayrollRunResource::getUrl('view', ['record' => $run]))
+        ->assertOk()
+        ->assertSee('TOTAL GAJI DITERIMA')
+        ->assertSee('Potongan OFF');
+});
