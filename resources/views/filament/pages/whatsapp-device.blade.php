@@ -94,10 +94,37 @@
                 </div>
 
                 <div class="mt-3">
-                    <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Isi pesan</label>
+                    <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                        Isi pesan {{ $tesGambarAktif ? '(caption gambar)' : '' }}
+                    </label>
                     <textarea wire:model="tesPesan" rows="5"
                         class="w-full rounded-lg border-0 bg-gray-50 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"></textarea>
                     @error('tesPesan') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="mt-4 rounded-lg bg-gray-50 p-3 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" wire:model.live="tesGambarAktif" class="rounded text-blue-600">
+                        Lampirkan gambar (uji kirim gambar + caption)
+                    </label>
+
+                    @if ($tesGambarAktif)
+                        <div class="mt-2">
+                            <input type="file" wire:model="tesGambarUpload" accept="image/*"
+                                class="block w-full text-sm text-gray-700 dark:text-gray-200">
+                            <div wire:loading wire:target="tesGambarUpload" class="mt-1 text-xs text-gray-400">
+                                Mengunggah gambar...
+                            </div>
+                            @if ($tesGambarUpload)
+                                <div class="mt-2 flex justify-center">
+                                    <img src="{{ $tesGambarUpload->temporaryUrl() }}" alt="Pratinjau"
+                                        class="h-32 rounded-lg ring-1 ring-gray-200">
+                                </div>
+                            @endif
+                            @error('tesGambarUpload') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            <p class="mt-1 text-xs text-gray-400">JPG/PNG, maksimal 5 MB.</p>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="mt-3">

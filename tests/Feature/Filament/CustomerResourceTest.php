@@ -110,3 +110,32 @@ it('edit customer yg SUDAH punya customer_addresses -> tidak menambah alamat bar
     expect($customer->fresh()->addresses()->count())->toBe(1)
         ->and($customer->fresh()->alamatUtama()->alamat)->toBe('Alamat Tersimpan Asli');
 });
+
+it('admin bisa mengisi ID Grup WA (wa_group_id) pada customer', function () {
+    $customer = Customer::factory()->create(['wa_group_id' => null]);
+
+    Livewire::actingAs($this->admin)
+        ->test(EditCustomer::class, ['record' => $customer->getRouteKey()])
+        ->fillForm(['wa_group_id' => '120363040944048443@g.us'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($customer->fresh()->wa_group_id)->toBe('120363040944048443@g.us');
+});
+
+it('wa_group_id boleh kosong (nullable)', function () {
+    Livewire::actingAs($this->admin)
+        ->test(CreateCustomer::class)
+        ->fillForm([
+            'nama' => 'Customer Tanpa Grup',
+            'no_hp' => '081234567892',
+            'area' => 'makassar',
+            'sumber_lead' => 'whatsapp',
+            'status' => 'lead',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $customer = Customer::where('nama', 'Customer Tanpa Grup')->firstOrFail();
+    expect($customer->wa_group_id)->toBeNull();
+});

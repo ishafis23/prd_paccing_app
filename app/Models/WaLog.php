@@ -80,6 +80,8 @@ class WaLog extends Model
     public function bisaDikirimUlang(): bool
     {
         return filled($this->pesan)
-            && in_array($this->action, ['send-teks', 'send-grup', 'send-document', 'send-massal'], true);
+            && in_array($this->action, [
+                'send-teks', 'send-grup', 'send-document', 'send-massal', 'send-gambar', 'send-gambar-grup',
+            ], true);
     }
 }

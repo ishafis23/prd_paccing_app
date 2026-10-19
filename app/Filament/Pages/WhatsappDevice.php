@@ -10,6 +10,7 @@ use App\Services\WhatsappService;
 use App\Support\WhatsappTemplate;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Livewire\WithFileUploads;
 
 /**
  * dev-plan/23 fase 23-A: menu WhatsApp → "Perangkat & Tes WA".
@@ -18,6 +19,8 @@ use Filament\Pages\Page;
  */
 class WhatsappDevice extends Page
 {
+    use WithFileUploads;
+
     protected static string $view = 'filament.pages.whatsapp-device';
 
     protected static ?string $navigationGroup = 'WhatsApp';
@@ -56,6 +59,11 @@ class WhatsappDevice extends Page
     public string $tesGrup = '120363023284398181@g.us';
 
     public string $tesPesan = '';
+
+    /** Uji kirim GAMBAR (adopsi model pmb-onegate-bersih): aktifkan + upload file. */
+    public bool $tesGambarAktif = false;
+
+    public ?\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $tesGambarUpload = null;
 
     public static function canAccess(): bool
     {
@@ -191,7 +199,7 @@ class WhatsappDevice extends Page
         $this->muatDevices();
     }
 
-    /** Uji kirim pesan teks ke nomor/grup yang dipilih bebas (default nomor device). */
+    /** Uji kirim pesan (teks atau gambar) ke nomor/grup yang dipilih bebas (default nomor device). */
     public function kirimTes(): void
     {
         $keGrup = $this->tesJenis === 'grup';
@@ -202,6 +210,7 @@ class WhatsappDevice extends Page
             'tesTarget' => [$keGrup ? 'nullable' : 'required', 'string'],
             'tesGrup' => [$keGrup ? 'required' : 'nullable', 'string'],
             'tesPesan' => ['required', 'string', 'max:4000'],
+            'tesGambarUpload' => [$this->tesGambarAktif ? 'required' : 'nullable', 'image', 'max:5120'],
         ]);
 
         $device = WaDevice::find($this->tesDeviceId);
@@ -212,11 +221,26 @@ class WhatsappDevice extends Page
         }
 
         try {
-            // Radio "Grup" → kirimGrup (JID apa adanya); "Nomor Pribadi" →
-            // kirimTeks (nomor dinormalisasi).
-            $log = $keGrup
-                ? app(WhatsappService::class)->kirimGrup(auth()->user(), $device, $this->tesGrup, $this->tesPesan, null, 'tes')
-                : app(WhatsappService::class)->kirimTeks(auth()->user(), $device, $this->tesTarget, $this->tesPesan, null, 'tes');
+            $service = app(WhatsappService::class);
+            $user = auth()->user();
+
+            if ($this->tesGambarAktif && $this->tesGambarUpload) {
+                $namafile = (string) $this->tesGambarUpload->getClientOriginalName();
+                $binary = (string) file_get_contents($this->tesGambarUpload->getRealPath());
+                $gambarPath = $service->simpanGambar($binary, $namafile);
+
+                // Radio "Grup" → kirimGambarGrup (JID apa adanya); "Nomor Pribadi" →
+                // kirimGambar (nomor dinormalisasi).
+                $log = $keGrup
+                    ? $service->kirimGambarGrup($user, $device, $this->tesGrup, $gambarPath, $this->tesPesan, $namafile, null, 'tes')
+                    : $service->kirimGambar($user, $device, $this->tesTarget, $gambarPath, $this->tesPesan, $namafile, null, 'tes');
+            } else {
+                // Radio "Grup" → kirimGrup (JID apa adanya); "Nomor Pribadi" →
+                // kirimTeks (nomor dinormalisasi).
+                $log = $keGrup
+                    ? $service->kirimGrup($user, $device, $this->tesGrup, $this->tesPesan, null, 'tes')
+                    : $service->kirimTeks($user, $device, $this->tesTarget, $this->tesPesan, null, 'tes');
+            }
 
             Notification::make()
                 ->title($log->sukses() ? 'Pesan tes terkirim' : 'Gagal mengirim')
@@ -225,6 +249,8 @@ class WhatsappDevice extends Page
                     : (string) $log->error_message)
                 ->status($log->sukses() ? 'success' : 'danger')
                 ->send();
+
+            $this->reset('tesGambarUpload');
         } catch (BusinessRuleException $e) {
             Notification::make()->title('Tidak bisa kirim')->body($e->getMessage())->danger()->send();
         }

@@ -38,6 +38,7 @@ class Customer extends Model implements AuthenticatableContract
         'sumber_lead',
         'status',
         'catatan',
+        'wa_group_id',
     ];
 
     protected $hidden = [

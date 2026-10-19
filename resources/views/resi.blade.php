@@ -99,6 +99,13 @@
         </div>
     </dl>
 
+    @if (filled($laporan?->catatan_pengerjaan))
+        <div class="mt-4 rounded-lg bg-amber-50 p-3 text-sm ring-1 ring-amber-100">
+            <h3 class="text-xs font-bold uppercase tracking-wide text-amber-700">Catatan Teknisi</h3>
+            <p class="mt-1 whitespace-pre-line text-gray-700">{{ $laporan->catatan_pengerjaan }}</p>
+        </div>
+    @endif
+
     {{-- Rincian semua baris layanan (termasuk yang ditambahkan teknisi) --}}
     @if ($itemsAktifResi->isNotEmpty())
         <div class="mt-4">

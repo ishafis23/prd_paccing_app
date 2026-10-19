@@ -63,6 +63,11 @@ class CustomerResource extends BaseResource
                     ->required(),
                 Forms\Components\Textarea::make('catatan')
                     ->columnSpanFull(),
+                Forms\Components\TextInput::make('wa_group_id')
+                    ->label('ID Grup WA')
+                    ->helperText('Salin dari menu WhatsApp → Cek ID Group WA. Isi jika dokumentasi pengerjaan customer ini juga perlu dikirim ke grup WA bersama.')
+                    ->maxLength(100)
+                    ->columnSpanFull(),
             ]);
     }
 

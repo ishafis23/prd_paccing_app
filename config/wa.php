@@ -35,6 +35,9 @@ return [
     // Token bridge api_document.php (fase 23-C).
     'document_token' => env('WA_DOCUMENT_TOKEN'),
 
+    // Token bridge getgroupwa.php (menu "Cek ID Group WA").
+    'groups_token' => env('WA_GROUPS_TOKEN'),
+
     // Verifikasi sertifikat SSL saat memanggil gateway. Beberapa hosting
     // tanpa CA bundle perlu false; default true demi keamanan.
     'verify_ssl' => (bool) env('WA_VERIFY_SSL', true),
@@ -50,5 +53,7 @@ return [
         'document' => env('WA_BASE_URL_DOCUMENT'),
         // Override endpoint reset session (opsional; default turunan document).
         'reset' => env('WA_BASE_URL_RESET'),
+        // Endpoint "daftar grup WA" (bridge getgroupwa.php, menu "Cek ID Group WA").
+        'groups' => env('WA_BASE_URL_GROUPS'),
     ],
 ];

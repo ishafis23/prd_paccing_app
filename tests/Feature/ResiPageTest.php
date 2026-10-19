@@ -68,7 +68,22 @@ it('resi publik menampilkan detail order yang sudah selesai', function () {
         ->assertSee('#' . $order->id)
         ->assertSee($order->customer->nama)
         ->assertSee($order->customer->alamat)
-        ->assertSee('Qris'); // metode_dipilih ditampilkan versi label
+        ->assertSee('Qris') // metode_dipilih ditampilkan versi label
+        ->assertSee('Catatan Teknisi')
+        ->assertSee('Pengerjaan selesai sesuai SOP.');
+});
+
+it('resi tanpa catatan pengerjaan tidak menampilkan blok Catatan Teknisi', function () {
+    $teknisi = ($this->buatUser)(RoleName::Teknisi->value);
+    $order = Order::factory()->create([
+        'teknisi_id' => $teknisi->id,
+        'status' => OrderStatus::Selesai,
+    ]);
+    $order->pastikanResiToken();
+
+    $this->get(route('resi.show', [$order->id, $order->resi_token]))
+        ->assertOk()
+        ->assertDontSee('Catatan Teknisi');
 });
 
 it('resi belum lunas menampilkan total, status belum bayar, dan channel aktif', function () {

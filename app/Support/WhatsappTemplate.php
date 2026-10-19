@@ -61,10 +61,16 @@ class WhatsappTemplate
     {
         $order->loadMissing('customer');
 
+        $laporan = $order->workReports()->orderByDesc('waktu_selesai')->first();
+        $catatanTeknisi = filled($laporan?->catatan_pengerjaan)
+            ? "\n\nCatatan Teknisi: ".$laporan->catatan_pengerjaan
+            : '';
+
         return "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
             .'Bapak/Ibu '.($order->customer?->nama ?? 'Pelanggan')."\n\n"
             .'Terima kasih, pengerjaan '.$order->ringkasanLayanan().' telah selesai dikerjakan oleh '.$namaUsaha.'.'
             ."\n\nBukti/resi pengerjaan dapat dilihat di tautan berikut:\n".$tautan
+            .$catatanTeknisi
             ."\n\nTerima kasih atas kepercayaan Anda.\n\n"
             ."Hormat kami,\n".$namaUsaha;
     }

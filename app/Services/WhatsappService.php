@@ -113,6 +113,50 @@ class WhatsappService
         ];
     }
 
+    /**
+     * Ambil daftar grup WA yang diikuti nomor device (menu "Cek ID Group
+     * WA"). Endpoint JSON + Bearer terpisah (WA_BASE_URL_GROUPS /
+     * WA_GROUPS_TOKEN) — bukan bagian dari pre-flight/kirim, jadi tidak
+     * lewat pastikanBolehKirim()/wa_logs.
+     *
+     * @return array{ok:bool,groups:array<int,array{id:string,subject:string}>,error:?string}
+     */
+    public function daftarGroup(WaDevice $device): array
+    {
+        $url = $this->baseUrl($device, 'groups');
+        if ($url === null) {
+            return ['ok' => false, 'groups' => [], 'error' => 'Base URL grup belum dikonfigurasi (WA_BASE_URL_GROUPS).'];
+        }
+
+        $headers = [];
+        $token = trim((string) config('wa.groups_token'));
+        if ($token !== '') {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        try {
+            $resp = Http::withOptions($this->opsiHttp())
+                ->withHeaders($headers)
+                ->asJson()
+                ->post($url, $this->params($device));
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'groups' => [], 'error' => 'Gagal mengambil daftar grup: '.$e->getMessage()];
+        }
+
+        if (! $resp->successful()) {
+            return ['ok' => false, 'groups' => [], 'error' => 'Gateway membalas HTTP '.$resp->status().'.'];
+        }
+
+        $list = data_get($resp->json(), 'data.groups', []);
+        $groups = collect(is_array($list) ? $list : [])
+            ->map(fn ($g): array => ['id' => (string) ($g['id'] ?? ''), 'subject' => (string) ($g['subject'] ?? '')])
+            ->filter(fn (array $g): bool => $g['id'] !== '')
+            ->values()
+            ->all();
+
+        return ['ok' => true, 'groups' => $groups, 'error' => null];
+    }
+
     // ---------------------------------------------------------------
     // Kirim (fase 23-B/23-C) — setiap kirim WAJIB lewat salah satu method
     // orkestrasi ini agar pre-flight, rate limit, dan wa_logs konsisten.
@@ -270,6 +314,88 @@ class WhatsappService
     }
 
     /**
+     * Kirim satu gambar (JPG/PNG) + caption ke NOMOR pribadi. Pola diadopsi
+     * dari proyek `pmb-onegate-bersih` (gateway WABlasted yang sama): satu
+     * endpoint kirim, field `jenis=gambar` + `gambar=<url>` (dibangun lewat
+     * urlPublik(), sama seperti dokumen). `gambar_path` disimpan ke log →
+     * kirim ulang tidak perlu upload ulang.
+     */
+    public function kirimGambar(
+        User $user,
+        WaDevice $device,
+        string $target,
+        string $gambarPath,
+        string $caption,
+        string $namafile,
+        ?Model $related = null,
+        string $jenisKirim = 'gambar',
+        int $percobaan = 1,
+        ?int $logAsalId = null
+    ): WaLog {
+        $this->pastikanBolehKirim($user, $device);
+        $target = $this->targetValid($target);
+
+        return $this->kirimGambarTervalidasi(
+            $user, $device, $target, $gambarPath, $caption, $namafile,
+            $related, $jenisKirim, $percobaan, $logAsalId, 'send-gambar',
+        );
+    }
+
+    /** Kirim satu gambar + caption ke GRUP WhatsApp (JID apa adanya). */
+    public function kirimGambarGrup(
+        User $user,
+        WaDevice $device,
+        string $grup,
+        string $gambarPath,
+        string $caption,
+        string $namafile,
+        ?Model $related = null,
+        string $jenisKirim = 'gambar-grup',
+        int $percobaan = 1,
+        ?int $logAsalId = null
+    ): WaLog {
+        $this->pastikanBolehKirim($user, $device);
+        $grup = $this->targetGrupValid($grup);
+
+        return $this->kirimGambarTervalidasi(
+            $user, $device, $grup, $gambarPath, $caption, $namafile,
+            $related, $jenisKirim, $percobaan, $logAsalId, 'send-gambar-grup',
+        );
+    }
+
+    /** Inti kirim gambar setelah target divalidasi (dipakai kirimGambar & kirimGambarGrup). */
+    private function kirimGambarTervalidasi(
+        ?User $user,
+        WaDevice $device,
+        string $target,
+        string $gambarPath,
+        string $caption,
+        string $namafile,
+        ?Model $related,
+        string $jenisKirim,
+        int $percobaan,
+        ?int $logAsalId,
+        string $action
+    ): WaLog {
+        $gambarUrl = $this->urlPublik($gambarPath, $namafile);
+        $resp = $this->sendImage($device, $target, $gambarUrl, $caption);
+
+        return $this->catat($user, $device, [
+            'action' => $action,
+            'target' => $target,
+            'jenis_kirim' => $jenisKirim,
+            'pesan' => $caption,
+            'dokumen_path' => $gambarPath,
+            'dokumen_namafile' => $namafile,
+            'dokumen_url' => $gambarUrl,
+            'related' => $related,
+            'percobaan' => $percobaan,
+            'log_asal_id' => $logAsalId,
+            'request' => ['target' => $target, 'jenis' => 'gambar', 'namafile' => $namafile],
+        ], $resp);
+    }
+
+    /**
      * Kirim ulang baris wa_logs memakai payload tersimpan — TANPA menyusun
      * pesan / render PDF lagi. Membuat baris log BARU (log lama tetap) dengan
      * `log_asal_id` + `percobaan` naik.
@@ -323,6 +449,24 @@ class WhatsappService
             );
         }
 
+        if (in_array($log->action, ['send-gambar', 'send-gambar-grup'], true) && filled($log->dokumen_path)) {
+            if (! Storage::disk('local')->exists($log->dokumen_path)) {
+                throw new BusinessRuleException('File gambar sudah tidak ada — upload & kirim ulang dari sumbernya.');
+            }
+
+            $namafile = (string) ($log->dokumen_namafile ?: basename($log->dokumen_path));
+
+            return $log->action === 'send-gambar-grup'
+                ? $this->kirimGambarGrup(
+                    $user, $device, (string) $target, $log->dokumen_path, (string) $log->pesan, $namafile,
+                    $log->related, (string) ($log->jenis_kirim ?: 'gambar-grup'), $log->percobaan + 1, $log->id,
+                )
+                : $this->kirimGambar(
+                    $user, $device, (string) $target, $log->dokumen_path, (string) $log->pesan, $namafile,
+                    $log->related, (string) ($log->jenis_kirim ?: 'gambar'), $log->percobaan + 1, $log->id,
+                );
+        }
+
         return $this->kirimTeks(
             $user,
             $device,
@@ -340,6 +484,17 @@ class WhatsappService
     {
         $ext = pathinfo($namafile, PATHINFO_EXTENSION) ?: 'pdf';
         $file = 'wa-dokumen/'.date('Y/m').'/'.Str::random(32).'.'.$ext;
+
+        Storage::disk('local')->put($file, $binary);
+
+        return $file;
+    }
+
+    /** Simpan binary gambar (JPG/PNG) lampiran WA; kembalikan path relatif disk local. */
+    public function simpanGambar(string $binary, string $namafile): string
+    {
+        $ext = pathinfo($namafile, PATHINFO_EXTENSION) ?: 'jpg';
+        $file = 'wa-gambar/'.date('Y/m').'/'.Str::random(32).'.'.$ext;
 
         Storage::disk('local')->put($file, $binary);
 
@@ -414,6 +569,29 @@ class WhatsappService
             'jenis' => 'teks',
             'pesan' => $pesan,
             'target' => $grup,
+        ]);
+    }
+
+    /**
+     * POST form ke endpoint send induk — jenis=gambar + URL gambar publik
+     * (field `gambar`). Pola diadopsi dari `pmb-onegate-bersih` (gateway
+     * WABlasted yang sama, action `send_gambar`): satu endpoint kirim,
+     * dibedakan lewat `jenis`, gambar dikirim sebagai URL — bukan base64.
+     *
+     * @return array{ok:bool,status_code:int,body:string,parsed:mixed,error:?string}
+     */
+    public function sendImage(WaDevice $device, string $target, string $gambarUrl, string $pesan): array
+    {
+        $base = $this->baseUrl($device, 'send');
+        if ($base === null) {
+            return $this->gagalHttp('Base URL kirim belum dikonfigurasi (WA_BASE_URL_SEND).');
+        }
+
+        return $this->call($base.'/api/send/', $this->params($device) + [
+            'jenis' => 'gambar',
+            'pesan' => $pesan,
+            'target' => $target,
+            'gambar' => $gambarUrl,
         ]);
     }
 

@@ -1074,6 +1074,10 @@ class OrderResource extends BaseResource
                                     app(BusinessInfoService::class)->namaUsaha(),
                                     Url::absolute('resi.show', ['order' => $record->id, 'token' => $record->resi_token]),
                                 )),
+                            Forms\Components\Toggle::make('kirimKeGrup')
+                                ->label(fn (Order $record): string => 'Juga kirim ke Group WA Customer ('.($record->customer?->wa_group_id ?? '').')')
+                                ->visible(fn (Order $record): bool => filled($record->customer?->wa_group_id))
+                                ->default(fn (Order $record): bool => filled($record->customer?->wa_group_id)),
                         ])
                         ->action(function (Order $record, array $data): void {
                             $user = auth()->user();
@@ -1086,24 +1090,44 @@ class OrderResource extends BaseResource
                                 return;
                             }
 
-                            try {
-                                $log = app(WhatsappService::class)->kirimTeks(
-                                    $user,
-                                    $device,
-                                    (string) $data['target'],
-                                    (string) $data['pesan'],
-                                    $record,
-                                    'resi',
-                                );
+                            $service = app(WhatsappService::class);
 
-                                Notification::make()
-                                    ->title($log->sukses() ? 'Resi terkirim' : 'Gagal mengirim resi')
-                                    ->body($log->sukses() ? 'Ke '.$log->target : (string) $log->error_message)
-                                    ->status($log->sukses() ? 'success' : 'danger')
-                                    ->send();
+                            // Kirim pribadi (perilaku lama, tidak berubah).
+                            $pribadiOk = false;
+                            $pribadiError = null;
+                            try {
+                                $log = $service->kirimTeks($user, $device, (string) $data['target'], (string) $data['pesan'], $record, 'resi');
+                                $pribadiOk = $log->sukses();
+                                $pribadiError = $pribadiOk ? null : (string) $log->error_message;
                             } catch (BusinessRuleException $e) {
-                                Notification::make()->title('Tidak bisa kirim')->body($e->getMessage())->danger()->send();
+                                $pribadiError = $e->getMessage();
                             }
+
+                            // Kirim ke grup customer (opsional — toggle dicentang DAN wa_group_id masih terisi).
+                            $kirimGrup = (bool) ($data['kirimKeGrup'] ?? false) && filled($record->customer?->wa_group_id);
+                            $grupOk = null;
+                            $grupError = null;
+                            if ($kirimGrup) {
+                                try {
+                                    $logGrup = $service->kirimGrup($user, $device, (string) $record->customer->wa_group_id, (string) $data['pesan'], $record, 'resi-grup');
+                                    $grupOk = $logGrup->sukses();
+                                    $grupError = $grupOk ? null : (string) $logGrup->error_message;
+                                } catch (BusinessRuleException $e) {
+                                    $grupOk = false;
+                                    $grupError = $e->getMessage();
+                                }
+                            }
+
+                            [$title, $status, $body] = match (true) {
+                                ! $kirimGrup && $pribadiOk => ['Resi terkirim', 'success', null],
+                                ! $kirimGrup && ! $pribadiOk => ['Gagal mengirim resi', 'danger', $pribadiError],
+                                $pribadiOk && $grupOk => ['Resi terkirim ke customer & grup', 'success', null],
+                                $pribadiOk && ! $grupOk => ['Resi terkirim ke customer, GAGAL ke grup', 'warning', $grupError],
+                                ! $pribadiOk && $grupOk => ['Gagal ke customer, resi terkirim ke grup', 'warning', $pribadiError],
+                                default => ['Gagal mengirim resi (customer & grup)', 'danger', trim(($pribadiError ?? '').' | '.($grupError ?? ''), ' |')],
+                            };
+
+                            Notification::make()->title($title)->body($body)->status($status)->send();
                         }),
 
                     Tables\Actions\Action::make('verifikasiLaporan')
