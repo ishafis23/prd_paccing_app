@@ -186,3 +186,28 @@ it('slip hanya tampil setelah ACC & PDF ter-generate', function () {
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
 });
+
+it('draft gaji otomatis ikut berubah saat OFF & pulang cepat disetujui sesudah dihitung', function () {
+    $admin = ($this->mkUser)(RoleName::Admin);
+    $teknisi = ($this->mkUser)(RoleName::Teknisi);
+    $profil = ($this->siapkanProfil)($teknisi);
+
+    $run = app(PayrollService::class)->hitung($profil, Carbon::parse('2026-06-15'), $admin);
+    expect((float) $run->total_potongan_off)->toBe(0.0);
+
+    foreach (range(16, 22) as $i) {
+        TechnicianOffDay::create(['user_id' => $teknisi->id, 'tanggal' => '2026-06-'.$i]);
+    }
+
+    $leave = \App\Models\TechnicianEarlyLeave::create([
+        'user_id' => $teknisi->id, 'tanggal' => '2026-06-25', 'jam_pulang' => '12:00:00',
+        'status' => \App\Enums\EarlyLeaveStatus::Menunggu,
+    ]);
+    app(\App\Services\EarlyLeaveService::class)->setujui($leave, $admin);
+
+    $run->refresh();
+    expect($run->jumlah_hari_off)->toBe(7)
+        ->and((float) $run->total_potongan_off)->toBe(200000.0)
+        ->and($run->jumlah_setengah_hari)->toBe(1)
+        ->and((float) $run->total_potongan_setengah_hari)->toBe(50000.0);
+});

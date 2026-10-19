@@ -65,6 +65,38 @@ class PayrollService
     {
         $this->assertRole($actor, self::PENGELOLA_ROLES);
 
+        return $this->proses($profil, $mulaiAwal, $actor->id);
+    }
+
+    /**
+     * Segarkan draft gaji teknisi yang periodenya memuat $tanggal (dipanggil
+     * otomatis saat OFF / pulang cepat / absensi / insentif berubah). Gaji
+     * yang sudah di-ACC/dibayar tidak disentuh.
+     */
+    public function segarkanDraft(int $userId, CarbonInterface|string|null $tanggal): void
+    {
+        if ($tanggal === null) {
+            return;
+        }
+
+        $tgl = CarbonImmutable::parse($tanggal)->toDateString();
+
+        $run = PayrollRun::query()
+            ->where('user_id', $userId)
+            ->where('status', PayrollStatus::Draft->value)
+            ->whereDate('periode_mulai', '<=', $tgl)
+            ->whereDate('periode_selesai', '>=', $tgl)
+            ->first();
+
+        $profil = $run === null ? null : TechnicianPayrollProfile::where('user_id', $userId)->first();
+
+        if ($run !== null && $profil !== null) {
+            $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh);
+        }
+    }
+
+    private function proses(TechnicianPayrollProfile $profil, CarbonInterface $mulaiAwal, ?int $actorId): PayrollRun
+    {
         [$mulai, $selesai] = $this->rentangPeriode($mulaiAwal);
 
         $existing = PayrollRun::query()
@@ -140,7 +172,7 @@ class PayrollService
         $bonusUmum = (float) ($existing->bonus_umum ?? 0);
 
         return DB::transaction(function () use (
-            $existing, $profil, $mulai, $selesai, $actor, $bulananPerKategori, $bonusBulanan,
+            $existing, $profil, $mulai, $selesai, $actorId, $bulananPerKategori, $bonusBulanan,
             $bonusMingguan, $bonusUmum, $jumlahTelat, $dendaTelat, $jumlahOff, $kelebihanOff,
             $potonganOff, $jumlahSetengahHari, $potonganSetengahHari
         ): PayrollRun {
@@ -162,7 +194,7 @@ class PayrollService
                 'total_potongan_setengah_hari' => round($potonganSetengahHari, 2),
                 'potongan_bpjs_tk' => $profil->potongan_bpjs_tk,
                 'status' => PayrollStatus::Draft,
-                'dihitung_oleh' => $actor->id,
+                'dihitung_oleh' => $actorId,
             ]);
             $run->save();
 

@@ -25,6 +25,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Draft gaji = hasil hitung yang ikut berubah bila data sumbernya
+        // (OFF, pulang cepat, absensi, insentif) berubah — tanpa harus klik
+        // "Hitung Ulang" manual. Gaji ACC/dibayar tidak disentuh.
+        foreach ([
+            \App\Models\TechnicianOffDay::class,
+            \App\Models\TechnicianEarlyLeave::class,
+            \App\Models\DailyAttendance::class,
+            \App\Models\TechnicianIncentive::class,
+        ] as $model) {
+            $segarkan = fn ($m) => app(\App\Services\PayrollService::class)
+                ->segarkanDraft((int) $m->user_id, $m->tanggal);
+            $model::saved($segarkan);
+            $model::deleted($segarkan);
+        }
+
         // dev-plan/17 insiden 18 Sep: URL::forceRootUrl(config('app.url'))
         // sempat dipasang di sini utk perbaiki redirect login di hosting
         // subfolder (domain.com/paccing/public) — TAPI merusak SEMUA upload
