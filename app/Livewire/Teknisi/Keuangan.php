@@ -51,9 +51,13 @@ class Keuangan extends Component
             ->get();
     }
 
+    /**
+     * Portal teknisi hanya menampilkan omset JASA (material tidak ikut) —
+     * supaya potensi bonus terbaca jelas. Admin tetap melihat total penuh.
+     */
     private function totalOrder(Collection $orders): float
     {
-        return (float) $orders->sum(fn (Order $order) => $order->total());
+        return (float) $orders->sum(fn (Order $order) => $order->totalPerKomponen()['jasa']);
     }
 
     #[Computed]
@@ -82,13 +86,13 @@ class Keuangan extends Component
             ->where('status', OrderStatus::Selesai->value)
             ->with('orderItems')
             ->get()
-            ->sum(fn (Order $order) => $order->total());
+            ->sum(fn (Order $order) => $order->totalPerKomponen()['jasa']);
     }
 
     /**
      * Daftar pendapatan sesuai filter terpilih (harian/bulanan).
      *
-     * @return array<int, array{tanggal: string, order_id: int, customer: string, total: float}>
+     * @return array<int, array{tanggal: string, order_id: int, customer: string, layanan: string, total: float}>
      */
     #[Computed]
     public function daftarPendapatan(): array
@@ -107,7 +111,8 @@ class Keuangan extends Component
                 'tanggal' => $order->updated_at->translatedFormat('d M Y'),
                 'order_id' => $order->id,
                 'customer' => $order->customer?->nama ?? 'Tanpa nama',
-                'total' => $order->total(),
+                'layanan' => $order->ringkasanLayanan(),
+                'total' => $order->totalPerKomponen()['jasa'],
             ])
             ->all();
     }

@@ -65,4 +65,22 @@ class TeknisiKeuanganCapaianTest extends TestCase
             ->set('nominal', '')
             ->assertOk();
     }
+
+    public function test_pendapatan_teknisi_hanya_menampilkan_omset_jasa(): void
+    {
+        $order = \App\Models\Order::factory()->create([
+            'teknisi_id' => $this->teknisi->id,
+            'status' => \App\Enums\OrderStatus::Selesai,
+        ]);
+        $order->orderItems()->delete();
+        $order->orderItems()->create(['nama_layanan' => 'Cuci AC', 'kategori' => \App\Enums\ServiceType::CuciAc, 'komponen' => \App\Enums\IncomeCategory::Jasa, 'harga' => 150000, 'jumlah' => 1]);
+        $order->orderItems()->create(['nama_layanan' => 'Isi Freon', 'kategori' => \App\Enums\ServiceType::CuciAc, 'komponen' => \App\Enums\IncomeCategory::Material, 'harga' => 375000, 'jumlah' => 1]);
+
+        \Livewire\Livewire::actingAs($this->teknisi)
+            ->test(\App\Livewire\Teknisi\Keuangan::class)
+            ->assertSet('tab', 'pengeluaran')
+            ->call('setTab', 'pendapatan')
+            ->assertSee('Rp 150.000')
+            ->assertDontSee('525.000');
+    }
 }

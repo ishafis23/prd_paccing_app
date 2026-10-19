@@ -76,7 +76,7 @@
         {{-- Table --}}
         <div class="rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
             <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-                <h2 class="font-bold text-gray-900">Riwayat Pendapatan</h2>
+                <h2 class="font-bold text-gray-900">Riwayat Pendapatan Jasa</h2>
                 <span class="text-sm font-bold text-emerald-600">{{ $this->formatRupiah($this->totalPendapatanFilter) }}</span>
             </div>
 
@@ -88,7 +88,7 @@
                                 <th class="px-4 py-2 font-semibold">No</th>
                                 <th class="px-2 py-2 font-semibold">Tanggal</th>
                                 <th class="px-2 py-2 font-semibold">Customer</th>
-                                <th class="px-4 py-2 text-right font-semibold">Nominal</th>
+                                <th class="px-4 py-2 text-right font-semibold">Jasa</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
@@ -99,6 +99,7 @@
                                     <td class="px-2 py-2">
                                         <p class="text-xs font-medium text-gray-800">{{ $item['customer'] }}</p>
                                         <p class="text-[10px] text-blue-500">Order #{{ $item['order_id'] }}</p>
+                                        <p class="text-[10px] text-gray-500">{{ $item['layanan'] }}</p>
                                     </td>
                                     <td class="px-4 py-2 text-right text-xs font-bold text-gray-900">{{ $this->formatRupiah($item['total']) }}</td>
                                 </tr>
