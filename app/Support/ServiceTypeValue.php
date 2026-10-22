@@ -7,11 +7,16 @@ namespace App\Support;
  * yang bukan bagian enum `ServiceType` bawaan. Punya `->value` & `->label()`
  * supaya konsumen lama (yang membaca `->value`) tetap jalan.
  */
-final class ServiceTypeValue
+final class ServiceTypeValue implements \Stringable
 {
     public function __construct(public string $value, public string $label) {}
 
     public function label(): string
+    {
+        return $this->label;
+    }
+
+    public function __toString(): string
     {
         return $this->label;
     }
