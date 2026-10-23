@@ -61,7 +61,7 @@
             </tr>
         </thead>
         <tbody>
-            @forelse ($getState() as $index => $item)
+            @forelse ($getState() ?? [] as $index => $item)
                 <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 {{ $item->dibatalkan ? 'bg-rose-50 dark:bg-rose-900/20' : '' }}">
                     <td class="border border-slate-300 dark:border-slate-600 px-3 py-3 text-center">
                         <input type="checkbox" {{ $item->dibatalkan ? 'checked' : '' }}
