@@ -4,10 +4,15 @@ namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
 use App\Services\AkuntanService;
+use App\Services\BusinessInfoService;
+use App\Services\LaporanRekapExcelService;
+use App\Services\LaporanRekapPdfService;
+use App\Services\LaporanRekapService;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Halaman "Akuntan" (dev-plan/20): tampilan read-only pendapatan &
@@ -112,6 +117,52 @@ class Akuntan extends Page
     public function halamanBerikutnya(): void
     {
         $this->halaman++;
+    }
+
+    public function unduhExcel(): StreamedResponse
+    {
+        abort_unless(static::canAccess(), 403);
+
+        [$data, $namaUsaha] = $this->dataRekap();
+        $isi = app(LaporanRekapExcelService::class)->render($data, $namaUsaha);
+
+        return response()->streamDownload(
+            function () use ($isi): void {
+                echo $isi;
+            },
+            $this->namaBerkasRekap('xlsx'),
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
+    }
+
+    public function unduhPdf(): StreamedResponse
+    {
+        abort_unless(static::canAccess(), 403);
+
+        [$data, $namaUsaha] = $this->dataRekap();
+        $isi = app(LaporanRekapPdfService::class)->render($data, $namaUsaha);
+
+        return response()->streamDownload(
+            function () use ($isi): void {
+                echo $isi;
+            },
+            $this->namaBerkasRekap('pdf'),
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    /** @return array{0: array<string, mixed>, 1: string} */
+    private function dataRekap(): array
+    {
+        $bulan = CarbonImmutable::createFromFormat('!Y-m', $this->bulan);
+        $namaUsaha = app(BusinessInfoService::class)->data()->nama_usaha ?: 'PT. Paccing Jaya Sejahtera';
+
+        return [app(LaporanRekapService::class)->susun($bulan), $namaUsaha];
+    }
+
+    private function namaBerkasRekap(string $ekstensi): string
+    {
+        return 'Rekap Bulanan Dana '.$this->bulan.'.'.$ekstensi;
     }
 
     protected function getViewData(): array
