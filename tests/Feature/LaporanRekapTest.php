@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\OrderStatus;
-use App\Filament\Pages\Akuntan;
+use App\Filament\Pages\LaporanBulananCustomer;
 use App\Models\Customer;
 use App\Models\Expense;
 use App\Models\Order;
@@ -132,15 +132,15 @@ it('tombol unduh hanya untuk owner/admin/finance', function (string $role, bool 
     $this->actingAs($user);
 
     if (! $boleh) {
-        $this->get(Akuntan::getUrl())->assertForbidden();
+        $this->get(LaporanBulananCustomer::getUrl())->assertForbidden();
 
         return;
     }
 
-    $this->get(Akuntan::getUrl())->assertOk()->assertSee('Unduh Excel')->assertSee('Unduh PDF');
+    $this->get(LaporanBulananCustomer::getUrl())->assertOk()->assertSee('Unduh Excel')->assertSee('Unduh PDF');
 
-    Livewire::test(Akuntan::class, ['bulan' => '2026-10'])->call('unduhExcel')->assertFileDownloaded('Rekap Bulanan Dana 2026-10.xlsx');
-    Livewire::test(Akuntan::class, ['bulan' => '2026-10'])->call('unduhPdf')->assertFileDownloaded('Rekap Bulanan Dana 2026-10.pdf');
+    Livewire::test(LaporanBulananCustomer::class)->set('bulanRekap', '2026-10')->call('unduhRekapExcel')->assertFileDownloaded('Rekap Bulanan Dana 2026-10.xlsx');
+    Livewire::test(LaporanBulananCustomer::class)->set('bulanRekap', '2026-10')->call('unduhRekapPdf')->assertFileDownloaded('Rekap Bulanan Dana 2026-10.pdf');
 })->with([
     ['owner', true],
     ['admin', true],

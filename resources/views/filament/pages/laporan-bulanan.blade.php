@@ -11,6 +11,24 @@
     @endphp
 
     <div class="space-y-5" @if ($berjalan) wire:poll.5s @endif>
+        <div class="space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5">
+            <p class="text-sm font-semibold text-gray-700">Rekap Bulanan Dana (Keuangan)</p>
+            <p class="text-sm text-gray-500">
+                Rekap pendapatan &amp; pengeluaran perusahaan sebulan (Operasional, Material, Perawatan, Omset Jasa, Omset Material, Gaji, Laba). Angkanya sama dengan menu Akuntan.
+            </p>
+            <div class="flex flex-wrap items-center gap-3">
+                <label class="text-sm font-semibold text-gray-600" for="rekap-bulan">Bulan</label>
+                <input id="rekap-bulan" type="month" wire:model="bulanRekap"
+                    class="rounded-lg border-gray-300 text-sm focus:border-primary-500 focus:ring-primary-500">
+                <x-filament::button type="button" color="success" wire:click="unduhRekapExcel" wire:loading.attr="disabled" wire:target="unduhRekapExcel,unduhRekapPdf" icon="heroicon-o-table-cells">
+                    Unduh Excel
+                </x-filament::button>
+                <x-filament::button type="button" color="danger" wire:click="unduhRekapPdf" wire:loading.attr="disabled" wire:target="unduhRekapExcel,unduhRekapPdf" icon="heroicon-o-document-arrow-down">
+                    Unduh PDF
+                </x-filament::button>
+            </div>
+        </div>
+
         <div class="space-y-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5">
             <p class="text-sm text-gray-500">
                 Pilih customer dan bulan. PDF memuat semua kunjungan order pada bulan itu (urut tanggal), format sama dengan preview laporan per order.

@@ -7,7 +7,12 @@ use App\Exceptions\BusinessRuleException;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\LaporanBulanan;
+use App\Services\BusinessInfoService;
 use App\Services\LaporanBulananService;
+use App\Services\LaporanRekapExcelService;
+use App\Services\LaporanRekapPdfService;
+use App\Services\LaporanRekapService;
+use Carbon\CarbonImmutable;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -16,6 +21,7 @@ use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Halaman "Laporan Bulanan" (dev-plan/21 §6): admin memilih customer + bulan
@@ -42,6 +48,9 @@ class LaporanBulananCustomer extends Page implements HasForms
     /** @var array<string, mixed> */
     public ?array $data = [];
 
+    /** Bulan (Y-m) utk unduhan Rekap Dana keuangan. */
+    public string $bulanRekap = '';
+
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole([
@@ -55,6 +64,7 @@ class LaporanBulananCustomer extends Page implements HasForms
     {
         abort_unless(static::canAccess(), 403);
 
+        $this->bulanRekap = now()->format('Y-m');
         $this->form->fill(['customer_id' => null, 'bulan' => now()->format('Y-m'), 'customer_address_id' => null]);
     }
 
@@ -129,6 +139,52 @@ class LaporanBulananCustomer extends Page implements HasForms
     public function riwayat(): Collection
     {
         return LaporanBulanan::query()->with(['customer', 'alamat', 'pembuat'])->latest('id')->limit(30)->get();
+    }
+
+    public function unduhRekapExcel(): StreamedResponse
+    {
+        abort_unless(static::canAccess(), 403);
+
+        [$data, $namaUsaha] = $this->dataRekap();
+        $isi = app(LaporanRekapExcelService::class)->render($data, $namaUsaha);
+
+        return response()->streamDownload(
+            function () use ($isi): void {
+                echo $isi;
+            },
+            $this->namaBerkasRekap('xlsx'),
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
+    }
+
+    public function unduhRekapPdf(): StreamedResponse
+    {
+        abort_unless(static::canAccess(), 403);
+
+        [$data, $namaUsaha] = $this->dataRekap();
+        $isi = app(LaporanRekapPdfService::class)->render($data, $namaUsaha);
+
+        return response()->streamDownload(
+            function () use ($isi): void {
+                echo $isi;
+            },
+            $this->namaBerkasRekap('pdf'),
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    /** @return array{0: array<string, mixed>, 1: string} */
+    private function dataRekap(): array
+    {
+        $bulan = CarbonImmutable::createFromFormat('!Y-m', $this->bulanRekap);
+        $namaUsaha = app(BusinessInfoService::class)->data()->nama_usaha ?: 'PT. Paccing Jaya Sejahtera';
+
+        return [app(LaporanRekapService::class)->susun($bulan), $namaUsaha];
+    }
+
+    private function namaBerkasRekap(string $ekstensi): string
+    {
+        return 'Rekap Bulanan Dana '.$this->bulanRekap.'.'.$ekstensi;
     }
 
     private function buat(bool $sinkron): void

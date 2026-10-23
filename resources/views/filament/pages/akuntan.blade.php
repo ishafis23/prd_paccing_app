@@ -14,16 +14,6 @@
             <span class="text-sm font-semibold text-gray-600">{{ $bulanLabel }}</span>
 
             <div class="ml-auto flex flex-wrap items-center gap-2">
-                <button type="button" wire:click="unduhExcel" wire:loading.attr="disabled" wire:target="unduhExcel,unduhPdf"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60">
-                    <x-heroicon-o-table-cells class="h-4 w-4" />
-                    Unduh Excel
-                </button>
-                <button type="button" wire:click="unduhPdf" wire:loading.attr="disabled" wire:target="unduhExcel,unduhPdf"
-                    class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-500 disabled:opacity-60">
-                    <x-heroicon-o-document-arrow-down class="h-4 w-4" />
-                    Unduh PDF
-                </button>
                 <a href="{{ \App\Support\Url::absolute('filament.admin.pages.pengeluaran-teknisi') }}"
                     class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500">
                     <x-heroicon-o-banknotes class="h-4 w-4" />
