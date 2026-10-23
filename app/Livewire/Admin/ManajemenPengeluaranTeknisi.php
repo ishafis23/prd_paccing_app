@@ -54,16 +54,16 @@ class ManajemenPengeluaranTeknisi extends Component
     #[Validate('required|integer|min:1|max:100000')]
     public $formQty = 1;
 
-    #[Validate('required|integer|min:0|max:5000000')]
+    #[Validate('required|integer|min:0')]
     public $formHarga = 0;
 
-    #[Validate('required|integer|min:1000|max:5000000')]
+    #[Validate('required|integer|min:1000')]
     public $formNominal = 0;
 
     #[Validate('nullable|string|max:255')]
     public string $formKeterangan = '';
 
-    private const NOMINAL_RULE = 'required|integer|min:1000|max:5000000';
+    private const NOMINAL_RULE = 'required|integer|min:1000';
 
     /**
      * Hanya owner/admin/finance yang boleh memproses pengeluaran.
@@ -251,7 +251,7 @@ class ManajemenPengeluaranTeknisi extends Component
         }
 
         if (validator(['nominal' => $expense->nominal], ['nominal' => self::NOMINAL_RULE])->fails()) {
-            session()->flash('error', 'Nominal di luar batas 1.000–5.000.000; tidak bisa disetujui.');
+            session()->flash('error', 'Nominal minimal Rp1.000; tidak bisa disetujui.');
 
             return;
         }
@@ -315,7 +315,7 @@ class ManajemenPengeluaranTeknisi extends Component
             'formTanggal' => 'required|date|before_or_equal:today',
             'formKategori' => 'required|in:bensin,makan,material,transport,lainnya',
             'formQty' => 'required|integer|min:1|max:100000',
-            'formHarga' => 'required|integer|min:0|max:5000000',
+            'formHarga' => 'required|integer|min:0',
             'formNominal' => self::NOMINAL_RULE,
             'formKeterangan' => 'nullable|string|max:255',
         ]);

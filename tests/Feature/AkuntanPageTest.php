@@ -213,14 +213,23 @@ it('ACC: status yang berubah saat modal terbuka tidak menimpa keputusan lain', f
     expect($e->fresh())->status->toBe('rejected')->catatan_approval->toBeNull();
 });
 
-it('ACC: quickApprove menolak nominal di luar batas', function (int $nominal) {
+it('ACC: quickApprove menolak nominal di bawah batas', function (int $nominal) {
     $e = akExpense('pending', $nominal);
 
     Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
         ->call('quickApprove', $e->id);
 
     expect($e->fresh()->status)->toBe('pending');
-})->with([500, 6000000]);
+})->with([500]);
+
+it('ACC: quickApprove menyetujui nominal besar tanpa batas 5 juta', function () {
+    $e = akExpense('pending', 6000000);
+
+    Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
+        ->call('quickApprove', $e->id);
+
+    expect($e->fresh()->status)->toBe('approved');
+});
 
 it('ACC: quickApprove menyetujui pending bernominal valid', function () {
     $e = akExpense();
@@ -277,6 +286,23 @@ it('Tambah Manual: admin mencatat pengeluaran atas nama teknisi, langsung approv
         ->and($expense->approved_by)->toBe($admin->id)
         ->and($expense->nominal)->toBe(30000)
         ->and($expense->kategori)->toBe('bensin');
+});
+
+it('Tambah Manual: nominal di atas 5 juta tetap bisa dicatat', function () {
+    $teknisi = akUser('teknisi');
+
+    Livewire::actingAs(akUser('admin'))->test(ManajemenPengeluaranTeknisi::class)
+        ->call('bukaTambah')
+        ->set('formTeknisiId', $teknisi->id)
+        ->set('formTanggal', today()->format('Y-m-d'))
+        ->set('formKategori', 'material')
+        ->set('formQty', 1)
+        ->set('formHarga', 6000000)
+        ->assertSet('formNominal', 6000000)
+        ->call('simpanManual')
+        ->assertHasNoErrors();
+
+    expect(TeknisiExpense::where('teknisi_id', $teknisi->id)->value('nominal'))->toBe(6000000);
 });
 
 it('Tambah Manual: wajib pilih teknisi & kategori valid', function () {
