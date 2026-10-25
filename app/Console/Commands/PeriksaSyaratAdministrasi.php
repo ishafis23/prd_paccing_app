@@ -38,7 +38,7 @@ class PeriksaSyaratAdministrasi extends Command
 
         $tandai = $this->option('tandai-terkirim');
         if ($tandai !== null) {
-            return $this->tandaiSebelum((string) $tandai);
+            return $this->tandaiSebelum((string) $tandai, $this->option('teknisi') !== null ? $daftar->pluck('id')->all() : null);
         }
 
         if ($daftar->isEmpty()) {
@@ -77,8 +77,13 @@ class PeriksaSyaratAdministrasi extends Command
         return self::SUCCESS;
     }
 
-    /** Tandai laporan terkirim untuk order yang selesai sebelum tanggal tertentu (keputusan pemilik). */
-    private function tandaiSebelum(string $tanggal): int
+    /**
+     * Tandai laporan terkirim untuk order yang selesai sebelum tanggal tertentu
+     * (keputusan pemilik).
+     *
+     * @param  array<int, int>|null  $teknisiIds  null = semua teknisi
+     */
+    private function tandaiSebelum(string $tanggal, ?array $teknisiIds = null): int
     {
         $batas = \Illuminate\Support\Carbon::parse($tanggal)->startOfDay();
 
@@ -87,8 +92,15 @@ class PeriksaSyaratAdministrasi extends Command
             ->whereNull('ditutup_pada')
             ->whereNull('laporan_terkirim_pada')
             ->where('updated_at', '<', $batas)
+            ->when($teknisiIds !== null, fn ($q) => $q->whereIn('teknisi_id', $teknisiIds))
             ->orderBy('id')
             ->get();
+
+        if ($teknisiIds !== null && $teknisiIds === []) {
+            $this->warn('Tidak ada teknisi yang cocok — tidak ada yang ditandai.');
+
+            return self::SUCCESS;
+        }
 
         if ($orders->isEmpty()) {
             $this->info('Tidak ada order lama yang perlu ditandai.');

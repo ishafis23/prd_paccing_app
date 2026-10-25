@@ -674,6 +674,11 @@ class TeknisiService
             throw new BusinessRuleException('Upload bukti pembayaran dulu sebelum menutup order (wajib untuk customer rumahan).');
         }
 
+        // dev-plan/29 C1: menutup order TIDAK diperiksa syarat administrasi —
+        // penutupan tetap urusan teknisi di lokasi (keputusan B32 tidak diubah).
+        // Celah "tutup order dulu supaya lolos syarat" ditutup di
+        // SyaratAdministrasiService::penghalang(): ketiga syarat tetap berlaku
+        // untuk order yang ditutup dalam tenggang (config administrasi.*).
         $order->ditutup_pada = now();
         $order->save();
 

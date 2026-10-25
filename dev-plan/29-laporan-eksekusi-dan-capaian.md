@@ -72,11 +72,11 @@ Uji pada MySQL/MariaDB lokal **belum** dijalankan pada sesi ini karena MariaDB X
 
 | Uji | Hasil |
 |---|---|
-| `php artisan test` (suite penuh, run terakhir) | **1054 lulus, 16 gagal, 3414 assertion, 171 detik** |
+| `php artisan test` (suite penuh, run terakhir) | **1057 lulus, 16 gagal, 3424 assertion, 192 detik** |
 | Susunan 16 gagal | `ExpenseTrackingTest` 7, `PhotoUploadTest` 5, `NotifBerangkatTest` 2, `NotifPembayaranTest` 1, `OrderAcUnitLinkTest` 1 — **persis baseline sebelum pekerjaan ini**, tidak ada tambahan |
-| Test baru Fase 2 | `SyaratAdministrasiTest` 4, `CashHandoverTest` 5, `LaporanTerkirimGateTest` 4 — hijau |
+| Test baru Fase 2 | `SyaratAdministrasiTest` 7, `CashHandoverTest` 5, `LaporanTerkirimGateTest` 4 — hijau |
 | Test baru Fase 1 | `PayrollCutoffTest`, `KasbonPeriodeTest`, `KategoriPengeluaranTeknisiTest`, `Devplan29PanelKasbonTest` — hijau (dibuktikan ulang di run penuh di atas) |
-| `php artisan administrasi:periksa` | jalan; di DB dev semua teknisi 0 penghalang (DB dev memang hampir kosong) |
+| `php artisan administrasi:periksa` | jalan dengan data nyata: Teknisi Andi 2 penghalang (1 setoran pada order demo #2, 1 foto), teknisi lain 0 |
 | `php artisan route:list --path=teknisi` | route `teknisi.setoran` terdaftar |
 | `php -l` semua berkas baru/berubah | tanpa error sintaks |
 
@@ -119,9 +119,7 @@ Uji pada MySQL/MariaDB lokal **belum** dijalankan pada sesi ini karena MariaDB X
    (port 3306 menolak koneksi). Migrasi hanya memakai operasi Blueprint standar + satu `UPDATE`
    kolom, tetapi ini belum dibuktikan di MySQL seperti yang saya lakukan pada plan 21. Bila XAMPP
    dinyalakan, saya bisa ulangi uji itu (±5 menit).
-2. **Review independen agen kedua (`_brief/laporan-12.md`) belum ada.** Agen CLI kehabisan kuota di
-   tengah review (`You've hit your usage limit ... Nov 24, 2026`). Review masih berjalan lewat agen
-   lain; hasilnya akan ditambahkan ke berkas ini setelah saya verifikasi sendiri.
+2. **Review independen sudah dijalankan** (agen terpisah, `_brief/laporan-12.md`): **LAYAK DENGAN CATATAN — 1 blocker, 5 mayor, 7 minor**. Satu blocker-nya nyata dan sudah diperbaiki (lihat §10). Sisa temuan mayor/minor: sebagian sudah diperbaiki, sebagian sengaja diterima dengan alasan — semuanya dicatat di §10.
 3. **Tampilan baru sudah saya pastikan ter-render dengan data nyata**, bukan lewat browser (tool browser di mesin ini tidak merespons): saya login sebagai teknisi (id 3) dan Owner (id 1) di dalam aplikasi, lalu meminta `/teknisi`, `/teknisi/setoran`, `/admin/cash-handovers`, `/admin/orders`, `/admin/orders/2` — kelimanya **HTTP 200** dan memuat penanda yang benar: panel "Akses ditahan" muncul di beranda **dan** daftar order ("Hari Ini & Akan Datang") hilang; halaman Setoran Tunai memuat form + riwayat; menu Finance → Setoran Tunai ada; aksi "Kirim Laporan ke Customer" dan "Tandai Laporan Terkirim" ada di daftar order. Yang belum: tata letak di layar HP sungguhan (9 tab bottom-nav) dan rasa tombolnya saat diklik — perlu sekali Anda coba.
    - **Data demo di DB lokal:** saya membuat 1 order contoh **id 2** (teknisi Teknisi Andi, customer Budi Santoso, Rp100.000, tunai ditandai kemarin, laporan sudah ditandai terkirim) supaya panel "Akses ditahan" bisa Anda lihat langsung. Hapus dengan `php artisan tinker --execute="\App\Models\Order::find(2)->delete();"` bila sudah tidak perlu.
 4. **Cut-off per teknisi masih kosong** untuk semua teknisi. Admin perlu mengisi (mis. Bayu = 23)
@@ -153,6 +151,12 @@ php artisan administrasi:periksa                    # lihat dampak gate SEBELUM 
 ```
 
 - **Tidak perlu** `npm run build` — tidak ada perubahan `resources/js` atau `resources/css`.
+- **Urutan penting untuk cut-off:** isi `cut-off_hari` di profil gaji teknisi **sebelum** membuat run
+  penggajian periode berjalan. Mengisi cut-off setelah run lama ada bisa membuat run periode baru yang
+  tumpang tindih (temuan review M4).
+- Opsional di `.env`: `WA_NOTIF_LAPORAN=true|false` (default `true`) dan
+  `ADMINISTRASI_TENGGANG_HARI=7` (default 7). Set `0` bila Anda ingin aturan lama B32 tetap berlaku
+  (order yang sudah ditutup langsung bebas dari syarat administrasi).
 - Setelah deploy: isi **cut-off** teknisi (menu profil gaji), buka **Finance → Setoran Tunai** untuk
   memastikan menunya muncul untuk Owner/Admin/Finance, dan cek **Template Pesan WA** memuat
   "Notifikasi Laporan Pengerjaan".
@@ -164,7 +168,6 @@ php artisan administrasi:periksa                    # lihat dampak gate SEBELUM 
 ---
 
 ## 9. Berkas bukti
-
 - Brief & laporan agen: `_brief/10-…md` + `laporan-10.md` (fase 1, sisi periode gaji/kategori),
   `_brief/11-…md` (spesifikasi asli fase 2), `_brief/11b-…md` + `laporan-11b.md` (sisi teknisi),
   `_brief/11c-…md` + `laporan-11c.md` (sisi admin).
@@ -172,3 +175,39 @@ php artisan administrasi:periksa                    # lihat dampak gate SEBELUM 
 - Log suite: `_log/fullsuite-devplan29-*.log` (20 gagal, sebelum 4 regresi diperbaiki),
   `_log/fullsuite-devplan29-r2-*.log` (16 gagal = baseline, 1054 lulus).
 - Commit: `93578ec` (fase 1), `864062d` + `b36008e` (fase 2 teknisi), `f451589` (fase 2 admin).
+
+---
+
+## 10. Hasil review independen & tindakannya
+
+Reviewer terpisah (`_brief/laporan-12.md`) memberi putusan **LAYAK DENGAN CATATAN** (1 blocker,
+5 mayor, 7 minor). Yang saya lakukan atas tiap temuan:
+
+| # | Temuan | Tindakan |
+|---|---|---|
+| B1 (blocker) | Ketiga syarat hilang begitu teknisi menutup order (`ditutup_pada IS NULL` di gerbang), padahal menutup order adalah aksi normal teknisi → cukup tutup order untuk lolos syarat. | **Diperbaiki.** Gerbang kini juga memeriksa order yang ditutup dalam **tenggang** (`config/administrasi.php` → `tenggang_hari`, default 7 hari; bisa diatur lewat `ADMINISTRASI_TENGGANG_HARI`). Konsekuensi: **keputusan B32 ("order ditutup = tidak lagi menahan keberangkatan") digantikan untuk tiga syarat ini**. Test B32 lama saya ubah nama + isi agar mengunci perilaku baru (`PhotoReportTemplateTest`: ditolak saat masih dalam tenggang, lolos setelah 30 hari). Kalau Anda ingin B32 tetap berlaku, cukup set `ADMINISTRASI_TENGGANG_HARI=0`. |
+| M1 | `administrasi:periksa --teknisi=X --tandai-terkirim=…` mengabaikan filter teknisi. | **Diperbaiki**: filter teknisi diteruskan; kombinasi tanpa teknisi cocok menolak menandai apa pun. |
+| M2 | Aturan kasbon-periode hanya aktif bila `cutoff_hari` terisi; default kosong. | **Diterima + jadi langkah deploy wajib** (§7.4 & §8). Saran reviewer menambah indikator "cut-off belum diatur" belum dikerjakan — usul untuk plan berikutnya. |
+| M3 | Kasbon yang potongannya 0 karena plafon gaji habis tidak pernah dipotong otomatis lagi. | **Diterima sebagai risiko** (perlu keputusan Anda): usulan reviewer (menandai kasbon "terlewat karena plafon" + daftar tindakan Admin) belum dikerjakan. Saat ini kasbon seperti itu tampil sebagai baris informasi di slip. |
+| M4 | Mengisi `cutoff_hari` setelah run periode lama ada → run baru bisa tumpang tindih dan menghitung absensi/bonus dua kali. | **Diterima sebagai risiko** + dicatat di §8: isi cut-off **sebelum** membuat run periode berjalan. Peringatan otomatis belum dibuat. |
+| M5 | Teknisi tidak punya jalan keluar bila Admin lupa mengirim laporan (gate `laporan` sepenuhnya bergantung Admin). | **Sebagian**: Admin bisa "Tandai Laporan Terkirim" (satu klik per order) dan ada command `administrasi:periksa` untuk melihat tunggakan. Dashboard khusus "menunggu kirim laporan" belum ada — usul plan berikutnya. |
+| m1 | Batas tanggal pengeluaran memakai `updated_at` order. | Diterima (belum ada kolom waktu selesai). |
+| m2 | Order tunai yang dibatalkan tidak masuk kewajiban setoran. | Diterima (uang pada order batal diselesaikan manual oleh Admin). |
+| m3 | `cash_handovers.teknisi_id` cascadeOnDelete → riwayat setoran hilang bila user dihapus. | Diterima: aplikasi ini menonaktifkan user (`user.aktif`), bukan menghapus, jadi jalur ini teoretis. |
+| m4 | Foto setoran disimpan sebelum validasi → file yatim bila ditolak. | **Diperbaiki**: file dihapus lagi di blok `catch`. |
+| m5 | N+1 pada kolom "Status Potong" di menu Kasbon. | Diterima (volume kasbon kecil). |
+| m6 | `kasbonBelumTerpotongLewatPeriode()` memakai `today()`, bukan periode run yang dihitung. | Diterima; dicatat untuk perbaikan berikutnya. |
+| m7 | Nominal setoran tidak dibandingkan dengan tagihan order. | Diterima sesuai desain (verifikasi manual Admin). Saran "tampilkan selisih" belum dikerjakan. |
+
+Yang **tidak** ditemukan reviewer (dan saya sepakat): tidak ada kebocoran data lintas teknisi, tidak ada
+migrasi destruktif, tidak ada test yang dilemahkan/dihapus.
+
+### Test yang berubah karena aturan baru (bukan dilemahkan)
+
+| Berkas | Perubahan | Alasan |
+|---|---|---|
+| `PhotoReportTemplateTest` (dulu "berangkat BOLEH … asalkan order sudah ditutup (B32)") | jadi "tutup order bukan jalan pintas … lolos setelah lewat tenggang" | keputusan client 25 Okt menggantikan B32 untuk tiga syarat administrasi (temuan B1) |
+| `PhotoReportTemplateTest` ("berangkat BOLEH setelah foto wajib dilengkapi") | menambah `laporan_terkirim_pada` sebelum berangkat | aturan baru: laporan harus sudah dikirim |
+| `UnitReportTest` ×2 | idem | idem |
+| `SyaratAdministrasiTest` | +3 test baru: tutup order bukan jalan pintas, pengeluaran pending menahan walau sudah ditutup, order >tenggang tidak menahan | mengunci perilaku hasil review |
+

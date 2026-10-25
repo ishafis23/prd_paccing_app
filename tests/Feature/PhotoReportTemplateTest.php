@@ -296,7 +296,7 @@ it('berangkat BOLEH setelah foto wajib order sebelumnya dilengkapi', function ()
     expect($hasil->status)->toBe(OrderStatus::MenujuLokasi);
 });
 
-it('berangkat BOLEH meski foto wajib order sebelumnya kurang, asalkan order itu sudah ditutup (B32)', function () {
+it('tutup order bukan jalan pintas: berangkat DITOLAK bila foto wajib belum lengkap, lolos setelah lewat tenggang (dev-plan/29 menggantikan B32)', function () {
     $teknisi = ($this->mkUser)(RoleName::Teknisi->value);
     $ordersLama = buatOrderDenganKategori($teknisi, ServiceType::CuciAc);
     $itemLama = $ordersLama->orderItems->first();
@@ -312,7 +312,14 @@ it('berangkat BOLEH meski foto wajib order sebelumnya kurang, asalkan order itu 
 
     $orderBaru = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Terjadwal]);
 
-    $hasil = app(TeknisiService::class)->berangkat($orderBaru, $teknisi);
+    // dev-plan/29: order yang baru ditutup tetap diperiksa selama tenggang.
+    expect(fn () => app(TeknisiService::class)->berangkat($orderBaru, $teknisi))
+        ->toThrow(BusinessRuleException::class, 'Lengkapi dulu foto');
+
+    // Setelah lewat tenggang (default 7 hari), order dianggap pekerjaan historis.
+    $ordersLama->fresh()->update(['ditutup_pada' => now()->subDays(30)]);
+
+    $hasil = app(TeknisiService::class)->berangkat($orderBaru->fresh(), $teknisi);
 
     expect($hasil->status)->toBe(OrderStatus::MenujuLokasi);
 });

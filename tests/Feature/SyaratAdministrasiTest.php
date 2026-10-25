@@ -77,3 +77,73 @@ it('berangkat dan check-in sama-sama menolak bila administrasi belum tuntas', fu
     expect(fn () => $service->berangkat($berangkat, $teknisi))->toThrow(BusinessRuleException::class);
     expect(fn () => $service->checkIn($checkIn, $teknisi))->toThrow(BusinessRuleException::class);
 });
+
+it('laporan belum terkirim tidak menahan penutupan order, tetapi menahan keberangkatan', function () {
+    $teknisi = administrasiTeknisi();
+    $order = administrasiOrder($teknisi, [
+        'status' => OrderStatus::Selesai,
+        'metode_dipilih' => PaymentMethod::Transfer,
+        'metode_dipilih_pada' => now(),
+        'bukti_pembayaran' => 'bukti-pembayaran/bukti.jpg',
+        'laporan_terkirim_pada' => null,
+        'ditutup_pada' => null,
+    ]);
+
+    // Order tanpa baris layanan supaya penghalang yang tersisa hanya "laporan".
+    $order->orderItems()->delete();
+    $order->refresh();
+
+    // Menutup order = urusan teknisi (foto & pengeluaran sudah bersih) -> boleh.
+    $ditutup = app(TeknisiService::class)->tutupOrder($order, $teknisi);
+    expect($ditutup->ditutup_pada)->not->toBeNull();
+
+    // Tetapi laporan yang belum dikirim Admin tetap menahan keberangkatan
+    // (celah "tutup order dulu" ditutup oleh tenggang laporan).
+    $berikutnya = administrasiOrder($teknisi, ['status' => OrderStatus::Terjadwal]);
+    expect(fn () => app(TeknisiService::class)->berangkat($berikutnya, $teknisi))
+        ->toThrow(BusinessRuleException::class, 'laporan pengerjaan belum dikirim');
+
+    $order->update(['laporan_terkirim_pada' => now(), 'laporan_terkirim_oleh' => 1]);
+
+    expect(app(TeknisiService::class)->berangkat($berikutnya->fresh(), $teknisi)->status)
+        ->toBe(OrderStatus::MenujuLokasi);
+});
+
+it('order yang ditutup lebih lama dari tenggang tidak lagi menahan keberangkatan', function () {
+    $teknisi = administrasiTeknisi();
+    $lama = administrasiOrder($teknisi, [
+        'status' => OrderStatus::Selesai,
+        'laporan_terkirim_pada' => null,
+        'ditutup_pada' => now()->subDays(30),
+    ]);
+    $berikutnya = administrasiOrder($teknisi, ['status' => OrderStatus::Terjadwal]);
+
+    expect(collect(app(SyaratAdministrasiService::class)->penghalang($teknisi))->where('jenis', 'laporan')->pluck('order_id')->all())
+        ->not->toContain($lama->id);
+
+    expect(app(TeknisiService::class)->berangkat($berikutnya, $teknisi)->status)->toBe(OrderStatus::MenujuLokasi);
+});
+
+it('pengeluaran pending tetap menahan keberangkatan walau order sudah ditutup', function () {
+    $teknisi = administrasiTeknisi();
+    $order = administrasiOrder($teknisi, [
+        'status' => OrderStatus::Selesai,
+        'metode_dipilih' => PaymentMethod::Transfer,
+        'laporan_terkirim_pada' => now(),
+        'ditutup_pada' => now(),
+    ]);
+
+    TeknisiExpense::create([
+        'teknisi_id' => $teknisi->id,
+        'order_id' => $order->id,
+        'kategori' => 'bensin',
+        'nominal' => 25000,
+        'tanggal_input' => today(),
+        'status' => 'pending',
+    ]);
+
+    $berikutnya = administrasiOrder($teknisi, ['status' => OrderStatus::Terjadwal]);
+
+    expect(fn () => app(TeknisiService::class)->berangkat($berikutnya, $teknisi))
+        ->toThrow(BusinessRuleException::class, 'pengeluaran pending');
+});

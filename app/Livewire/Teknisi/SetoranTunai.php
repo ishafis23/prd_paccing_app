@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Services\CashHandoverService;
 use App\Services\StorageQuotaService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -40,6 +41,7 @@ class SetoranTunai extends Component
         ]);
 
         $order = Order::findOrFail($this->pilihOrderId);
+        $path = null;
         try {
             app(StorageQuotaService::class)->pastikanCukup((int) $this->foto->getSize());
             $path = $this->foto->store('setoran-tunai', 'public');
@@ -57,6 +59,11 @@ class SetoranTunai extends Component
             $this->pilihOrderId = app(CashHandoverService::class)->kewajiban(auth()->user())->first()?->id;
             $this->dispatch('setoran-tersimpan');
         } catch (BusinessRuleException|AuthorizationException $e) {
+            // Foto sudah terlanjur disimpan sebelum validasi service — hapus supaya
+            // tidak ada file yatim di disk public (temuan review m4).
+            if ($path !== null) {
+                Storage::disk('public')->delete($path);
+            }
             session()->flash('error', $e->getMessage());
         }
     }
