@@ -34,6 +34,10 @@ class CashHandoverService
         return Order::query()
             ->untukTeknisi($teknisi->id)
             ->where('metode_dipilih', PaymentMethod::Cash->value)
+            // Hanya order yang ditandai tunai SETELAH fitur ini dipasang
+            // (metode_dipilih_pada terisi). Order tunai lama tanpa cap waktu
+            // tidak boleh mengunci portal teknisi pada hari deploy.
+            ->whereNotNull('metode_dipilih_pada')
             ->where('status', '!=', OrderStatus::Batal->value)
             ->whereDoesntHave('cashHandovers', fn ($q) => $q->whereIn('status', [
                 CashHandoverStatus::Menunggu->value,
@@ -56,7 +60,7 @@ class CashHandoverService
         $hariIni = now()->startOfDay();
 
         return $this->kewajiban($teknisi)->filter(function (Order $order) use ($hariIni): bool {
-            $acuan = $order->metode_dipilih_pada ?? $order->tanggal_jadwal;
+            $acuan = $order->metode_dipilih_pada;
 
             return $acuan !== null && $acuan->copy()->startOfDay()->lt($hariIni);
         })->values();

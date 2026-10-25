@@ -51,13 +51,9 @@ class TeknisiService
         // keberangkatan sampai dilengkapi. Satu-satunya dokumentasi foto
         // adalah per baris layanan (work_report_photos); sistem lama
         // "Foto per Layanan" (order_photos) sudah dihapus agar tidak dobel.
-        $tertunda = $this->orderDenganFotoBelumLengkap($teknisi);
-        if ($tertunda !== null) {
-            $daftar = collect($this->fotoWajibKurang($tertunda))->pluck('label')->implode(', ');
-
-            throw new BusinessRuleException(
-                "Lengkapi dulu foto pada order #{$tertunda->id} ({$tertunda->customer?->nama}) sebelum berangkat ke order berikutnya: {$daftar}."
-            );
+        $penghalang = app(SyaratAdministrasiService::class)->penghalang($teknisi);
+        if ($penghalang !== []) {
+            throw new BusinessRuleException(app(SyaratAdministrasiService::class)->pesanRingkas($penghalang));
         }
 
         $order->status = OrderStatus::MenujuLokasi;
@@ -188,6 +184,11 @@ class TeknisiService
 
         if ($order->status !== OrderStatus::MenujuLokasi) {
             throw new BusinessRuleException('Check-in hanya bisa setelah status menuju_lokasi.');
+        }
+
+        $penghalang = app(SyaratAdministrasiService::class)->penghalang($teknisi);
+        if ($penghalang !== []) {
+            throw new BusinessRuleException(app(SyaratAdministrasiService::class)->pesanRingkas($penghalang));
         }
 
         $attendance = Attendance::create([
@@ -706,7 +707,10 @@ class TeknisiService
             throw new BusinessRuleException('Order sudah lunas; metode pembayaran tidak bisa diubah.');
         }
 
-        $order->metode_dipilih = $metode?->value;
+        if ($order->metode_dipilih !== $metode) {
+            $order->metode_dipilih = $metode?->value;
+            $order->metode_dipilih_pada = $metode === null ? null : now();
+        }
         $order->save();
 
         return $order->fresh();

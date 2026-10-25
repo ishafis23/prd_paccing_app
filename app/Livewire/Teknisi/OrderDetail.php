@@ -17,6 +17,7 @@ use App\Models\TemporaryPhotoUpload;
 use App\Models\WorkReport;
 use App\Models\WorkReportPhoto;
 use App\Services\AttendanceService;
+use App\Services\CashHandoverService;
 use App\Services\OrderService;
 use App\Services\PaymentChannelService;
 use App\Services\StorageQuotaService;
@@ -119,8 +120,16 @@ class OrderDetail extends Component
     public function mount(Order $order): void
     {
         abort_if(! $order->diassignkanKe(auth()->user()), 403, 'Order ini bukan tugas Anda.');
-
         $this->orderId = $order->id;
+
+        $telat = app(CashHandoverService::class)->telat(auth()->user());
+        if ($telat->isNotEmpty()) {
+            $tertunda = $telat->first();
+            session()->flash('error', sprintf('Akses order ditahan. Laporkan setoran order #%d sebesar Rp %s terlebih dahulu.', $tertunda->id, number_format((float) $tertunda->total(), 0, ',', '.')));
+            $this->redirect(route('teknisi.setoran'), navigate: true);
+            return;
+        }
+
         $this->customerSudahBayar = (bool) $order->bayar_dilaporkan_teknisi;
 
         // Initialize expanded items (all expanded by default)
@@ -132,7 +141,7 @@ class OrderDetail extends Component
 
     public function getOrderProperty(): Order
     {
-        return Order::with(['customer', 'serviceCatalog', 'orderItems.acUnit', 'workReports.materials.stockItem', 'workReports.photos.orderItem.acUnit', 'latestPayment'])
+        return Order::with(['customer', 'serviceCatalog', 'orderItems.acUnit', 'workReports.materials.stockItem', 'workReports.photos.orderItem.acUnit', 'latestPayment', 'cashHandovers'])
             ->findOrFail($this->orderId);
     }
 
@@ -956,6 +965,12 @@ class OrderDetail extends Component
         }
     }
 
+    /** Arahkan ke formulir setoran yang selalu memeriksa kepemilikan order. */
+    public function laporSetoran(): void
+    {
+        $this->redirect(route('teknisi.setoran'), navigate: true);
+    }
+
     /**
      * Upload/ganti bukti pembayaran (B-bukti-bayar) — wajib utk customer
      * rumahan sebelum order bisa ditutup, opsional utk instansi.
@@ -1317,6 +1332,7 @@ class OrderDetail extends Component
             'paymentChannels' => app(PaymentChannelService::class)->daftarAktif(),
             'fotoSlots' => $this->fotoSlots,
             'itemPhotoStatus' => $itemPhotoStatus,
+            'handoverAktif' => $order->cashHandovers->first(fn ($handover): bool => in_array($handover->status->value, ['menunggu', 'diterima'], true)),
         ])->layout('layouts.teknisi', ['title' => 'Detail Order']);
     }
 }

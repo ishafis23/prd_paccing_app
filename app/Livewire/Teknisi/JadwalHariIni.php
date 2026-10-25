@@ -5,6 +5,7 @@ namespace App\Livewire\Teknisi;
 use App\Enums\OrderStatus;
 use App\Models\DailyAttendance;
 use App\Models\Order;
+use App\Services\SyaratAdministrasiService;
 use Livewire\Component;
 
 class JadwalHariIni extends Component
@@ -47,10 +48,15 @@ class JadwalHariIni extends Component
             ->whereNotNull('jam_datang')
             ->exists();
 
+        $administrasi = app(SyaratAdministrasiService::class);
+        $penghalang = $administrasi->penghalang(auth()->user());
+
         return view('livewire.teknisi.jadwal-hari-ini', [
             'ordersSebelumnya' => $ordersSebelumnya,
             'ordersHariIni' => $ordersHariIni,
             'sudahAbsen' => $sudahAbsen,
+            'penghalang' => $penghalang,
+            'tertahan' => $administrasi->tertahanSetoran($penghalang),
         ])->layout('layouts.teknisi', ['title' => 'Jadwal Saya']);
     }
 }

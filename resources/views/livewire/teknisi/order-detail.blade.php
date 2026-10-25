@@ -1143,6 +1143,19 @@
             </div>
         </div>
 
+        @if ($order->metodeTunai())
+            <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                <h2 class="flex items-center gap-2 text-sm font-extrabold text-gray-900"><x-heroicon-o-banknotes class="h-5 w-5 text-green-600" /> Laporan Setoran Tunai</h2>
+                @if ($handoverAktif)
+                    <p class="mt-2 text-sm text-gray-700">Rp {{ number_format((float) $handoverAktif->nominal, 0, ',', '.') }} · diserahkan ke {{ $handoverAktif->diserahkan_ke }}</p>
+                    <p class="mt-1 text-xs font-bold text-amber-700">{{ $handoverAktif->status->label() }}</p>
+                @else
+                    <p class="mt-1 text-xs text-gray-500">Setelah menerima pembayaran tunai, laporkan nominal, penerima, dan foto bukti setoran.</p>
+                    <button type="button" wire:click="laporSetoran" class="mt-3 w-full rounded-xl bg-green-600 py-2.5 text-sm font-bold text-white">Laporkan Setoran</button>
+                @endif
+            </div>
+        @endif
+
         {{-- Slider penutup order (B32): muncul setelah metode dipilih, sebelum lunas. --}}
         @if ($order->status === $orderStatus::Selesai && ! $isLunas && $metodeDipilih && ! $order->sudahDitutup())
             <x-teknisi-slider

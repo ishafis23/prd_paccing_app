@@ -32,6 +32,7 @@ use App\Livewire\Teknisi\OrderDetail;
 use App\Livewire\Teknisi\PulangCepat;
 use App\Livewire\Teknisi\RiwayatAbsensi;
 use App\Livewire\Teknisi\RiwayatPengerjaan;
+use App\Livewire\Teknisi\SetoranTunai;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -60,6 +61,7 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     Route::get('/capaian', CapaianKerja::class)->name('teknisi.capaian');
     Route::get('/laporan-harian', DailyReport::class)->name('teknisi.daily-report');
     Route::get('/laporan-pengeluaran', LaporanPengeluaran::class)->name('teknisi.laporan-pengeluaran');
+    Route::get('/setoran', SetoranTunai::class)->name('teknisi.setoran');
     Route::get('/keuangan', Keuangan::class)->name('teknisi.keuangan');
     Route::get('/akun', Akun::class)->name('teknisi.akun');
 

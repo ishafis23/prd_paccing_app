@@ -7,6 +7,7 @@
         ['route' => 'teknisi.lengkapi-laporan', 'label' => 'Lengkapi', 'icon' => 'clipboard-document-check'],
         ['route' => 'teknisi.capaian', 'label' => 'Capaian', 'icon' => 'chart-bar'],
         ['route' => 'teknisi.keuangan', 'label' => 'Keuangan', 'icon' => 'wallet'],
+        ['route' => 'teknisi.setoran', 'label' => 'Setoran', 'icon' => 'banknotes'],
         ['route' => 'teknisi.akun', 'label' => 'Akun', 'icon' => 'user-circle'],
     ];
 @endphp

@@ -13,6 +13,23 @@
         </div>
     </div>
 
+    @if ($tertahan)
+        <div class="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+            <p class="flex items-center gap-2 text-sm font-extrabold text-red-800"><x-heroicon-o-lock-closed class="h-5 w-5" /> Akses ditahan — setoran tunai belum dilaporkan</p>
+            <p class="mt-1 text-xs text-red-700">Laporkan setoran untuk membuka kembali daftar order.</p>
+            @foreach (collect($penghalang)->where('jenis', 'setoran') as $item)
+                <p class="mt-2 text-xs font-semibold text-red-800">{{ $item['pesan'] }}</p>
+            @endforeach
+            <a href="{{ \App\Support\Url::absolute('teknisi.setoran') }}" wire:navigate class="mt-3 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white">Laporkan Setoran</a>
+        </div>
+    @else
+        @if ($penghalang !== [])
+            <div class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+                <p class="text-sm font-extrabold text-amber-800">Administrasi belum tuntas</p>
+                @foreach ($penghalang as $item)<p class="mt-1 text-xs text-amber-800">{{ $item['pesan'] }}</p>@endforeach
+            </div>
+        @endif
+
     {{-- Gating absen (masukan client Poin 4): buka order hanya setelah absen datang. --}}
     @unless ($sudahAbsen)
         <div class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
@@ -97,5 +114,6 @@
             <p class="mt-4 font-bold text-gray-700">Tidak ada order aktif</p>
             <p class="mt-1 text-sm text-gray-400">Order baru yang dijadwalkan untuk Anda akan muncul di sini.</p>
         </div>
+    @endif
     @endif
 </div>
