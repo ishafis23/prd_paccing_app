@@ -39,6 +39,9 @@ class Order extends Model
         'bayar_dilaporkan_pada',
         'bayar_dilaporkan_oleh',
         'bukti_pembayaran',
+        'laporan_terkirim_pada',
+        'laporan_terkirim_oleh',
+        'metode_dipilih_pada',
         'resi_token',
         'surat_jalan_token',
         'ditutup_pada',
@@ -64,6 +67,8 @@ class Order extends Model
             'bayar_dilaporkan_teknisi' => 'boolean',
             'bayar_dilaporkan_pada' => 'datetime',
             'ditutup_pada' => 'datetime',
+            'laporan_terkirim_pada' => 'datetime',
+            'metode_dipilih_pada' => 'datetime',
             'perbaikan_menunggu_konfirmasi' => 'boolean',
             'perbaikan_estimasi_harga' => 'decimal:2',
             'perbaikan_dilaporkan_pada' => 'datetime',
@@ -366,6 +371,23 @@ class Order extends Model
         }
 
         return $this->surat_jalan_token;
+    }
+
+    public function cashHandovers(): HasMany
+    {
+        return $this->hasMany(CashHandover::class);
+    }
+
+    /** Laporan pengerjaan sudah dikirim ke customer (WA otomatis / ditandai admin). */
+    public function laporanTerkirim(): bool
+    {
+        return $this->laporan_terkirim_pada !== null;
+    }
+
+    /** Teknisi menandai pembayaran order ini sebagai tunai. */
+    public function metodeTunai(): bool
+    {
+        return $this->metode_dipilih === PaymentMethod::Cash;
     }
 
     /**
