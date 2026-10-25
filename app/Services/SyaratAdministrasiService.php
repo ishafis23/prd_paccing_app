@@ -29,7 +29,7 @@ class SyaratAdministrasiService
             }
             $kurang = $fotoService->fotoWajibKurang($order);
             if ($kurang !== []) {
-                $hasil[] = $this->entri('foto', $order, 'Foto laporan belum lengkap', sprintf('Order #%d (%s): lengkapi foto/keterangan wajib: %s.', $order->id, $order->customer?->nama ?? 'tanpa customer', collect($kurang)->pluck('label')->filter()->implode(', ')));
+                $hasil[] = $this->entri('foto', $order, 'Foto laporan belum lengkap', sprintf('Lengkapi dulu foto pada order #%d (%s) sebelum berangkat ke order berikutnya: %s.', $order->id, $order->customer?->nama ?? 'tanpa customer', collect($kurang)->pluck('label')->filter()->implode(', ')));
             }
             $batas = $order->updated_at?->toDateString() ?? $order->tanggal_jadwal?->toDateString();
             $expenses = TeknisiExpense::query()->byTeknisi($teknisi)->pending()

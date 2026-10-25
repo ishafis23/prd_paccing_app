@@ -258,6 +258,9 @@ it('berangkat diblokir selama keterangan unit kurang, lolos setelah dilengkapi',
 
     app(UnitReportService::class)->simpan($unit, ($this->dataLengkap)(), $this->teknisi);
 
+    // dev-plan/29: syarat baru — laporan order sebelumnya harus sudah dikirim ke customer.
+    $order->update(['laporan_terkirim_pada' => now()]);
+
     expect(app(TeknisiService::class)->berangkat($baru->fresh(), $this->teknisi)->status)->toBe(OrderStatus::MenujuLokasi);
 });
 
@@ -273,6 +276,9 @@ it('order lama tanpa data unit tidak terblokir & tidak otomatis dibuatkan unit s
 
     // Teknisi membuka detail order lama yang sudah Selesai -> tetap tanpa data unit.
     Livewire::actingAs($this->teknisi)->test(OrderDetail::class, ['order' => $order])->assertOk();
+
+    // dev-plan/29: syarat baru — laporan order lama dianggap sudah dikirim (penanda admin).
+    $order->update(['laporan_terkirim_pada' => now()]);
 
     expect(OrderUnitReport::where('order_id', $order->id)->count())->toBe(0)
         ->and(app(TeknisiService::class)->fotoWajibKurang($order->fresh('orderItems')))->toBe([])

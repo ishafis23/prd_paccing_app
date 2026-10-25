@@ -20,7 +20,13 @@ dev-plan/
 │   └── 02-backlog-diskusi-wa-13sep.md ← irisan Teknisi dari 12-analisis-...md
 ├── hrd/01-konsep-hrd.md
 ├── finance/01-konsep-finance.md
-└── portal-customer/01-konsep-portal-customer.md ← DRAFT, portal corporate (Stage 2 utk sebagian besar)
+├── portal-customer/01-konsep-portal-customer.md ← DRAFT, portal corporate (Stage 2 utk sebagian besar)
+└── screening-23oktober2026/    ← hasil screening menyeluruh (76 temuan) + rencana 4 gelombang
+    ├── 00-RINGKASAN.md
+    ├── 01-DAFTAR-BUG.md
+    ├── 02-penyampaian-klien.md ← fokus keluhan klien 10 Okt (angka & foto ke pelanggan)
+    ├── 03-rencana-perbaikan.md
+    ├── brief/ laporan/ log/
 ```
 
 Konsep & fitur dipecah **per folder modul** (Admin, Teknisi, HRD, Finance) supaya bisa dibahas terpisah dengan client per bagian. Skema database tetap **satu file gabungan** karena tabel-tabelnya saling terhubung lintas modul (mis. `orders` disentuh Admin, Teknisi, dan Finance sekaligus) — alasannya dijelaskan di `00-overview.md`.

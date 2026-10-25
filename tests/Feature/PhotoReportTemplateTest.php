@@ -288,6 +288,9 @@ it('berangkat BOLEH setelah foto wajib order sebelumnya dilengkapi', function ()
 
     $orderBaru = Order::factory()->create(['teknisi_id' => $teknisi->id, 'status' => OrderStatus::Terjadwal]);
 
+    // dev-plan/29: syarat baru — laporan order sebelumnya harus sudah dikirim ke customer.
+    $ordersLama->update(['laporan_terkirim_pada' => now()]);
+
     $hasil = app(TeknisiService::class)->berangkat($orderBaru, $teknisi);
 
     expect($hasil->status)->toBe(OrderStatus::MenujuLokasi);

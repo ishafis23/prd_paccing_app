@@ -1,8 +1,10 @@
 # 29 — Revisi Teknisi: Kasbon Ikut Periode Gaji, Kategori Pengeluaran Baru, dan 3 Syarat Administrasi Sebelum Bertugas
 
-> STATUS: **USULAN — DISETUJUI PEMILIK UNTUK DIEKSEKUSI** (25 Okt 2026).
+> STATUS: **SELESAI DIEKSEKUSI** (25 Okt 2026) — laporan capaian & bukti verifikasi:
+> `dev-plan/29-laporan-eksekusi-dan-capaian.md`.
 > Sumber: pesan client (WhatsApp, via pemilik proyek), 25 Okt 2026.
-> Eksekusi: agen CLI Claude Code, brief di `_brief/10-…md` dan `_brief/11-…md`; review terpisah oleh agen kedua (`_brief/12-…md`).
+> Eksekusi: agen CLI (brief `_brief/10-…md`, `_brief/11-…md`, `_brief/11b-…md`, `_brief/11c-…md`);
+> verifikasi angka oleh supervisor (sesi Hermes).
 
 ## 1. Kutipan permintaan client
 
@@ -68,7 +70,8 @@ Dipecah menjadi tiga pekerjaan:
 - Label: `⛽ Bensin`, `🍜 Makan`, `🔧 Material`, `⚙️ Perawatan`, `💵 Gaji/Honor`, `🎁 Bonus`, `📦 Lainnya`.
 - Migrasi data: `UPDATE teknisi_expenses SET kategori='perawatan' WHERE kategori='transport'`. Tabel legacy `teknis_expenses` (model `TeknisExpense`, enum MySQL, controller sudah rusak & test-nya merah) **tidak disentuh**.
 - Daftar kategori di 4 tempat diganti menjadi satu sumber: `TeknisiExpense::KATEGORI` + `kategoriLabel()`, dan aturan validasi disusun dari konstanta itu (bukan string `in:...` yang ditulis ulang).
-- Rekap Bulanan Dana: `gaji_honor` dan `bonus` **tidak** dijumlahkan ke Operasional Rutin (sumber resmi gaji/bonus tetap `payroll_runs` → kalau ikut dijumlah akan dobel). Keduanya hanya tampil sebagai baris informasi.
+- Rekap Bulanan Dana: `gaji_honor` dan `bonus` **tidak** dijumlahkan ke Operasional Rutin, melainkan digabung ke kolom **Gaji/Honor** (bersama `payroll_runs`), supaya uangnya terhitung **sekali** dan total pengeluaran rekap tetap sama dengan halaman Akuntan.
+  - **REVISI (25 Okt 2026, saat verifikasi):** rencana awal adalah "hanya informasi, tidak dijumlahkan". Itu membuat total Rekap ≠ total Akuntan (melanggar janji "sumber tunggal AkuntanService") dan uang yang diinput Admin seolah hilang. Diubah menjadi masuk kolom Gaji/Honor; test `KategoriPengeluaranTeknisiTest` ikut mengunci angka `gaji` & `pengeluaran`.
 
 ### C1. Tiga syarat administrasi (gate)
 Service baru `app/Services/SyaratAdministrasiService.php` → `penghalang(User $teknisi): array` berisi daftar penghalang terstruktur (`jenis`, `order_id`, `pesan`). Jenis:
@@ -131,4 +134,5 @@ Test baru: `SyaratAdministrasiTest`, `CashHandoverTest`, `LaporanTerkirimGateTes
 1. **Cut-off teknisi lain.** Usulan: kolom cut-off per teknisi, default kosong = perilaku sekarang; Bayu diisi 23 oleh Admin. (Butuh daftar cut-off teknisi lain dari client.)
 2. **Kasbon yang sudah dibayar di gaji lalu tetapi belum tercatat di sistem** (kasus Bayu 19 Sep). Usulan: Admin memakai aksi "Tandai sudah dibayar/dipotong di periode lalu" — bukan menghapus kasbon, supaya jejaknya tetap ada.
 3. **Gaji/Honor & Bonus di Pengeluaran Teknisi.** Usulan: dicatat sebagai pengeluaran (bisa dipakai bukti bayar honor/bonus di luar penggajian) tetapi **tidak** dijumlahkan ke Rekap Bulanan Dana, karena gaji & bonus resmi sudah diambil dari menu Penggajian.
+   - **DIUBAH SAAT VERIFIKASI (25 Okt 2026):** keputusan di atas membuat total Rekap Bulanan Dana ≠ total halaman Akuntan (uang yang diinput Admin seolah hilang). Implementasi akhir: honor/bonus masuk kolom **Gaji/Honor** rekap, sehingga uangnya terhitung **sekali** dan total kedua halaman sama. Bukti: `tests/Feature/KategoriPengeluaranTeknisiTest.php`.
 4. **Kapan gate benar-benar mengunci layar.** Usulan: order yang belum tuntas mengunci **keberangkatan & check-in**; tunggakan **setoran tunai** mengunci seluruh portal teknisi sampai dilaporkan (sesuai kalimat client "besoknya teknisi tidak bisa akses").
