@@ -62,6 +62,11 @@
                 <td class="muted">—</td>
                 <td class="angka potongan">− {{ $rp($run->potongan_bpjs_tk) }}</td>
             </tr>
+            @php $kasbonTerlewat = $run->items->firstWhere('kategori', 'kasbon_belum_terpotong'); @endphp
+            @if ($kasbonTerlewat)
+                {{-- Baris informasi (nominal 0): tidak ikut total potongan. --}}
+                <tr><td colspan="3" class="muted">⚠ {{ $kasbonTerlewat->label }}</td></tr>
+            @endif
             <tr class="sub"><td colspan="2">Total Potongan</td><td class="angka">− {{ $rp((float) $run->total_denda_telat + (float) $run->total_potongan_off + (float) $run->total_potongan_setengah_hari + (float) $run->total_potongan_kasbon + (float) $run->potongan_bpjs_tk) }}</td></tr>
 
             @if ($mingguan)

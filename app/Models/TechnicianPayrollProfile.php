@@ -16,6 +16,7 @@ class TechnicianPayrollProfile extends Model
     protected $fillable = [
         'user_id',
         'tanggal_masuk',
+        'cutoff_hari',
         'gaji_pokok',
         'potongan_bpjs_tk',
         'potongan_off_per_hari',
@@ -28,6 +29,7 @@ class TechnicianPayrollProfile extends Model
     {
         return [
             'tanggal_masuk' => 'date:Y-m-d',
+            'cutoff_hari' => 'integer',
             'gaji_pokok' => 'decimal:2',
             'potongan_bpjs_tk' => 'decimal:2',
             'potongan_off_per_hari' => 'decimal:2',

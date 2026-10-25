@@ -6,6 +6,7 @@ use App\Enums\IncentiveStatusVerifikasi;
 use App\Enums\IncentiveTipe;
 use App\Models\Order;
 use App\Models\PayrollRun;
+use App\Models\TeknisiExpense;
 use App\Models\TechnicianIncentive;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -16,9 +17,13 @@ use Illuminate\Support\Collection;
  * sama dgn halaman Akuntan — sumber tunggalnya AkuntanService, jadi total
  * laporan selalu cocok dgn layar. Read-only.
  *
- * Pengeluaran Teknisi kategori "material" masuk Material; kategori teknisi
- * lain (bensin, makan, transport, lainnya) masuk Operasional Rutin.
- * Gaji/Honor = payroll_runs yg dibayar pada bulan tsb (tgl dibayar_pada).
+ * Pengeluaran Teknisi kategori "material" masuk Material, "perawatan" masuk
+ * Perawatan; kategori teknisi lain (bensin, makan, lainnya) masuk Operasional
+ * Rutin. "gaji_honor" & "bonus" tidak masuk Operasional — keduanya digabung ke
+ * kolom Gaji/Honor bersama payroll_runs, supaya uangnya terhitung sekali dan
+ * total pengeluaran rekap tetap sama dengan halaman Akuntan.
+ * Gaji/Honor = payroll_runs yg dibayar pada bulan tsb (tgl dibayar_pada) +
+ * pengeluaran teknisi kategori gaji_honor/bonus.
  * Bonus hanya tabel info di sheet Operasional (tidak menambah total).
  */
 class LaporanRekapService
@@ -49,7 +54,16 @@ class LaporanRekapService
 
         $material = $pengeluaran->filter(fn (array $r): bool => $r['kategori'] === 'material');
         $perawatan = $pengeluaran->filter(fn (array $r): bool => $r['kategori'] === 'perawatan');
-        $operasional = $pengeluaran->reject(fn (array $r): bool => in_array($r['kategori'], ['material', 'perawatan'], true));
+        // Gaji/Honor & Bonus teknisi TIDAK masuk Operasional Rutin; keduanya
+        // digabung ke kolom Gaji/Honor supaya uangnya tetap terhitung SEKALI
+        // (kalau dijumlahkan dua kali, gaji tampak dobel), dan total pengeluaran
+        // rekap tetap sama dengan total di halaman Akuntan.
+        $honor = $pengeluaran->filter(fn (array $r): bool => in_array($r['kategori'], TeknisiExpense::tidakDihitungRekap(), true));
+        $operasional = $pengeluaran->reject(fn (array $r): bool => in_array(
+            $r['kategori'],
+            ['material', 'perawatan', ...TeknisiExpense::tidakDihitungRekap()],
+            true
+        ));
 
         $pendapatan = $this->akuntan->pendapatan($awal, $akhir);
         $tim = $this->namaTim($pendapatan->pluck('order_id')->all());
@@ -71,7 +85,11 @@ class LaporanRekapService
             'perawatan' => $baris($perawatan),
             'omset_jasa' => $omset('total_jasa'),
             'omset_material' => $omset('total_material'),
-            'gaji' => $this->gaji($awal, $akhir),
+            'gaji' => collect($this->gaji($awal, $akhir))
+                ->concat($baris($honor))
+                ->sortBy('tanggal')
+                ->values()
+                ->all(),
             'bonus' => $this->bonus($awal, $akhir),
         ];
 

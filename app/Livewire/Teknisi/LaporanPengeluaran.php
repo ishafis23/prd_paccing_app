@@ -5,6 +5,7 @@ namespace App\Livewire\Teknisi;
 use App\Models\Order;
 use App\Models\TeknisiExpense;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -17,7 +18,7 @@ class LaporanPengeluaran extends Component
     #[Validate('required|date|before_or_equal:today')]
     public string $tanggal_input = '';
 
-    #[Validate('required|in:bensin,makan,material,transport,lainnya')] // TeknisiExpense::KATEGORI (atribut tidak bisa baca const)
+    // Aturan `kategori` ada di rules() — atribut Validate tidak bisa membaca konstanta.
     public string $kategori = '';
 
     // CATATAN: properti angka di bawah sengaja TIDAK diketik (bukan `int`).
@@ -51,6 +52,14 @@ class LaporanPengeluaran extends Component
     public bool $showForm = false;
 
     public bool $isSubmitting = false;
+
+    /** @return array<string, mixed> digabung dengan atribut #[Validate] di properti lain. */
+    protected function rules(): array
+    {
+        return [
+            'kategori' => ['required', Rule::in(TeknisiExpense::KATEGORI)],
+        ];
+    }
 
     public function mount(): void
     {

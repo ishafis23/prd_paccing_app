@@ -12,7 +12,7 @@ class TeknisiExpense extends Model
     use HasFactory;
 
     /** Katalog kategori pengeluaran teknisi — satu sumber, dipakai form teknisi & admin (tambah manual). */
-    public const KATEGORI = ['bensin', 'makan', 'material', 'transport', 'lainnya'];
+    public const KATEGORI = ['bensin', 'makan', 'material', 'perawatan', 'gaji_honor', 'bonus', 'lainnya'];
 
     protected $fillable = [
         'teknisi_id',
@@ -90,9 +90,31 @@ class TeknisiExpense extends Model
             'bensin' => '⛽ Bensin',
             'makan' => '🍜 Makan',
             'material' => '🔧 Material',
-            'transport' => '🚗 Transport',
+            'perawatan' => '⚙️ Perawatan',
+            'gaji_honor' => '💵 Gaji/Honor',
+            'bonus' => '🎁 Bonus',
             'lainnya' => '📦 Lainnya',
             default => $kategori,
         };
+    }
+
+    /** @return array<string, string> kategori => label, untuk select/filter. */
+    public static function kategoriOpsi(): array
+    {
+        return collect(self::KATEGORI)
+            ->mapWithKeys(fn (string $k): array => [$k => self::kategoriLabel($k)])
+            ->all();
+    }
+
+    /**
+     * Kategori yang TIDAK masuk Operasional Rutin pada Rekap Bulanan Dana.
+     * Keduanya digabung ke kolom Gaji/Honor (bersama payroll_runs) supaya
+     * uangnya terhitung sekali — bukan dobel, bukan hilang.
+     *
+     * @return array<int, string>
+     */
+    public static function tidakDihitungRekap(): array
+    {
+        return ['gaji_honor', 'bonus'];
     }
 }

@@ -8,6 +8,7 @@ use App\Models\TeknisiExpense;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -48,7 +49,7 @@ class ManajemenPengeluaranTeknisi extends Component
     #[Validate('required|date|before_or_equal:today')]
     public string $formTanggal = '';
 
-    #[Validate('required|in:bensin,makan,material,transport,lainnya')] // TeknisiExpense::KATEGORI
+    // Aturan `formKategori` ada di rules() — atribut Validate tidak bisa membaca konstanta.
     public string $formKategori = '';
 
     #[Validate('required|integer|min:1|max:100000')]
@@ -64,6 +65,14 @@ class ManajemenPengeluaranTeknisi extends Component
     public string $formKeterangan = '';
 
     private const NOMINAL_RULE = 'required|integer|min:1000';
+
+    /** @return array<string, mixed> digabung dengan atribut #[Validate] di properti lain. */
+    protected function rules(): array
+    {
+        return [
+            'formKategori' => ['required', Rule::in(TeknisiExpense::KATEGORI)],
+        ];
+    }
 
     /**
      * Hanya owner/admin/finance yang boleh memproses pengeluaran.
@@ -313,7 +322,7 @@ class ManajemenPengeluaranTeknisi extends Component
         $this->validate([
             'formTeknisiId' => 'required|exists:users,id',
             'formTanggal' => 'required|date|before_or_equal:today',
-            'formKategori' => 'required|in:bensin,makan,material,transport,lainnya',
+            'formKategori' => ['required', Rule::in(TeknisiExpense::KATEGORI)],
             'formQty' => 'required|integer|min:1|max:100000',
             'formHarga' => 'required|integer|min:0',
             'formNominal' => self::NOMINAL_RULE,

@@ -53,6 +53,13 @@ class TechnicianPayrollProfileResource extends BaseResource
                 ->label('Tanggal Masuk')
                 ->helperText('Dasar periode gaji bulanan (mis. masuk tgl 15 → periode 15 Okt – 14 Nov).')
                 ->required(),
+            Forms\Components\TextInput::make('cutoff_hari')
+                ->label('Tanggal Cut-off Periode Gaji')
+                ->numeric()
+                ->minValue(1)
+                ->maxValue(31)
+                ->nullable()
+                ->helperText('Contoh 23 → periode 24 bulan lalu s.d. 23 bulan ini. Kosongkan untuk periode 1 bulan dari tanggal acuan.'),
             Forms\Components\TextInput::make('gaji_pokok')
                 ->label('Gaji Pokok')
                 ->numeric()
@@ -91,6 +98,7 @@ class TechnicianPayrollProfileResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('user.name')->label('Teknisi')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('tanggal_masuk')->label('Tgl Masuk')->date('d M Y')->sortable(),
+                Tables\Columns\TextColumn::make('cutoff_hari')->label('Cut-off')->placeholder('—')->toggleable(),
                 Tables\Columns\TextColumn::make('gaji_pokok')->label('Gaji Pokok')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('potongan_bpjs_tk')->label('BPJS TK')->money('IDR')->toggleable(),
                 Tables\Columns\TextColumn::make('potongan_off_per_hari')->label('OFF/hari')->money('IDR')->toggleable(),

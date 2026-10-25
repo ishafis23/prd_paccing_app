@@ -113,8 +113,8 @@ class PayrollRunResource extends BaseResource
                             ->searchable()
                             ->required(),
                         Forms\Components\DatePicker::make('periode_mulai')
-                            ->label('Mulai Periode')
-                            ->helperText('Periode = 1 bulan dari tanggal ini (mis. 15 Okt → 15 Okt–14 Nov).')
+                            ->label('Tanggal acuan periode')
+                            ->helperText('Periode mengikuti tanggal cut-off teknisi (mis. cut-off 23 → 24 Sep–23 Okt). Tanpa cut-off: 1 bulan dari tanggal ini.')
                             ->required()
                             ->default(now()->startOfMonth()),
                     ])

@@ -71,11 +71,9 @@
                             wire:model="kategori"
                             class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             <option value="">Pilih kategori...</option>
-                            <option value="bensin">⛽ Bensin</option>
-                            <option value="makan">🍜 Makan</option>
-                            <option value="material">🔧 Material</option>
-                            <option value="transport">🚗 Transport</option>
-                            <option value="lainnya">📦 Lainnya</option>
+                            @foreach (\App\Models\TeknisiExpense::kategoriOpsi() as $nilai => $label)
+                                <option value="{{ $nilai }}">{{ $label }}</option>
+                            @endforeach
                         </select>
                         @error('kategori')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -203,11 +201,9 @@
                 <label class="block text-xs font-medium text-gray-600">Kategori</label>
                 <select wire:model.live="filterKategori" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
                     <option value="">Semua</option>
-                    <option value="bensin">⛽ Bensin</option>
-                    <option value="makan">🍜 Makan</option>
-                    <option value="material">🔧 Material</option>
-                    <option value="transport">🚗 Transport</option>
-                    <option value="lainnya">📦 Lainnya</option>
+                    @foreach (\App\Models\TeknisiExpense::kategoriOpsi() as $nilai => $label)
+                        <option value="{{ $nilai }}">{{ $label }}</option>
+                    @endforeach
                 </select>
             </div>
 
@@ -263,15 +259,10 @@
                     <div class="flex items-start justify-between gap-3 p-3">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
-                                <span class="text-lg">{{ match ($expense->kategori) {
-                                    'bensin' => '⛽',
-                                    'makan' => '🍜',
-                                    'material' => '🔧',
-                                    'transport' => '🚗',
-                                    default => '📦',
-                                } }}</span>
+                                @php [$ikonKategori, $namaKategori] = array_pad(explode(' ', $this->getKategoriLabel($expense->kategori), 2), 2, ''); @endphp
+                                <span class="text-lg">{{ $ikonKategori }}</span>
                                 <div class="min-w-0 flex-1">
-                                    <p class="font-medium text-gray-900">{{ ucfirst($expense->kategori) }}</p>
+                                    <p class="font-medium text-gray-900">{{ $namaKategori }}</p>
                                     <p class="truncate text-xs text-gray-500">
                                         {{ $expense->keterangan ?: 'Tanpa keterangan' }}
                                     </p>

@@ -23,6 +23,7 @@ use App\Models\TechnicianPayrollProfile;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -59,6 +60,95 @@ class PayrollService
         $awal = CarbonImmutable::parse($mulai)->startOfDay();
 
         return [$awal, $awal->addMonthNoOverflow()->subDay()];
+    }
+
+    /**
+     * Rentang periode gaji sebuah profil yang memuat $acuan. Tanpa cut-off
+     * → perilaku lama (rentangPeriode). Dengan cut-off (mis. 23) → tanggal 24
+     * bulan lalu s.d. 23 bulan berjalan; bulan pendek memakai akhir bulan
+     * (cut-off 31 di Februari = 28/29 Feb, periode berikutnya mulai 1 Mar).
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public function rentangPeriodeProfil(TechnicianPayrollProfile $profil, CarbonInterface $acuan): array
+    {
+        $cutoff = $profil->cutoff_hari;
+
+        if ($cutoff === null) {
+            return $this->rentangPeriode($acuan);
+        }
+
+        $cutoff = (int) $cutoff;
+        $tgl = CarbonImmutable::parse($acuan)->startOfDay();
+        $akhirDiBulan = fn (CarbonImmutable $bulan): CarbonImmutable => CarbonImmutable::create(
+            $bulan->year, $bulan->month, min($cutoff, $bulan->daysInMonth)
+        )->startOfDay();
+
+        $bulan = $tgl->startOfMonth();
+        $akhir = $akhirDiBulan($bulan);
+
+        if ($tgl->gt($akhir)) {
+            $bulan = $bulan->addMonthNoOverflow();
+            $akhir = $akhirDiBulan($bulan);
+        }
+
+        // Awal = sehari setelah akhir periode sebelumnya.
+        $awal = $akhirDiBulan($bulan->subMonthNoOverflow())->addDay();
+
+        return [$awal, $akhir->endOfDay()];
+    }
+
+    /**
+     * Periode gaji asal sebuah kasbon (periode yang memuat tanggal kasbon).
+     * Null bila teknisi belum punya profil gaji atau profilnya tanpa cut-off —
+     * tanpa cut-off periode tidak punya batas tetap, jadi kasbon mengikuti
+     * perilaku lama (dipotong di gaji berikutnya).
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    public function periodeKasbon(TechnicianAdvance $kasbon): ?array
+    {
+        $profil = TechnicianPayrollProfile::where('user_id', $kasbon->user_id)->first();
+
+        if ($profil === null || $profil->cutoff_hari === null) {
+            return null;
+        }
+
+        return $this->rentangPeriodeProfil($profil, $kasbon->tanggal);
+    }
+
+    /**
+     * Kasbon aktif yang periode asalnya sudah lewat dan belum pernah dipotong
+     * (perlu tindakan Admin).
+     *
+     * @return Collection<int, TechnicianAdvance>
+     */
+    public function kasbonBelumTerpotongLewatPeriode(?int $userId = null): Collection
+    {
+        $profil = TechnicianPayrollProfile::query()
+            ->whereNotNull('cutoff_hari')
+            ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
+            ->get()
+            ->keyBy('user_id');
+
+        if ($profil->isEmpty()) {
+            return collect();
+        }
+
+        return TechnicianAdvance::query()
+            ->whereIn('user_id', $profil->keys())
+            ->where('status', AdvanceStatus::Aktif->value)
+            ->orderBy('tanggal')
+            ->orderBy('id')
+            ->get()
+            ->filter(function (TechnicianAdvance $k) use ($profil): bool {
+                $p = $profil[$k->user_id];
+                $berjalanMulai = $this->rentangPeriodeProfil($p, today())[0];
+
+                return $k->terbayar() <= 0
+                    && $this->rentangPeriodeProfil($p, $k->tanggal)[1]->lt($berjalanMulai);
+            })
+            ->values();
     }
 
     /**
@@ -125,27 +215,50 @@ class PayrollService
     }
 
     /**
-     * Alokasi potongan kasbon aktif teknisi untuk gaji yang periodenya
-     * berakhir $selesai: tiap kasbon dipotong min(sisa, cicilan/periode),
-     * tanpa cicilan = lunas sekaligus. Total dibatasi $batas supaya gaji
-     * tidak jadi negatif; sisanya terbawa ke periode berikutnya.
+     * Alokasi potongan kasbon aktif teknisi untuk gaji periode
+     * [$periodeMulai, $periodeSelesai]: tiap kasbon dipotong min(sisa,
+     * cicilan/periode), tanpa cicilan = lunas sekaligus. Total dibatasi $batas
+     * supaya gaji tidak jadi negatif; sisanya terbawa ke periode berikutnya.
+     *
+     * Kasbon mengikuti periode gaji asalnya (yang memuat tanggal kasbon, hanya
+     * bila teknisi punya cut-off): periode mendatang dilewati, dan kasbon dari
+     * periode lampau yang belum pernah dipotong sama sekali juga dilewati
+     * (periodenya sudah tutup — Admin yang memutuskan lewat pelunasan manual).
+     * Kasbon yang sudah pernah dicicil tetap lanjut dipotong.
      *
      * @return array<int, array{advance: TechnicianAdvance, nominal: float}>
      */
-    private function alokasiKasbon(int $userId, string $selesai, float $batas): array
+    private function alokasiKasbon(int $userId, CarbonInterface $periodeMulai, CarbonInterface $periodeSelesai, float $batas): array
     {
         $alokasi = [];
         $tersisa = max(0.0, $batas);
+        $mulai = $periodeMulai->toDateString();
+
+        // Profil dimuat sekali di luar loop; tanpa profil/cut-off = perilaku lama.
+        $profil = TechnicianPayrollProfile::where('user_id', $userId)->first();
+        $berCutoff = $profil !== null && $profil->cutoff_hari !== null;
 
         $kasbon = TechnicianAdvance::query()
             ->where('user_id', $userId)
             ->where('status', AdvanceStatus::Aktif->value)
-            ->whereDate('tanggal', '<=', $selesai)
+            ->whereDate('tanggal', '<=', $periodeSelesai->toDateString())
             ->orderBy('tanggal')
             ->orderBy('id')
             ->get();
 
         foreach ($kasbon as $k) {
+            if ($berCutoff) {
+                $asalMulai = $this->rentangPeriodeProfil($profil, $k->tanggal)[0]->toDateString();
+
+                if ($asalMulai > $mulai) {
+                    continue;
+                }
+
+                if ($asalMulai < $mulai && $k->terbayar() <= 0) {
+                    continue;
+                }
+            }
+
             $cicilan = (float) $k->cicilan_per_periode;
             $sisa = $k->sisa();
             $potong = min($sisa, $cicilan > 0 ? $cicilan : $sisa, $tersisa);
@@ -161,7 +274,7 @@ class PayrollService
 
     private function proses(TechnicianPayrollProfile $profil, CarbonInterface $mulaiAwal, ?int $actorId): PayrollRun
     {
-        [$mulai, $selesai] = $this->rentangPeriode($mulaiAwal);
+        [$mulai, $selesai] = $this->rentangPeriodeProfil($profil, $mulaiAwal);
 
         $existing = PayrollRun::query()
             ->where('user_id', $profil->user_id)
@@ -239,14 +352,16 @@ class PayrollService
         $sebelumKasbon = (float) $profil->gaji_pokok + $bonusBulanan + $bonusUmum
             - $dendaTelat - $potonganOff - $potonganSetengahHari - (float) $profil->potongan_bpjs_tk;
         $potonganKasbon = round(array_sum(array_column(
-            $this->alokasiKasbon($profil->user_id, $selesai->toDateString(), $sebelumKasbon),
+            $this->alokasiKasbon($profil->user_id, $mulai, $selesai, $sebelumKasbon),
             'nominal'
         )), 2);
+
+        $adaKasbonTerlewat = $this->kasbonBelumTerpotongLewatPeriode($profil->user_id)->isNotEmpty();
 
         return DB::transaction(function () use (
             $existing, $profil, $mulai, $selesai, $actorId, $bulananPerKategori, $bonusBulanan,
             $bonusMingguan, $bonusUmum, $jumlahTelat, $dendaTelat, $jumlahOff, $kelebihanOff,
-            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari, $potonganKasbon
+            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari, $potonganKasbon, $adaKasbonTerlewat
         ): PayrollRun {
             $run = $existing ?? new PayrollRun;
 
@@ -351,6 +466,18 @@ class PayrollService
                 ]);
             }
 
+            // Item informasi (nominal 0): tidak mengubah gaji karena recalc() memakai
+            // kolom total, bukan penjumlahan item.
+            if ($adaKasbonTerlewat) {
+                $run->items()->create([
+                    'jenis' => PayrollItemJenis::Potongan->value,
+                    'kategori' => 'kasbon_belum_terpotong',
+                    'label' => 'Kasbon periode lalu belum terpotong (perlu tindakan Admin)',
+                    'nominal' => 0,
+                    'urutan' => ++$urutan,
+                ]);
+            }
+
             if ((float) $profil->potongan_bpjs_tk > 0) {
                 $run->items()->create([
                     'jenis' => PayrollItemJenis::Potongan->value,
@@ -429,7 +556,7 @@ class PayrollService
     private function catatPelunasanKasbon(PayrollRun $run): void
     {
         $batas = (float) $run->gaji_bersih + (float) $run->total_potongan_kasbon;
-        $alokasi = $this->alokasiKasbon($run->user_id, $run->periode_selesai->toDateString(), $batas);
+        $alokasi = $this->alokasiKasbon($run->user_id, $run->periode_mulai, $run->periode_selesai, $batas);
 
         $total = round(array_sum(array_column($alokasi, 'nominal')), 2);
 
@@ -447,6 +574,55 @@ class PayrollService
                 $a['advance']->update(['status' => AdvanceStatus::Lunas]);
             }
         }
+    }
+
+    /**
+     * Admin menandai kasbon sudah dibayar/dipotong di luar perhitungan gaji
+     * (mis. gaji periode lalu yang diproses di luar sistem). Pelunasan dicatat
+     * tanpa payroll_run_id.
+     */
+    public function lunasiManual(TechnicianAdvance $kasbon, float $nominal, string $catatan, User $actor): TechnicianAdvance
+    {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+
+        if (trim($catatan) === '') {
+            throw new BusinessRuleException('Catatan wajib diisi.');
+        }
+
+        // Muat ulang: status/sisa harus dari DB, bukan dari instance yang mungkin basi.
+        $kasbon->refresh();
+
+        if ($kasbon->status !== AdvanceStatus::Aktif) {
+            throw new BusinessRuleException('Kasbon ini sudah lunas.');
+        }
+
+        $sisa = $kasbon->sisa();
+
+        if ($nominal <= 0) {
+            throw new BusinessRuleException('Nominal harus lebih dari 0.');
+        }
+
+        if ($nominal - $sisa > 0.005) {
+            throw new BusinessRuleException('Nominal melebihi sisa kasbon.');
+        }
+
+        DB::transaction(function () use ($kasbon, $nominal, $catatan, $actor): void {
+            TechnicianAdvanceRepayment::create([
+                'technician_advance_id' => $kasbon->id,
+                'payroll_run_id' => null,
+                'nominal' => round($nominal, 2),
+                'catatan' => trim($catatan),
+                'dicatat_oleh' => $actor->id,
+            ]);
+
+            if ($kasbon->sisa() <= 0.005) {
+                $kasbon->update(['status' => AdvanceStatus::Lunas]);
+            }
+        });
+
+        $this->segarkanDraftSejak($kasbon->user_id, $kasbon->tanggal);
+
+        return $kasbon->fresh();
     }
 
     public function bayar(PayrollRun $run, User $actor): PayrollRun

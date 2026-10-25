@@ -6,6 +6,7 @@ use App\Models\TeknisiExpense;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Validation\Rule;
 
 class TeknisExpenseController extends Controller
 {
@@ -16,7 +17,7 @@ class TeknisExpenseController extends Controller
     {
         $validated = $request->validate([
             'tanggal_input' => 'required|date|before_or_equal:today',
-            'kategori' => 'required|in:bensin,makan,material,transport,lainnya',
+            'kategori' => ['required', Rule::in(TeknisiExpense::KATEGORI)],
             'nominal' => 'required|integer|min:1000|max:5000000',
             'keterangan' => 'nullable|string|max:255',
             'bukti_file' => 'nullable|image|mimes:jpeg,png|max:5120',
@@ -353,7 +354,7 @@ class TeknisExpenseController extends Controller
 
     private function groupByKategori($expenses): array
     {
-        $kategoris = ['bensin', 'makan', 'material', 'transport', 'lainnya'];
+        $kategoris = TeknisiExpense::KATEGORI;
         $result = [];
 
         foreach ($kategoris as $kat) {

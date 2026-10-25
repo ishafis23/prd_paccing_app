@@ -14,6 +14,8 @@ class TechnicianAdvanceRepayment extends Model
         'technician_advance_id',
         'payroll_run_id',
         'nominal',
+        'catatan',
+        'dicatat_oleh',
     ];
 
     protected function casts(): array
@@ -29,5 +31,11 @@ class TechnicianAdvanceRepayment extends Model
     public function payrollRun(): BelongsTo
     {
         return $this->belongsTo(PayrollRun::class);
+    }
+
+    /** Admin yang menandai pelunasan manual (payroll_run_id kosong). */
+    public function dicatatOleh(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dicatat_oleh');
     }
 }
