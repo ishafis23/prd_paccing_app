@@ -24,6 +24,7 @@ return [
     // dev-plan/27: pemicu notifikasi otomatis ke customer.
     'notif_berangkat' => (bool) env('WA_NOTIF_BERANGKAT', true),
     'notif_lunas' => (bool) env('WA_NOTIF_LUNAS', false),
+    'notif_laporan' => (bool) env('WA_NOTIF_LAPORAN', true),
 
     // MODE UJI: bila diisi, SEMUA notifikasi otomatis ke customer diarahkan
     // ke nomor ini (mis. nomor admin) — untuk uji coba. Kosongkan di produksi.

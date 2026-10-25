@@ -121,6 +121,58 @@ class NotifikasiWaService
         return $this->wa->kirimDokumen($admin, $device, $target, $path, $pesan, $namafile, $invoice, 'pembayaran');
     }
 
+    /**
+     * Kirim laporan pengerjaan PDF ke customer dan catat pengiriman yang
+     * benar-benar berhasil. Aksi ini dipicu manual oleh Admin/Finance dari
+     * halaman order, sehingga kegagalan pengiriman tidak boleh menandai
+     * laporan sebagai telah terkirim.
+     */
+    public function kirimLaporanPengerjaan(Order $order, User $admin): WaLog
+    {
+        if (! config('wa.notif_laporan', true) || ! $this->wa->aktif()) {
+            throw new BusinessRuleException('Notifikasi WhatsApp laporan tidak aktif.');
+        }
+
+        $order->loadMissing('customer');
+        $customer = $order->customer;
+        $target = $this->targetUji((string) ($customer?->no_hp ?? ''));
+
+        if ($target === '') {
+            throw new BusinessRuleException('Customer belum punya nomor WhatsApp.');
+        }
+
+        $device = $this->deviceUntuk($admin);
+        if ($device === null) {
+            throw new BusinessRuleException('Belum ada device WA. Sambungkan device atau tandai "Device Notifikasi Otomatis" dulu.');
+        }
+
+        $dokumen = app(LaporanPengerjaanService::class)->dokumenOrder($order);
+        $pdf = app(LaporanPdfService::class)->render($dokumen);
+        $namafile = 'Laporan-Pengerjaan-Order-'.$order->id.'.pdf';
+        $path = $this->wa->simpanSnapshot($pdf, $namafile);
+
+        $pesan = $this->template->teks('laporan_pengerjaan', [
+            'nama' => (string) ($customer?->nama ?? 'Pelanggan'),
+            'nama_usaha' => $this->usaha->namaUsaha(),
+            'layanan' => $order->ringkasanLayanan(),
+            'nomor_order' => '#'.$order->id,
+        ]) ?? WhatsappTemplate::laporan(
+            (string) ($customer?->nama ?? 'Pelanggan'),
+            $this->usaha->namaUsaha(),
+        );
+
+        $log = $this->wa->kirimDokumen($admin, $device, $target, $path, $pesan, $namafile, $order, 'laporan_pengerjaan');
+
+        if ($log->sukses()) {
+            $order->update([
+                'laporan_terkirim_pada' => now(),
+                'laporan_terkirim_oleh' => $admin->id,
+            ]);
+        }
+
+        return $log;
+    }
+
     /** Device milik user (bila terhubung), fallback ke device notifikasi. */
     private function deviceUntuk(?User $user): ?WaDevice
     {

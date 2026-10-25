@@ -49,6 +49,14 @@ class WaTemplateService
         ."Terima kasih.\n\n"
         ."Hormat kami,\n{nama_usaha}";
 
+    /** Default pengantar PDF laporan pengerjaan. */
+    public const DEFAULT_LAPORAN_PENGERJAAN = "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
+        ."Bapak/Ibu {nama}\n\n"
+        .'Bersama pesan ini kami sampaikan laporan pengerjaan {layanan} untuk order {nomor_order}.'
+        ." Rincian dan foto pengerjaan terlampir dalam file PDF.\n\n"
+        ."Terima kasih atas kepercayaan Anda.\n\n"
+        ."Hormat kami,\n{nama_usaha}";
+
     /** Katalog default: kode => [nama, isi] — dipakai seeder & fallback. */
     public const DEFAULTS = [
         'berangkat' => [
@@ -67,6 +75,10 @@ class WaTemplateService
             'nama' => 'Pengingat Tagihan',
             'isi' => self::DEFAULT_REMINDER_TAGIHAN,
         ],
+        'laporan_pengerjaan' => [
+            'nama' => 'Notifikasi Laporan Pengerjaan',
+            'isi' => self::DEFAULT_LAPORAN_PENGERJAAN,
+        ],
     ];
 
     /** Placeholder yang dikenali (untuk helper text di halaman admin). */
@@ -80,6 +92,7 @@ class WaTemplateService
         'nomor_invoice',
         'total',
         'tautan_invoice',
+        'nomor_order',
     ];
 
     public function placeholderList(): string

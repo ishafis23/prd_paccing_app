@@ -29,6 +29,7 @@ use App\Services\BusinessInfoService;
 use App\Services\CustomerService;
 use App\Services\FinanceService;
 use App\Services\InvoiceService;
+use App\Services\NotifikasiWaService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\WhatsappService;
@@ -238,6 +239,10 @@ class OrderResource extends BaseResource
                                     ->schema([
                                         View::make('order.info-table')
                                             ->state(fn (Order $record): Order => $record),
+                                        TextEntry::make('laporan_terkirim_pada')
+                                            ->label('Laporan terkirim pada')
+                                            ->dateTime('d M Y H:i')
+                                            ->placeholder('Belum ditandai terkirim'),
                                     ]),
                             ]),
 
@@ -528,6 +533,37 @@ class OrderResource extends BaseResource
      *
      * @return array<int, Forms\Components\Component>
      */
+    public static function bolehKirimLaporan(Order $record): bool
+    {
+        return $record->laporan_terkirim_pada === null
+            && in_array($record->status, [OrderStatus::Selesai, OrderStatus::ButuhFollowup], true);
+    }
+
+    /** Tandai manual untuk laporan yang dikirim melalui kanal di luar aplikasi. */
+    public static function tandaiLaporanTerkirim(Order $record, User $admin): void
+    {
+        $record->update([
+            'laporan_terkirim_pada' => now(),
+            'laporan_terkirim_oleh' => $admin->id,
+        ]);
+
+    }
+
+    /** Kirim PDF laporan dan tampilkan hasil yang dicatat WhatsApp. */
+    public static function kirimLaporanPengerjaan(Order $record, User $admin): void
+    {
+        try {
+            $log = app(NotifikasiWaService::class)->kirimLaporanPengerjaan($record, $admin);
+            Notification::make()
+                ->title($log->sukses() ? 'Laporan terkirim ke customer' : 'Gagal mengirim laporan')
+                ->body($log->sukses() ? 'Ke '.$log->target.' — tercatat di Riwayat Kirim WA.' : (string) $log->error_message)
+                ->status($log->sukses() ? 'success' : 'danger')
+                ->send();
+        } catch (BusinessRuleException $e) {
+            Notification::make()->danger()->title('Tidak bisa kirim laporan')->body($e->getMessage())->send();
+        }
+    }
+
     public static function formInvoice(): array
     {
         return [
@@ -636,6 +672,11 @@ class OrderResource extends BaseResource
                         return $laporan->sudahDiverifikasi() ? 'Terverifikasi' : 'Menunggu Verifikasi';
                     })
                     ->color(fn (?string $state): string => $state === 'Terverifikasi' ? 'success' : 'warning'),
+                Tables\Columns\TextColumn::make('laporan_terkirim_pada')
+                    ->label('Laporan dikirim')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('Belum')
+                    ->toggleable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(EnumOptions::for(OrderStatus::class)),
@@ -677,6 +718,29 @@ class OrderResource extends BaseResource
                             && $record->status !== OrderStatus::Batal)
                         ->url(fn (Order $record) => Url::absolute('laporan.preview', ['order' => $record->id]))
                         ->openUrlInNewTab(),
+
+                    Tables\Actions\Action::make('kirimLaporanKeCustomer')
+                        ->label('Kirim Laporan ke Customer')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('success')
+                        ->visible(fn (Order $record): bool => self::bolehKirimLaporan($record))
+                        ->requiresConfirmation()
+                        ->modalHeading('Kirim Laporan Pengerjaan')
+                        ->modalDescription('PDF laporan pengerjaan akan dikirim ke WhatsApp customer.')
+                        ->action(fn (Order $record) => self::kirimLaporanPengerjaan($record, auth()->user())),
+
+                    Tables\Actions\Action::make('tandaiLaporanTerkirim')
+                        ->label('Tandai Laporan Terkirim')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('gray')
+                        ->visible(fn (Order $record): bool => $record->laporan_terkirim_pada === null)
+                        ->requiresConfirmation()
+                        ->modalHeading('Tandai laporan terkirim')
+                        ->modalDescription('Gunakan bila laporan dikirim di luar aplikasi. Tindakan ini tidak mengirim WhatsApp.')
+                        ->action(function (Order $record): void {
+                            self::tandaiLaporanTerkirim($record, auth()->user());
+                            Notification::make()->success()->title('Laporan ditandai terkirim')->send();
+                        }),
 
                     Tables\Actions\Action::make('buatInvoice')
                         ->label('Buat Invoice')
