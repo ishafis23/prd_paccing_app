@@ -122,9 +122,8 @@ Uji pada MySQL/MariaDB lokal **belum** dijalankan pada sesi ini karena MariaDB X
 2. **Review independen agen kedua (`_brief/laporan-12.md`) belum ada.** Agen CLI kehabisan kuota di
    tengah review (`You've hit your usage limit ... Nov 24, 2026`). Review masih berjalan lewat agen
    lain; hasilnya akan ditambahkan ke berkas ini setelah saya verifikasi sendiri.
-3. **Tampilan baru belum dicoba di browser oleh saya** (halaman Setoran Tunai, panel "Akses ditahan",
-   menu Finance → Setoran Tunai, tombol kirim laporan). Yang terbukti baru sebatas test HTTP
-   (`GET /teknisi/setoran` 200) dan render blade tanpa error. Perlu sekali klik-coba.
+3. **Tampilan baru sudah saya pastikan ter-render dengan data nyata**, bukan lewat browser (tool browser di mesin ini tidak merespons): saya login sebagai teknisi (id 3) dan Owner (id 1) di dalam aplikasi, lalu meminta `/teknisi`, `/teknisi/setoran`, `/admin/cash-handovers`, `/admin/orders`, `/admin/orders/2` — kelimanya **HTTP 200** dan memuat penanda yang benar: panel "Akses ditahan" muncul di beranda **dan** daftar order ("Hari Ini & Akan Datang") hilang; halaman Setoran Tunai memuat form + riwayat; menu Finance → Setoran Tunai ada; aksi "Kirim Laporan ke Customer" dan "Tandai Laporan Terkirim" ada di daftar order. Yang belum: tata letak di layar HP sungguhan (9 tab bottom-nav) dan rasa tombolnya saat diklik — perlu sekali Anda coba.
+   - **Data demo di DB lokal:** saya membuat 1 order contoh **id 2** (teknisi Teknisi Andi, customer Budi Santoso, Rp100.000, tunai ditandai kemarin, laporan sudah ditandai terkirim) supaya panel "Akses ditahan" bisa Anda lihat langsung. Hapus dengan `php artisan tinker --execute="\App\Models\Order::find(2)->delete();"` bila sudah tidak perlu.
 4. **Cut-off per teknisi masih kosong** untuk semua teknisi. Admin perlu mengisi (mis. Bayu = 23)
    lewat menu profil gaji teknisi; selama kosong, periode gaji tetap perilaku lama.
 5. **Kasbon Bayu 19 Sep** (kasus yang dilaporkan) harus diselesaikan sekali oleh Admin lewat aksi
