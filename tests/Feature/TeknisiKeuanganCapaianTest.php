@@ -10,6 +10,7 @@ use App\Enums\ServiceType;
 use App\Livewire\Teknisi\Keuangan;
 use App\Livewire\Teknisi\LaporanPengeluaran;
 use App\Models\Order;
+use App\Models\OrderTechnician;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,5 +118,24 @@ class TeknisiKeuanganCapaianTest extends TestCase
             ->call('setTab', 'pendapatan')
             ->assertSee('Rp 150.000')
             ->assertDontSee('550.000');
+    }
+
+    public function test_order_tim_tempat_dia_bukan_pic_tidak_masuk_pendapatan(): void
+    {
+        $pic = User::factory()->withRole('teknisi')->create();
+
+        $order = Order::factory()->create([
+            'teknisi_id' => $pic->id,
+            'status' => OrderStatus::Selesai,
+        ]);
+        $order->orderItems()->delete();
+        $order->orderItems()->create(['nama_layanan' => 'Cuci AC', 'kategori' => ServiceType::CuciAc, 'komponen' => IncomeCategory::Jasa, 'harga' => 200000, 'jumlah' => 1]);
+
+        OrderTechnician::create(['order_id' => $order->id, 'teknisi_id' => $this->teknisi->id]);
+
+        Livewire::actingAs($this->teknisi)
+            ->test(Keuangan::class)
+            ->call('setTab', 'pendapatan')
+            ->assertDontSee('200.000');
     }
 }

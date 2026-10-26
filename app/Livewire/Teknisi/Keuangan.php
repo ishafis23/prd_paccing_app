@@ -37,13 +37,15 @@ class Keuangan extends Component
     }
 
     /**
-     * Order selesai milik teknisi ini dalam rentang tanggal (pakai
-     * updated_at sebagai perkiraan tanggal penyelesaian).
+     * Order selesai dengan teknisi ini sebagai PIC dalam rentang tanggal
+     * (pakai updated_at sebagai perkiraan tanggal penyelesaian). Order yang
+     * dia hanya jadi anggota tim tidak ikut — pendapatan harus benar-benar
+     * jasa miliknya sendiri.
      */
     private function orderSelesaiRentang(CarbonImmutable $mulai, CarbonImmutable $selesai): Collection
     {
         return Order::query()
-            ->untukTeknisi(auth()->id())
+            ->where('teknisi_id', auth()->id())
             ->where('status', OrderStatus::Selesai->value)
             ->whereBetween('updated_at', [$mulai, $selesai])
             ->with(['customer', 'orderItems', 'latestPayment'])
@@ -95,7 +97,7 @@ class Keuangan extends Component
     public function pendapatanTotal(): float
     {
         return (float) Order::query()
-            ->untukTeknisi(auth()->id())
+            ->where('teknisi_id', auth()->id())
             ->where('status', OrderStatus::Selesai->value)
             ->with(['orderItems', 'latestPayment'])
             ->get()
