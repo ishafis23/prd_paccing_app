@@ -2,9 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\IncomeCategory;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\RoleName;
+use App\Enums\ServiceType;
+use App\Livewire\Teknisi\Keuangan;
+use App\Livewire\Teknisi\LaporanPengeluaran;
+use App\Models\Order;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -52,8 +61,8 @@ class TeknisiKeuanganCapaianTest extends TestCase
      */
     public function test_mengosongkan_field_angka_tidak_error_dan_nominal_jadi_nol(): void
     {
-        \Livewire\Livewire::actingAs($this->teknisi)
-            ->test(\App\Livewire\Teknisi\LaporanPengeluaran::class)
+        Livewire::actingAs($this->teknisi)
+            ->test(LaporanPengeluaran::class)
             ->set('qty', 2)
             ->set('harga', 5000)
             ->assertSet('nominal', 10000)
@@ -68,19 +77,45 @@ class TeknisiKeuanganCapaianTest extends TestCase
 
     public function test_pendapatan_teknisi_hanya_menampilkan_omset_jasa(): void
     {
-        $order = \App\Models\Order::factory()->create([
+        $order = Order::factory()->create([
             'teknisi_id' => $this->teknisi->id,
-            'status' => \App\Enums\OrderStatus::Selesai,
+            'status' => OrderStatus::Selesai,
         ]);
         $order->orderItems()->delete();
-        $order->orderItems()->create(['nama_layanan' => 'Cuci AC', 'kategori' => \App\Enums\ServiceType::CuciAc, 'komponen' => \App\Enums\IncomeCategory::Jasa, 'harga' => 150000, 'jumlah' => 1]);
-        $order->orderItems()->create(['nama_layanan' => 'Isi Freon', 'kategori' => \App\Enums\ServiceType::CuciAc, 'komponen' => \App\Enums\IncomeCategory::Material, 'harga' => 375000, 'jumlah' => 1]);
+        $order->orderItems()->create(['nama_layanan' => 'Cuci AC', 'kategori' => ServiceType::CuciAc, 'komponen' => IncomeCategory::Jasa, 'harga' => 150000, 'jumlah' => 1]);
+        $order->orderItems()->create(['nama_layanan' => 'Isi Freon', 'kategori' => ServiceType::CuciAc, 'komponen' => IncomeCategory::Material, 'harga' => 375000, 'jumlah' => 1]);
 
-        \Livewire\Livewire::actingAs($this->teknisi)
-            ->test(\App\Livewire\Teknisi\Keuangan::class)
+        Livewire::actingAs($this->teknisi)
+            ->test(Keuangan::class)
             ->assertSet('tab', 'pengeluaran')
             ->call('setTab', 'pendapatan')
             ->assertSee('Rp 150.000')
             ->assertDontSee('525.000');
+    }
+
+    public function test_pendapatan_teknisi_mengikuti_omset_jasa_yang_dicatat_admin(): void
+    {
+        $order = Order::factory()->create([
+            'teknisi_id' => $this->teknisi->id,
+            'status' => OrderStatus::Selesai,
+        ]);
+        $order->orderItems()->delete();
+        $order->orderItems()->create(['nama_layanan' => 'Isi Freon', 'kategori' => ServiceType::CuciAc, 'komponen' => IncomeCategory::Jasa, 'harga' => 550000, 'jumlah' => 1]);
+
+        Payment::factory()->create([
+            'order_id' => $order->id,
+            'status' => PaymentStatus::Lunas,
+            'total_tagihan' => 550000,
+            'jumlah_dibayar' => 550000,
+            'omset_jasa' => 150000,
+            'omset_material' => 400000,
+            'dicatat_oleh' => $this->teknisi->id,
+        ]);
+
+        Livewire::actingAs($this->teknisi)
+            ->test(Keuangan::class)
+            ->call('setTab', 'pendapatan')
+            ->assertSee('Rp 150.000')
+            ->assertDontSee('550.000');
     }
 }

@@ -46,9 +46,22 @@ class Keuangan extends Component
             ->untukTeknisi(auth()->id())
             ->where('status', OrderStatus::Selesai->value)
             ->whereBetween('updated_at', [$mulai, $selesai])
-            ->with(['customer', 'orderItems'])
+            ->with(['customer', 'orderItems', 'latestPayment'])
             ->orderBy('updated_at')
             ->get();
+    }
+
+    /**
+     * Omset JASA satu order. Bila admin sudah mencatat pembayaran dengan split
+     * omset (dev-plan/24), angka itulah yang dipakai — supaya tampilan teknisi
+     * ikut angka final yang dicatat admin. Tanpa pembayaran, fallback ke
+     * rincian order_items. Material tidak pernah ikut dihitung.
+     */
+    private function omsetJasa(Order $order): float
+    {
+        $split = $order->latestPayment?->splitOmset();
+
+        return $split !== null ? $split['jasa'] : $order->totalPerKomponen()['jasa'];
     }
 
     /**
@@ -57,7 +70,7 @@ class Keuangan extends Component
      */
     private function totalOrder(Collection $orders): float
     {
-        return (float) $orders->sum(fn (Order $order) => $order->totalPerKomponen()['jasa']);
+        return (float) $orders->sum(fn (Order $order) => $this->omsetJasa($order));
     }
 
     #[Computed]
@@ -84,9 +97,9 @@ class Keuangan extends Component
         return (float) Order::query()
             ->untukTeknisi(auth()->id())
             ->where('status', OrderStatus::Selesai->value)
-            ->with('orderItems')
+            ->with(['orderItems', 'latestPayment'])
             ->get()
-            ->sum(fn (Order $order) => $order->totalPerKomponen()['jasa']);
+            ->sum(fn (Order $order) => $this->omsetJasa($order));
     }
 
     /**
@@ -112,7 +125,7 @@ class Keuangan extends Component
                 'order_id' => $order->id,
                 'customer' => $order->customer?->nama ?? 'Tanpa nama',
                 'layanan' => $order->ringkasanLayanan(),
-                'total' => $order->totalPerKomponen()['jasa'],
+                'total' => $this->omsetJasa($order),
             ])
             ->all();
     }
