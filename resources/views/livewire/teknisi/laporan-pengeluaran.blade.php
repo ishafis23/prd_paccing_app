@@ -47,6 +47,23 @@
                     @enderror
                 </div>
 
+                {{-- Partner tim / pendamping (opsional) --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Partner Tim/Pendamping (opsional)</label>
+                    <select
+                        wire:model="partner_id"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <option value="">— Tanpa partner —</option>
+                        @foreach ($this->partnerOptions as $id => $nama)
+                            <option value="{{ $id }}">{{ $nama }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Pengeluaran ini ikut terhitung untuk partner, jadi cukup satu orang yang mencatat.</p>
+                    @error('partner_id')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 {{-- Order terkait (opsional) --}}
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Order Terkait (opsional)</label>
@@ -275,6 +292,11 @@
                                     @if ($expense->order_id)
                                         <p class="text-[11px] font-medium text-blue-500">Order #{{ $expense->order_id }}</p>
                                     @endif
+                                    @if ($expense->teknisi_id !== auth()->id())
+                                        <p class="text-[11px] font-medium text-purple-600">Dicatat oleh {{ $expense->teknisi?->name }} (Anda partner)</p>
+                                    @elseif ($expense->partner_id)
+                                        <p class="text-[11px] font-medium text-purple-600">Partner: {{ $expense->partner?->name }}</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -297,7 +319,7 @@
                             </span>
 
                             {{-- Actions --}}
-                            @if ($expense->status === 'pending')
+                            @if ($expense->status === 'pending' && $expense->teknisi_id === auth()->id())
                                 <button
                                     type="button"
                                     wire:click="deletePengeluaran({{ $expense->id }})"

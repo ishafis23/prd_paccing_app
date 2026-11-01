@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Teknisi;
 
+use App\Enums\RoleName;
 use App\Models\Order;
 use App\Models\TeknisiExpense;
+use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -43,6 +45,9 @@ class LaporanPengeluaran extends Component
     #[Validate('nullable|string|max:255')]
     public string $keterangan = '';
 
+    // Rekan satu tim: pengeluaran ini ikut terhitung untuknya (tanpa input ulang).
+    public $partner_id = null;
+
     public string $filterBulan = '';
 
     public string $filterKategori = '';
@@ -58,7 +63,20 @@ class LaporanPengeluaran extends Component
     {
         return [
             'kategori' => ['required', Rule::in(TeknisiExpense::KATEGORI)],
+            'partner_id' => ['nullable', Rule::in(array_keys($this->partnerOptions))],
         ];
+    }
+
+    private function partnerQuery()
+    {
+        return User::role(RoleName::Teknisi->value)->where('users.id', '!=', auth()->id());
+    }
+
+    /** Teknisi lain yang bisa dipilih sebagai partner/pendamping. */
+    #[Computed]
+    public function partnerOptions(): array
+    {
+        return $this->partnerQuery()->orderBy('name')->pluck('name', 'id')->all();
     }
 
     public function mount(): void
@@ -174,8 +192,10 @@ class LaporanPengeluaran extends Component
     #[Computed]
     public function expenses(): LengthAwarePaginator
     {
+        // Termasuk pengeluaran rekan yang menautkan saya sebagai partner (tampil, tidak bisa dihapus).
         $query = TeknisiExpense::query()
-            ->byTeknisi(auth()->id());
+            ->tercatatUntuk(auth()->id())
+            ->with(['teknisi', 'partner']);
 
         if ($this->filterBulan) {
             $query->byMonth($this->filterBulan);
@@ -206,6 +226,7 @@ class LaporanPengeluaran extends Component
         try {
             TeknisiExpense::create([
                 'teknisi_id' => auth()->id(),
+                'partner_id' => filled($this->partner_id) ? (int) $this->partner_id : null,
                 'order_id' => $this->order_id,
                 'tanggal_input' => $this->tanggal_input,
                 'kategori' => $this->kategori,
@@ -217,7 +238,7 @@ class LaporanPengeluaran extends Component
             ]);
 
             session()->flash('status', 'Pengeluaran berhasil dicatat.');
-            $this->reset(['tanggal_input', 'kategori', 'order_id', 'qty', 'harga', 'nominal', 'keterangan', 'showForm']);
+            $this->reset(['tanggal_input', 'kategori', 'order_id', 'partner_id', 'qty', 'harga', 'nominal', 'keterangan', 'showForm']);
             $this->tanggal_input = today()->format('Y-m-d');
             $this->qty = 1;
             $this->harga = 0;

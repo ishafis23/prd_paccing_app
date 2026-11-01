@@ -16,6 +16,7 @@ class TeknisiExpense extends Model
 
     protected $fillable = [
         'teknisi_id',
+        'partner_id',
         'order_id',
         'tanggal_input',
         'kategori',
@@ -40,6 +41,19 @@ class TeknisiExpense extends Model
     public function teknisi(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teknisi_id');
+    }
+
+    public function partner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'partner_id');
+    }
+
+    /** Pengeluaran yang dicatat teknisi ini ATAU dicatat rekannya dengan dia sebagai partner. */
+    public function scopeTercatatUntuk(Builder $query, User|int $teknisi): Builder
+    {
+        $id = is_int($teknisi) ? $teknisi : $teknisi->id;
+
+        return $query->where(fn (Builder $q) => $q->where('teknisi_id', $id)->orWhere('partner_id', $id));
     }
 
     public function order(): BelongsTo

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Models\DailyAttendance;
 use App\Models\Order;
 use App\Models\TeknisiExpense;
 use App\Models\User;
@@ -68,10 +69,51 @@ class SyaratAdministrasiService
             $hasil = [...$hasil, ...$this->penghalangFisik($order, $teknisi)];
         }
 
+        // 3. Pengeluaran harian — tiap hari teknisi absen wajib ada catatan pengeluaran
+        //    (dicatat sendiri atau oleh partner timnya).
+        $hasil = [...$hasil, ...$this->penghalangPengeluaranHarian($teknisi, $tenggang)];
+
         usort($hasil, fn (array $a, array $b): int => (self::URUTAN[$a['jenis']] <=> self::URUTAN[$b['jenis']])
             ?: ($a['order_id'] <=> $b['order_id']));
 
         return $hasil;
+    }
+
+    /**
+     * Hari-hari lampau (dalam tenggang) saat teknisi absen tetapi tidak ada satu pun
+     * catatan pengeluaran. Hari ini tidak dihitung — pengeluaran masih bisa menyusul.
+     *
+     * @return array<int, array{jenis: string, order_id: ?int, judul: string, pesan: string}>
+     */
+    public function penghalangPengeluaranHarian(User $teknisi, \Carbon\CarbonInterface $sejak): array
+    {
+        $hariAbsen = DailyAttendance::query()
+            ->where('user_id', $teknisi->id)
+            ->whereNotNull('jam_datang')
+            ->whereDate('tanggal', '>=', $sejak->toDateString())
+            ->whereDate('tanggal', '<', today()->toDateString())
+            ->pluck('tanggal')
+            ->map(fn ($t) => $t->toDateString());
+
+        if ($hariAbsen->isEmpty()) {
+            return [];
+        }
+
+        $adaPengeluaran = TeknisiExpense::query()->tercatatUntuk($teknisi)
+            ->whereDate('tanggal_input', '>=', $sejak->toDateString())
+            ->pluck('tanggal_input')
+            ->map(fn ($t) => $t->toDateString())
+            ->unique();
+
+        return $hariAbsen->diff($adaPengeluaran)->sort()->values()->map(fn (string $tgl): array => [
+            'jenis' => 'pengeluaran',
+            'order_id' => null,
+            'judul' => 'Catatan pengeluaran harian belum diisi',
+            'pesan' => sprintf(
+                'Catatan pengeluaran tanggal %s belum diisi (wajib untuk hari masuk kerja). Isi di Keuangan > Laporan Pengeluaran.',
+                \Carbon\Carbon::parse($tgl)->format('d M Y'),
+            ),
+        ])->all();
     }
 
     /**
