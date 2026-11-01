@@ -138,4 +138,26 @@ class TeknisiKeuanganCapaianTest extends TestCase
             ->call('setTab', 'pendapatan')
             ->assertDontSee('200.000');
     }
+
+    public function test_omset_jasa_terhitung_di_tanggal_jadwal_bukan_tanggal_laporan_selesai(): void
+    {
+        $order = Order::factory()->create([
+            'teknisi_id' => $this->teknisi->id,
+            'status' => OrderStatus::Selesai,
+            'tanggal_jadwal' => '2026-10-31',
+        ]);
+        $order->orderItems()->delete();
+        $order->orderItems()->create(['nama_layanan' => 'Cuci AC', 'kategori' => ServiceType::CuciAc, 'komponen' => IncomeCategory::Jasa, 'harga' => 115000, 'jumlah' => 1]);
+        // Laporan baru diselesaikan keesokan harinya.
+        $order->forceFill(['updated_at' => '2026-11-01 09:00:00'])->saveQuietly();
+
+        $hari = fn (string $tgl) => Livewire::actingAs($this->teknisi)
+            ->test(Keuangan::class)
+            ->call('setTab', 'pendapatan')
+            ->set('modePendapatan', 'harian')
+            ->set('filterTanggal', $tgl);
+
+        $hari('2026-10-31')->assertSee('Order #'.$order->id)->assertSee('31 Oct 2026');
+        $hari('2026-11-01')->assertDontSee('Order #'.$order->id);
+    }
 }

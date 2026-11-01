@@ -4,6 +4,7 @@ namespace App\Livewire\Teknisi;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Services\OmsetService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -37,8 +38,10 @@ class Keuangan extends Component
     }
 
     /**
-     * Order selesai dengan teknisi ini sebagai PIC dalam rentang tanggal
-     * (pakai updated_at sebagai perkiraan tanggal penyelesaian). Order yang
+     * Order selesai dengan teknisi ini sebagai PIC dalam rentang tanggal.
+     * Tanggal omset = tanggal order DIJADWALKAN/dikerjakan (sama dengan admin,
+     * OmsetService::tanggalPendapatanSql), bukan tanggal laporan diselesaikan
+     * atau tanggal pembayaran dicatat. Order yang
      * dia hanya jadi anggota tim tidak ikut — pendapatan harus benar-benar
      * jasa miliknya sendiri.
      */
@@ -47,9 +50,10 @@ class Keuangan extends Component
         return Order::query()
             ->where('teknisi_id', auth()->id())
             ->where('status', OrderStatus::Selesai->value)
-            ->whereBetween('updated_at', [$mulai, $selesai])
+            ->whereRaw(OmsetService::tanggalPendapatanSql().' BETWEEN ? AND ?', [$mulai->toDateString(), $selesai->toDateString()])
             ->with(['customer', 'orderItems', 'latestPayment'])
-            ->orderBy('updated_at')
+            ->orderByRaw(OmsetService::tanggalPendapatanSql())
+            ->orderBy('id')
             ->get();
     }
 
@@ -123,7 +127,7 @@ class Keuangan extends Component
 
         return $this->orderSelesaiRentang($mulai, $selesai)
             ->map(fn (Order $order) => [
-                'tanggal' => $order->updated_at->translatedFormat('d M Y'),
+                'tanggal' => ($order->tanggal_jadwal ?? $order->updated_at)->translatedFormat('d M Y'),
                 'order_id' => $order->id,
                 'customer' => $order->customer?->nama ?? 'Tanpa nama',
                 'layanan' => $order->ringkasanLayanan(),
