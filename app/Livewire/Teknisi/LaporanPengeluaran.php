@@ -62,6 +62,9 @@ class LaporanPengeluaran extends Component
 
     public bool $showForm = false;
 
+    /** Id pengeluaran yang sedang diubah; null = form catat baru. */
+    public ?int $editId = null;
+
     public bool $isSubmitting = false;
 
     /** @return array<string, mixed> digabung dengan atribut #[Validate] di properti lain. */
@@ -232,8 +235,50 @@ class LaporanPengeluaran extends Component
             ->paginate(15);
     }
 
+    /** Buka form dalam mode ubah untuk pengeluaran milik sendiri (pencatat). */
+    public function mulaiEdit(int $id): void
+    {
+        $e = TeknisiExpense::query()->where('teknisi_id', auth()->id())->find($id);
+
+        if ($e === null) {
+            session()->flash('error', 'Hanya pencatat yang bisa mengubah pengeluaran ini.');
+
+            return;
+        }
+
+        $this->resetValidation();
+        $this->editId = $e->id;
+        $this->tanggal_input = $e->tanggal_input->format('Y-m-d');
+        $this->order_id = $e->order_id;
+        $this->partner_id = $e->partner_id;
+        $this->kategori = (string) $e->kategori;
+        $this->qty = $e->qty ?? 1;
+        $this->harga = $e->harga ?? 0;
+        $this->nominal = (int) $e->nominal;
+        $this->keterangan = (string) $e->keterangan;
+        $this->showForm = true;
+    }
+
+    public function batalForm(): void
+    {
+        $this->resetValidation();
+        $this->resetForm();
+    }
+
+    private function resetForm(): void
+    {
+        $this->reset(['tanggal_input', 'kategori', 'order_id', 'partner_id', 'qty', 'harga', 'nominal', 'keterangan', 'showForm', 'editId']);
+        $this->tanggal_input = today()->format('Y-m-d');
+        $this->qty = 1;
+        $this->harga = 0;
+    }
+
     /**
-     * Submit pengeluaran baru
+     * Submit pengeluaran baru / perubahan pengeluaran sendiri.
+     *
+     * Perubahan tanggal/kategori/qty/harga/nominal pada yang sudah diputuskan
+     * admin (disetujui/ditolak) mengembalikannya ke Menunggu; ubah partner,
+     * keterangan, atau order saja tidak mengubah status.
      */
     public function submitPengeluaran(): void
     {
@@ -242,27 +287,42 @@ class LaporanPengeluaran extends Component
         $this->isSubmitting = true;
 
         try {
-            TeknisiExpense::create([
-                'teknisi_id' => auth()->id(),
+            $data = [
                 'partner_id' => filled($this->partner_id) ? (int) $this->partner_id : null,
-                'order_id' => $this->order_id,
+                'order_id' => filled($this->order_id) ? $this->order_id : null,
                 'tanggal_input' => $this->tanggal_input,
                 'kategori' => $this->kategori,
                 'qty' => $this->qty,
                 'harga' => $this->harga,
                 'nominal' => $this->nominal,
                 'keterangan' => $this->keterangan,
-                'status' => 'pending',
-            ]);
+            ];
 
-            session()->flash('status', 'Pengeluaran berhasil dicatat.');
-            $this->reset(['tanggal_input', 'kategori', 'order_id', 'partner_id', 'qty', 'harga', 'nominal', 'keterangan', 'showForm']);
-            $this->tanggal_input = today()->format('Y-m-d');
-            $this->qty = 1;
-            $this->harga = 0;
+            if ($this->editId !== null) {
+                $e = TeknisiExpense::query()->where('teknisi_id', auth()->id())->findOrFail($this->editId);
 
+                $uangBerubah = $e->tanggal_input->format('Y-m-d') !== $data['tanggal_input']
+                    || $e->kategori !== $data['kategori']
+                    || (int) $e->qty !== (int) $data['qty']
+                    || (int) $e->harga !== (int) $data['harga']
+                    || (int) $e->nominal !== (int) $data['nominal'];
+
+                $kembaliMenunggu = $uangBerubah && $e->status !== 'pending';
+
+                if ($kembaliMenunggu) {
+                    $data += ['status' => 'pending', 'approved_by' => null, 'catatan_approval' => null];
+                }
+
+                $e->update($data);
+                session()->flash('status', 'Pengeluaran berhasil diubah.'.($kembaliMenunggu ? ' Menunggu persetujuan ulang admin.' : ''));
+            } else {
+                TeknisiExpense::create($data + ['teknisi_id' => auth()->id(), 'status' => 'pending']);
+                session()->flash('status', 'Pengeluaran berhasil dicatat.');
+            }
+
+            $this->resetForm();
         } catch (\Exception $e) {
-            session()->flash('error', 'Gagal mencatat pengeluaran: ' . $e->getMessage());
+            session()->flash('error', 'Gagal menyimpan pengeluaran: '.$e->getMessage());
         } finally {
             $this->isSubmitting = false;
         }

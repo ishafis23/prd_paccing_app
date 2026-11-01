@@ -31,7 +31,7 @@
         <div class="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
             <h2 class="flex items-center gap-2 font-bold text-gray-900">
                 <x-heroicon-o-document-plus class="h-5 w-5 text-blue-600" />
-                Catat Pengeluaran Baru
+                {{ $editId ? 'Ubah Pengeluaran' : 'Catat Pengeluaran Baru' }}
             </h2>
 
             <form wire:submit="submitPengeluaran" class="space-y-3">
@@ -164,7 +164,7 @@
                     </button>
                     <button
                         type="button"
-                        wire:click="$toggle('showForm')"
+                        wire:click="batalForm"
                         class="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
                         Batal
                     </button>
@@ -339,6 +339,15 @@
                             </span>
 
                             {{-- Actions --}}
+                            @if ($expense->teknisi_id === auth()->id())
+                                <button
+                                    type="button"
+                                    wire:click="mulaiEdit({{ $expense->id }})"
+                                    class="text-xs font-medium text-blue-600 hover:text-blue-700">
+                                    Ubah
+                                </button>
+                            @endif
+
                             @if ($expense->status === 'pending' && $expense->teknisi_id === auth()->id())
                                 <button
                                     type="button"

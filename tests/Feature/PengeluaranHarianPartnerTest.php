@@ -93,3 +93,57 @@ it('filter riwayat pengeluaran bisa per hari/tanggal selain per bulan', function
         ->assertSee('catatan-sepuluh')->assertDontSee('catatan-duapuluh')
         ->assertSee('(2026-10-10)');
 });
+
+it('hari OFF tidak memblokir walau teknisi tetap absen (kasus 28 Okt)', function () {
+    $t = ($this->mk)();
+    $kemarin = today()->subDay()->toDateString();
+    ($this->absen)($t, $kemarin);
+
+    expect(collect(app(SyaratAdministrasiService::class)->penghalang($t))->where('jenis', 'pengeluaran'))->toHaveCount(1);
+
+    \App\Models\TechnicianOffDay::create(['user_id' => $t->id, 'tanggal' => $kemarin]);
+
+    expect(collect(app(SyaratAdministrasiService::class)->penghalang($t))->where('jenis', 'pengeluaran'))->toBeEmpty();
+});
+
+it('pencatat bisa menautkan partner lewat Ubah -> partner terbebas; status disetujui tetap', function () {
+    $a = ($this->mk)();
+    $b = ($this->mk)();
+    $kemarin = today()->subDay()->toDateString();
+    ($this->absen)($b, $kemarin);
+    $e = TeknisiExpense::create([
+        'teknisi_id' => $a->id, 'tanggal_input' => $kemarin, 'kategori' => 'makan',
+        'qty' => 1, 'harga' => 30000, 'nominal' => 30000, 'status' => 'approved', 'approved_by' => $a->id,
+    ]);
+    $blok = fn () => collect(app(SyaratAdministrasiService::class)->penghalang($b))->where('jenis', 'pengeluaran')->count();
+    expect($blok())->toBe(1);
+
+    Livewire::actingAs($a)->test(LaporanPengeluaran::class)
+        ->call('mulaiEdit', $e->id)
+        ->assertSet('showForm', true)->assertSet('partner_id', null)
+        ->set('partner_id', $b->id)
+        ->call('submitPengeluaran')->assertHasNoErrors();
+
+    $e->refresh();
+    expect($e->partner_id)->toBe($b->id)->and($e->status)->toBe('approved')->and($blok())->toBe(0);
+});
+
+it('ubah nominal pada pengeluaran disetujui mengembalikannya ke menunggu; bukan pencatat ditolak', function () {
+    $a = ($this->mk)();
+    $b = ($this->mk)();
+    $e = TeknisiExpense::create([
+        'teknisi_id' => $a->id, 'partner_id' => $b->id, 'tanggal_input' => today(), 'kategori' => 'makan',
+        'qty' => 1, 'harga' => 30000, 'nominal' => 30000, 'status' => 'approved', 'approved_by' => $a->id,
+    ]);
+
+    Livewire::actingAs($b)->test(LaporanPengeluaran::class)
+        ->call('mulaiEdit', $e->id)->assertSet('showForm', false);
+
+    Livewire::actingAs($a)->test(LaporanPengeluaran::class)
+        ->call('mulaiEdit', $e->id)
+        ->set('harga', 32000)->set('nominal', 32000)
+        ->call('submitPengeluaran')->assertHasNoErrors();
+
+    $e->refresh();
+    expect((int) $e->nominal)->toBe(32000)->and($e->status)->toBe('pending')->and($e->approved_by)->toBeNull();
+});

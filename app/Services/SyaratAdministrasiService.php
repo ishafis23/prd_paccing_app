@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\OrderStatus;
 use App\Models\DailyAttendance;
 use App\Models\Order;
+use App\Models\TechnicianOffDay;
 use App\Models\TeknisiExpense;
 use App\Models\User;
 
@@ -69,7 +70,7 @@ class SyaratAdministrasiService
             $hasil = [...$hasil, ...$this->penghalangFisik($order, $teknisi)];
         }
 
-        // 3. Pengeluaran harian — tiap hari teknisi absen wajib ada catatan pengeluaran
+        // 3. Pengeluaran harian â€” tiap hari teknisi absen wajib ada catatan pengeluaran
         //    (dicatat sendiri atau oleh partner timnya).
         $hasil = [...$hasil, ...$this->penghalangPengeluaranHarian($teknisi, $tenggang)];
 
@@ -81,7 +82,7 @@ class SyaratAdministrasiService
 
     /**
      * Hari-hari lampau (dalam tenggang) saat teknisi absen tetapi tidak ada satu pun
-     * catatan pengeluaran. Hari ini tidak dihitung — pengeluaran masih bisa menyusul.
+     * catatan pengeluaran. Hari ini tidak dihitung â€” pengeluaran masih bisa menyusul.
      *
      * @return array<int, array{jenis: string, order_id: ?int, judul: string, pesan: string}>
      */
@@ -94,6 +95,20 @@ class SyaratAdministrasiService
             ->whereDate('tanggal', '<', today()->toDateString())
             ->pluck('tanggal')
             ->map(fn ($t) => $t->toDateString());
+
+        if ($hariAbsen->isEmpty()) {
+            return [];
+        }
+
+        // Hari OFF tidak wajib catatan pengeluaran, walau teknisi tetap absen
+        // (mis. masuk hanya untuk menyelesaikan laporan hari sebelumnya).
+        $hariOff = TechnicianOffDay::query()
+            ->where('user_id', $teknisi->id)
+            ->whereDate('tanggal', '>=', $sejak->toDateString())
+            ->pluck('tanggal')
+            ->map(fn ($t) => $t->toDateString());
+
+        $hariAbsen = $hariAbsen->diff($hariOff);
 
         if ($hariAbsen->isEmpty()) {
             return [];
