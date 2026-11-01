@@ -203,14 +203,34 @@
 
     {{-- Filter Section --}}
     <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        {{-- Mode periode: Perbulan / Per hari (tanggal) --}}
+        <div class="mb-2 grid grid-cols-2 gap-2">
+            <button type="button" wire:click="$set('modeFilter', 'bulanan')"
+                class="rounded-lg py-1.5 text-xs font-semibold {{ $modeFilter === 'bulanan' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600' }}">
+                Perbulan
+            </button>
+            <button type="button" wire:click="$set('modeFilter', 'harian')"
+                class="rounded-lg py-1.5 text-xs font-semibold {{ $modeFilter === 'harian' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600' }}">
+                Perhari/Tanggal
+            </button>
+        </div>
+
         <div class="grid grid-cols-3 gap-2">
-            {{-- Month filter --}}
+            {{-- Periode filter --}}
             <div>
-                <label class="block text-xs font-medium text-gray-600">Bulan</label>
-                <input
-                    type="month"
-                    wire:model.live="filterBulan"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
+                @if ($modeFilter === 'harian')
+                    <label class="block text-xs font-medium text-gray-600">Tanggal</label>
+                    <input
+                        type="date"
+                        wire:model.live="filterTanggal"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
+                @else
+                    <label class="block text-xs font-medium text-gray-600">Bulan</label>
+                    <input
+                        type="month"
+                        wire:model.live="filterBulan"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs">
+                @endif
             </div>
 
             {{-- Kategori filter --}}
@@ -240,7 +260,7 @@
     {{-- Kategori Breakdown --}}
     @if ($this->kategoriBreakdown)
         <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-            <h2 class="mb-3 font-bold text-gray-900">Breakdown per Kategori ({{ $filterBulan }})</h2>
+            <h2 class="mb-3 font-bold text-gray-900">Breakdown per Kategori ({{ $this->labelPeriode() }})</h2>
             <div class="space-y-2">
                 @foreach ($this->kategoriBreakdown as $kat => $data)
                     @if ($data['count'] > 0)

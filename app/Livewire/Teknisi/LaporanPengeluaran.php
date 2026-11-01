@@ -50,6 +50,12 @@ class LaporanPengeluaran extends Component
 
     public string $filterBulan = '';
 
+    /** Mode filter periode riwayat/breakdown: bulanan | harian. */
+    public string $modeFilter = 'bulanan';
+
+    /** Tanggal (Y-m-d) saat mode harian. */
+    public string $filterTanggal = '';
+
     public string $filterKategori = '';
 
     public string $filterStatus = '';
@@ -83,6 +89,7 @@ class LaporanPengeluaran extends Component
     {
         $this->tanggal_input = today()->format('Y-m-d');
         $this->filterBulan = today()->format('Y-m');
+        $this->filterTanggal = today()->format('Y-m-d');
     }
 
     public function updatedQty(): void
@@ -160,16 +167,29 @@ class LaporanPengeluaran extends Component
         ];
     }
 
+    /** Batasi query ke periode terpilih: satu hari (harian) atau satu bulan (bulanan). */
+    private function terapkanPeriode($query)
+    {
+        if ($this->modeFilter === 'harian') {
+            return $this->filterTanggal ? $query->byDate($this->filterTanggal) : $query;
+        }
+
+        return $this->filterBulan ? $query->byMonth($this->filterBulan) : $query;
+    }
+
+    /** Label periode aktif untuk judul breakdown. */
+    public function labelPeriode(): string
+    {
+        return $this->modeFilter === 'harian' ? $this->filterTanggal : $this->filterBulan;
+    }
+
     /**
      * Get kategori breakdown
      */
     #[Computed]
     public function kategoriBreakdown(): array
     {
-        $expenses = TeknisiExpense::query()
-            ->byTeknisi(auth()->id())
-            ->byMonth($this->filterBulan)
-            ->get();
+        $expenses = $this->terapkanPeriode(TeknisiExpense::query()->byTeknisi(auth()->id()))->get();
 
         $result = [];
 
@@ -197,9 +217,7 @@ class LaporanPengeluaran extends Component
             ->tercatatUntuk(auth()->id())
             ->with(['teknisi', 'partner']);
 
-        if ($this->filterBulan) {
-            $query->byMonth($this->filterBulan);
-        }
+        $this->terapkanPeriode($query);
 
         if ($this->filterKategori) {
             $query->where('kategori', $this->filterKategori);

@@ -76,3 +76,20 @@ it('form menyimpan partner, partner melihatnya tapi tidak bisa menghapus; diri s
         ->call('deletePengeluaran', $e);
     expect(TeknisiExpense::count())->toBe(1);
 });
+
+it('filter riwayat pengeluaran bisa per hari/tanggal selain per bulan', function () {
+    $a = ($this->mk)();
+    $mk = fn (string $tgl, string $ket) => TeknisiExpense::create([
+        'teknisi_id' => $a->id, 'tanggal_input' => $tgl, 'kategori' => 'bensin',
+        'qty' => 1, 'harga' => 10000, 'nominal' => 10000, 'keterangan' => $ket, 'status' => 'pending',
+    ]);
+    $mk('2026-10-10', 'catatan-sepuluh');
+    $mk('2026-10-20', 'catatan-duapuluh');
+
+    $c = Livewire::actingAs($a)->test(LaporanPengeluaran::class)
+        ->set('filterBulan', '2026-10')
+        ->assertSee('catatan-sepuluh')->assertSee('catatan-duapuluh')
+        ->set('modeFilter', 'harian')->set('filterTanggal', '2026-10-10')
+        ->assertSee('catatan-sepuluh')->assertDontSee('catatan-duapuluh')
+        ->assertSee('(2026-10-10)');
+});
