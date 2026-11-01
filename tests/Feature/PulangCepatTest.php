@@ -103,3 +103,27 @@ it('halaman teknisi pulang cepat bisa diakses teknisi', function () {
         ->assertOk()
         ->assertSee('Ajukan Pulang Cepat');
 });
+
+it('admin menginput setengah hari langsung disetujui dengan nominal potongan bebas, masuk ke gaji', function () {
+    $admin = ($this->mkUser)(RoleName::Admin);
+    $teknisi = ($this->mkUser)(RoleName::Teknisi);
+    $finance = ($this->mkUser)(RoleName::Finance);
+
+    $profil = TechnicianPayrollProfile::create([
+        'user_id' => $teknisi->id, 'tanggal_masuk' => '2024-10-15', 'gaji_pokok' => 3000000,
+        'potongan_bpjs_tk' => 0, 'potongan_off_per_hari' => 100000, 'denda_telat_per_hari' => 7500, 'aktif' => true,
+    ]);
+    $svc = app(EarlyLeaveService::class);
+
+    expect(fn () => $svc->inputOlehAdmin($finance, $teknisi->id, '2026-06-18', '13:00', null, 1000))
+        ->toThrow(AuthorizationException::class);
+
+    $entry = $svc->inputOlehAdmin($admin, $teknisi->id, '2026-06-18', '13:00', 'masuk siang', 75000);
+    expect($entry->status)->toBe(EarlyLeaveStatus::Disetujui);
+
+    $run = app(PayrollService::class)->hitung($profil, Carbon::parse('2026-06-15'), $admin);
+    expect((float) $run->total_potongan_setengah_hari)->toBe(75000.0);
+
+    $svc->ubahNominal($entry, $admin, 20000);
+    expect((float) $run->refresh()->total_potongan_setengah_hari)->toBe(20000.0);
+});

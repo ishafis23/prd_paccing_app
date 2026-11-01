@@ -20,6 +20,7 @@ class TechnicianEarlyLeave extends Model
         'tanggal',
         'jam_pulang',
         'alasan',
+        'nominal_potongan',
         'status',
         'catatan_hrd',
         'diverifikasi_oleh',
@@ -30,6 +31,7 @@ class TechnicianEarlyLeave extends Model
     {
         return [
             'tanggal' => 'date:Y-m-d',
+            'nominal_potongan' => 'decimal:2',
             'status' => EarlyLeaveStatus::class,
             'diverifikasi_pada' => 'datetime',
         ];

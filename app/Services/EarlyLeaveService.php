@@ -43,6 +43,37 @@ class EarlyLeaveService
         );
     }
 
+    /**
+     * Admin/HRD/Owner menginput langsung (tanpa pengajuan teknisi): langsung
+     * disetujui, dengan nominal potongan yang bisa ditentukan.
+     */
+    public function inputOlehAdmin(User $actor, int $teknisiId, string $tanggal, string $jamPulang, ?string $alasan, ?float $nominal): TechnicianEarlyLeave
+    {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+
+        return TechnicianEarlyLeave::updateOrCreate(
+            ['user_id' => $teknisiId, 'tanggal' => CarbonImmutable::parse($tanggal)->toDateString()],
+            [
+                'jam_pulang' => $this->normalisasiJam($jamPulang),
+                'alasan' => filled($alasan) ? trim((string) $alasan) : null,
+                'nominal_potongan' => $nominal,
+                'status' => EarlyLeaveStatus::Disetujui,
+                'diverifikasi_oleh' => $actor->id,
+                'diverifikasi_pada' => now(),
+            ],
+        );
+    }
+
+    public function ubahNominal(TechnicianEarlyLeave $entry, User $actor, ?float $nominal): TechnicianEarlyLeave
+    {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+
+        $entry->nominal_potongan = $nominal;
+        $entry->save();
+
+        return $entry->fresh();
+    }
+
     public function setujui(TechnicianEarlyLeave $entry, User $actor, ?string $catatan = null): TechnicianEarlyLeave
     {
         $this->assertRole($actor, self::PENGELOLA_ROLES);

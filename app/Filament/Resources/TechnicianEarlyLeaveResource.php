@@ -71,6 +71,10 @@ class TechnicianEarlyLeaveResource extends BaseResource
                     ->label('Jam Pulang')
                     ->formatStateUsing(fn ($state): string => $state ? Carbon::parse($state)->format('H:i') : '—'),
                 Tables\Columns\TextColumn::make('alasan')->limit(40)->placeholder('—'),
+                Tables\Columns\TextColumn::make('nominal_potongan')
+                    ->label('Potongan')
+                    ->money('IDR')
+                    ->placeholder('Default'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (EarlyLeaveStatus $state): string => match ($state) {
@@ -93,6 +97,26 @@ class TechnicianEarlyLeaveResource extends BaseResource
                     ]),
             ])
             ->actions([
+                Tables\Actions\Action::make('ubahNominal')
+                    ->label('Ubah Potongan')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('gray')
+                    ->visible(fn (): bool => static::canViewAny())
+                    ->fillForm(fn (TechnicianEarlyLeave $r): array => ['nominal_potongan' => $r->nominal_potongan])
+                    ->form([
+                        Forms\Components\TextInput::make('nominal_potongan')
+                            ->label('Nominal Potongan')
+                            ->numeric()->prefix('Rp')->minValue(0)
+                            ->helperText('Kosongkan untuk default (0,5 × potongan OFF/hari).'),
+                    ])
+                    ->action(function (TechnicianEarlyLeave $record, array $data): void {
+                        app(EarlyLeaveService::class)->ubahNominal(
+                            $record,
+                            auth()->user(),
+                            filled($data['nominal_potongan'] ?? null) ? (float) $data['nominal_potongan'] : null,
+                        );
+                        Notification::make()->success()->title('Potongan diperbarui')->send();
+                    }),
                 Tables\Actions\Action::make('setujui')
                     ->label('Setujui')
                     ->icon('heroicon-o-check-circle')

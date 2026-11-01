@@ -338,13 +338,20 @@ class PayrollService
 
         // Pulang cepat disetujui (dev-plan/hrd/02) = setengah hari:
         // potongan 0,5 × potongan OFF/hari tiap kejadian.
-        $jumlahSetengahHari = TechnicianEarlyLeave::query()
+        $setengahHari = TechnicianEarlyLeave::query()
             ->where('user_id', $profil->user_id)
             ->where('status', EarlyLeaveStatus::Disetujui->value)
             ->whereBetween('tanggal', [$dari, $sampai])
-            ->count();
+            ->get(['nominal_potongan']);
 
-        $potonganSetengahHari = $jumlahSetengahHari * 0.5 * (float) $profil->potongan_off_per_hari;
+        $jumlahSetengahHari = $setengahHari->count();
+
+        // Nominal yang diinput admin dipakai apa adanya; kosong = default 0,5 × OFF/hari.
+        $potonganSetengahHari = (float) $setengahHari->sum(
+            fn ($e): float => $e->nominal_potongan !== null
+                ? (float) $e->nominal_potongan
+                : 0.5 * (float) $profil->potongan_off_per_hari
+        );
 
         $bonusUmum = (float) ($existing->bonus_umum ?? 0);
 
