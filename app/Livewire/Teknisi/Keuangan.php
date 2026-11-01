@@ -5,6 +5,7 @@ namespace App\Livewire\Teknisi;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Services\OmsetService;
+use App\Services\TechnicianIncentiveService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -58,25 +59,12 @@ class Keuangan extends Component
     }
 
     /**
-     * Omset JASA satu order. Bila admin sudah mencatat pembayaran dengan split
-     * omset (dev-plan/24), angka itulah yang dipakai — supaya tampilan teknisi
-     * ikut angka final yang dicatat admin. Tanpa pembayaran, fallback ke
-     * rincian order_items. Material tidak pernah ikut dihitung.
-     */
-    private function omsetJasa(Order $order): float
-    {
-        $split = $order->latestPayment?->splitOmset();
-
-        return $split !== null ? $split['jasa'] : $order->totalPerKomponen()['jasa'];
-    }
-
-    /**
      * Portal teknisi hanya menampilkan omset JASA (material tidak ikut) —
      * supaya potensi bonus terbaca jelas. Admin tetap melihat total penuh.
      */
     private function totalOrder(Collection $orders): float
     {
-        return (float) $orders->sum(fn (Order $order) => $this->omsetJasa($order));
+        return (float) $orders->sum(fn (Order $order) => $order->omsetJasa());
     }
 
     #[Computed]
@@ -105,7 +93,7 @@ class Keuangan extends Component
             ->where('status', OrderStatus::Selesai->value)
             ->with(['orderItems', 'latestPayment'])
             ->get()
-            ->sum(fn (Order $order) => $this->omsetJasa($order));
+            ->sum(fn (Order $order) => $order->omsetJasa());
     }
 
     /**
@@ -131,9 +119,21 @@ class Keuangan extends Component
                 'order_id' => $order->id,
                 'customer' => $order->customer?->nama ?? 'Tanpa nama',
                 'layanan' => $order->ringkasanLayanan(),
-                'total' => $this->omsetJasa($order),
+                'total' => $order->omsetJasa(),
             ])
             ->all();
+    }
+
+    /** Games 5 & 6 untuk tanggal terpilih (hanya mode harian). */
+    #[Computed]
+    public function gamesHarian(): ?array
+    {
+        if ($this->modePendapatan !== 'harian' || ! $this->filterTanggal) {
+            return null;
+        }
+
+        return app(TechnicianIncentiveService::class)
+            ->ringkasanGames56(auth()->user(), \Illuminate\Support\Carbon::parse($this->filterTanggal));
     }
 
     #[Computed]

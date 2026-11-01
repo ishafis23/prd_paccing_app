@@ -310,6 +310,18 @@ class Order extends Model
     }
 
     /**
+     * Omset JASA order. Bila admin sudah mencatat pembayaran dengan split omset
+     * (dev-plan/24), angka itulah yang dipakai; tanpa pembayaran fallback ke
+     * rincian order_items. Material tidak pernah ikut dihitung.
+     */
+    public function omsetJasa(): float
+    {
+        $split = $this->latestPayment?->splitOmset();
+
+        return $split !== null ? $split['jasa'] : $this->totalPerKomponen()['jasa'];
+    }
+
+    /**
      * Omset order dipisah per komponen baris: ['jasa' => x, 'material' => y].
      *
      * @return array{jasa: float, material: float}

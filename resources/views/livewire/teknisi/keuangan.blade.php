@@ -80,6 +80,21 @@
                 <span class="text-sm font-bold text-emerald-600">{{ $this->formatRupiah($this->totalPendapatanFilter) }}</span>
             </div>
 
+            @if ($g = $this->gamesHarian)
+                <div class="grid grid-cols-2 gap-2 border-b border-gray-100 px-4 py-3 text-xs">
+                    <div class="rounded-xl p-2 {{ $g['dapat_games5'] ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-gray-50 text-gray-600' }}">
+                        <p class="font-semibold">Game 5 · Omset {{ $g['dapat_games5'] ? '✓ Tercapai' : '' }}</p>
+                        <p class="mt-0.5 font-bold">{{ $this->formatRupiah($g['omset']) }}</p>
+                        <p class="text-[10px]">Target ≥ {{ $this->formatRupiah($g['minimal_omset']) }}@if ($g['dapat_games5']) · Bonus {{ $this->formatRupiah($g['nominal_games5']) }}@endif</p>
+                    </div>
+                    <div class="rounded-xl p-2 {{ $g['dapat_games6'] ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-gray-50 text-gray-600' }}">
+                        <p class="font-semibold">Game 6 · Unit {{ $g['dapat_games6'] ? '✓ Tercapai' : '' }}</p>
+                        <p class="mt-0.5 font-bold">{{ $g['unit'] }} unit</p>
+                        <p class="text-[10px]">@if ($g['minimal_unit'] !== null)Target {{ $g['minimal_unit'] }} unit @if ($g['dapat_games6']) · Bonus {{ $this->formatRupiah($g['nominal_games6']) }}@endif @else Belum ada order @endif</p>
+                    </div>
+                </div>
+            @endif
+
             @if (count($this->daftarPendapatan) > 0)
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">

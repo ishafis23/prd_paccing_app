@@ -40,6 +40,19 @@ class AppServiceProvider extends ServiceProvider
             $model::deleted($segarkan);
         }
 
+        // Games 5 (omset jasa tim) & Games 6 (unit): dihitung otomatis per tanggal
+        // order dijadwalkan, lalu masuk ledger insentif -> ikut gaji (draft
+        // disegarkan oleh hook TechnicianIncentive di atas).
+        $hitungGames = fn (?int $orderId) => $orderId === null ? null
+            : (($order = \App\Models\Order::find($orderId)) ? app(\App\Services\TechnicianIncentiveService::class)->hitungGames56UntukOrder($order) : null);
+        \App\Models\Order::saved(fn ($m) => $hitungGames($m->id));
+        \App\Models\OrderItem::saved(fn ($m) => $hitungGames($m->order_id));
+        \App\Models\OrderItem::deleted(fn ($m) => $hitungGames($m->order_id));
+        \App\Models\Payment::saved(fn ($m) => $hitungGames($m->order_id));
+        \App\Models\Payment::deleted(fn ($m) => $hitungGames($m->order_id));
+        \App\Models\OrderTechnician::saved(fn ($m) => $hitungGames($m->order_id));
+        \App\Models\OrderTechnician::deleted(fn ($m) => $hitungGames($m->order_id));
+
         // Kasbon (dev-plan/28): kasbon lama tetap ikut dipotong di periode
         // berikutnya, jadi segarkan semua draft yang berakhir setelah tanggalnya.
         $segarkanKasbon = fn ($m) => app(\App\Services\PayrollService::class)
