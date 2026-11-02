@@ -120,7 +120,7 @@ class TeknisiKeuanganCapaianTest extends TestCase
             ->assertDontSee('550.000');
     }
 
-    public function test_order_tim_tempat_dia_bukan_pic_tidak_masuk_pendapatan(): void
+    public function test_order_tim_tempat_dia_anggota_tampil_di_riwayat_tapi_tidak_masuk_total(): void
     {
         $pic = User::factory()->withRole('teknisi')->create();
 
@@ -133,10 +133,21 @@ class TeknisiKeuanganCapaianTest extends TestCase
 
         OrderTechnician::create(['order_id' => $order->id, 'teknisi_id' => $this->teknisi->id]);
 
-        Livewire::actingAs($this->teknisi)
+        $c = Livewire::actingAs($this->teknisi)
             ->test(Keuangan::class)
-            ->call('setTab', 'pendapatan')
-            ->assertDontSee('200.000');
+            ->call('setTab', 'pendapatan');
+
+        // Ada riwayatnya (sebagai Anggota) ...
+        $daftar = $c->get('daftarPendapatan');
+        $this->assertCount(1, $daftar);
+        $this->assertSame('Anggota', $daftar[0]['peran']);
+        // ... tetapi tidak dihitung ke pendapatan pribadi.
+        $this->assertSame(0.0, $c->get('totalPendapatanFilter'));
+
+        // PIC melihat order yang sama, dan dihitung.
+        $cPic = Livewire::actingAs($pic)->test(Keuangan::class);
+        $this->assertSame('PIC', $cPic->get('daftarPendapatan')[0]['peran']);
+        $this->assertSame(200000.0, $cPic->get('totalPendapatanFilter'));
     }
 
     public function test_omset_jasa_terhitung_di_tanggal_jadwal_bukan_tanggal_laporan_selesai(): void

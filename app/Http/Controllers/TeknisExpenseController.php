@@ -294,7 +294,7 @@ class TeknisExpenseController extends Controller
     {
         $date = $request->query('date', today()->format('Y-m-d'));
 
-        $query = TeknisExpense::byDate($date);
+        $query = TeknisiExpense::byDate($date);
 
         if (!auth()->user()->isAdmin()) {
             $query->byTeknisi(auth()->id());
@@ -320,7 +320,7 @@ class TeknisExpenseController extends Controller
     {
         $month = $request->query('month', today()->format('Y-m'));
 
-        $query = TeknisExpense::byMonth($month);
+        $query = TeknisiExpense::byMonth($month);
 
         if (!auth()->user()->isAdmin()) {
             $query->byTeknisi(auth()->id());
@@ -344,12 +344,12 @@ class TeknisExpenseController extends Controller
 
     private function canView(TeknisiExpense $expense): bool
     {
-        return auth()->user()->isAdmin() || $expense->teknisi_id === auth()->id();
+        return auth()->user()->isAdmin() || (int) $expense->teknisi_id === (int) auth()->id();
     }
 
     private function canEdit(TeknisiExpense $expense): bool
     {
-        return !auth()->user()->isAdmin() && $expense->teknisi_id === auth()->id();
+        return !auth()->user()->isAdmin() && (int) $expense->teknisi_id === (int) auth()->id();
     }
 
     private function groupByKategori($expenses): array

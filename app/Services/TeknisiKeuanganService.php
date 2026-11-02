@@ -36,6 +36,24 @@ class TeknisiKeuanganService
             ->get();
     }
 
+    /**
+     * Order selesai milik tim teknisi ini (PIC ATAU anggota) dalam rentang tanggal -
+     * untuk riwayat. Pendapatan pribadi tetap hanya order yang dia jadi PIC.
+     *
+     * @return Collection<int, Order>
+     */
+    public function orderTimSelesaiRentang(User $teknisi, CarbonImmutable $mulai, CarbonImmutable $selesai): Collection
+    {
+        return Order::query()
+            ->untukTeknisi($teknisi->id)
+            ->where('status', OrderStatus::Selesai->value)
+            ->whereRaw(OmsetService::tanggalPendapatanSql().' BETWEEN ? AND ?', [$mulai->toDateString(), $selesai->toDateString()])
+            ->with(['customer', 'orderItems', 'latestPayment'])
+            ->orderByRaw(OmsetService::tanggalPendapatanSql())
+            ->orderBy('id')
+            ->get();
+    }
+
     /** Total omset jasa kumpulan order (material tidak ikut). */
     public function totalJasa(Collection $orders): float
     {

@@ -60,3 +60,28 @@ it('sendiri: ambang & nominal sendiri; entri otomatis dicabut saat tidak lagi te
     $o->update(['status' => OrderStatus::Batal]);
     expect($q(IncentiveKategori::Games6Unit)->exists())->toBeFalse();
 });
+
+it('penolakan admin tidak ditimpa hitung ulang, dan kartu portal tidak lagi tercapai', function () {
+    $a = ($this->mk)();
+    $b = ($this->mk)();
+    ($this->order)($a, $b, 850000, 1);   // omset 850rb berdua -> Game 5 tercapai
+
+    $tgl = Carbon::parse('2026-10-26');
+    $svc = app(TechnicianIncentiveService::class);
+    $g5 = TechnicianIncentive::where('user_id', $b->id)->where('kategori', IncentiveKategori::Games5OmsetTim->value)->first();
+    expect($svc->ringkasanGames56($b, $tgl)['tercapai_games5'])->toBeTrue();
+
+    $admin = User::factory()->create();
+    $admin->assignRole(RoleName::Admin->value);
+    $svc->tolak($g5, $admin, 'Ada customer klaim');
+
+    // Hitung ulang (mis. order lain berubah) tidak boleh mengembalikan ke disetujui.
+    $svc->hitungGames56($b, $tgl);
+    expect($g5->fresh()->status_verifikasi->value)->toBe('ditolak');
+
+    $r = $svc->ringkasanGames56($b, $tgl);
+    expect($r['dapat_games5'])->toBeTrue()          // hitungan murni tetap
+        ->and($r['ditolak_games5'])->toBeTrue()
+        ->and($r['tercapai_games5'])->toBeFalse()   // kartu tidak hijau/tercentang
+        ->and($r['alasan_games5'])->toBe('Ada customer klaim');
+});

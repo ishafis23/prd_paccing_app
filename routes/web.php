@@ -79,9 +79,9 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     // Expense endpoints (Phase 03)
     Route::post('/expense', [TeknisExpenseController::class, 'store'])->name('teknisi.expense.store');
     Route::get('/expenses', [TeknisExpenseController::class, 'index'])->name('teknisi.expense.index');
-    Route::get('/expense/{teknisExpense}', [TeknisExpenseController::class, 'show'])->name('teknisi.expense.show');
-    Route::put('/expense/{teknisExpense}', [TeknisExpenseController::class, 'update'])->name('teknisi.expense.update');
-    Route::delete('/expense/{teknisExpense}', [TeknisExpenseController::class, 'destroy'])->name('teknisi.expense.destroy');
+    Route::get('/expense/{expense}', [TeknisExpenseController::class, 'show'])->name('teknisi.expense.show');
+    Route::put('/expense/{expense}', [TeknisExpenseController::class, 'update'])->name('teknisi.expense.update');
+    Route::delete('/expense/{expense}', [TeknisExpenseController::class, 'destroy'])->name('teknisi.expense.destroy');
     Route::get('/expense-summary/daily', [TeknisExpenseController::class, 'dailySummary'])->name('teknisi.expense.daily-summary');
     Route::get('/expense-summary/monthly', [TeknisExpenseController::class, 'monthlySummary'])->name('teknisi.expense.monthly-summary');
 });
@@ -151,8 +151,8 @@ Route::middleware('auth')->group(function () {
 // Admin approval endpoints (Phase 03)
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     // Expense API endpoints
-    Route::post('/expense/{teknisExpense}/approve', [TeknisExpenseController::class, 'approve'])->name('admin.expense.approve');
-    Route::post('/expense/{teknisExpense}/reject', [TeknisExpenseController::class, 'reject'])->name('admin.expense.reject');
+    Route::post('/expense/{expense}/approve', [TeknisExpenseController::class, 'approve'])->name('admin.expense.approve');
+    Route::post('/expense/{expense}/reject', [TeknisExpenseController::class, 'reject'])->name('admin.expense.reject');
     Route::get('/expenses', [TeknisExpenseController::class, 'index'])->name('admin.expense.index');
     Route::get('/expense-summary/daily', [TeknisExpenseController::class, 'dailySummary'])->name('admin.expense.daily-summary');
     Route::get('/expense-summary/monthly', [TeknisExpenseController::class, 'monthlySummary'])->name('admin.expense.monthly-summary');

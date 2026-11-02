@@ -187,7 +187,7 @@ class TechnicianIncentiveService
      * omset di admin & portal teknisi), bukan tanggal laporan/pembayaran.
      * Order klaim tidak dihitung. `mode` null = tidak ada order / tim campur.
      *
-     * @return array{omset: float, unit: int, mode: ?string, minimal_omset: float, minimal_unit: ?int, dapat_games5: bool, dapat_games6: bool, nominal_games5: float, nominal_games6: float}
+     * @return array{omset: float, unit: int, mode: ?string, ditolak_games5: bool, ditolak_games6: bool, alasan_games5: ?string, alasan_games6: ?string, tercapai_games5: bool, tercapai_games6: bool, minimal_omset: float, minimal_unit: ?int, dapat_games5: bool, dapat_games6: bool, nominal_games5: float, nominal_games6: float}
      */
     public function ringkasanGames56(User $teknisi, Carbon $tanggal): array
     {
@@ -217,10 +217,27 @@ class TechnicianIncentiveService
         $dapat5 = $mode !== null && $omset >= (float) $settings->omset_games5_minimal;
         $dapat6 = $mode !== null && $minimalUnit !== null && $unit >= $minimalUnit;
 
+        // Penolakan Admin/HR (mis. order diklaim customer) — dibaca dari ledger.
+        $ditolak = TechnicianIncentive::query()
+            ->where('user_id', $teknisi->id)
+            ->whereDate('tanggal', $tanggal->toDateString())
+            ->whereIn('kategori', [IncentiveKategori::Games5OmsetTim->value, IncentiveKategori::Games6Unit->value])
+            ->where('status_verifikasi', IncentiveStatusVerifikasi::Ditolak->value)
+            ->get()
+            ->keyBy(fn (TechnicianIncentive $e) => $e->kategori instanceof IncentiveKategori ? $e->kategori->value : $e->kategori);
+        $tolak5 = $ditolak->get(IncentiveKategori::Games5OmsetTim->value);
+        $tolak6 = $ditolak->get(IncentiveKategori::Games6Unit->value);
+
         return [
             'omset' => $omset,
             'unit' => $unit,
             'mode' => $mode,
+            'ditolak_games5' => $tolak5 !== null,
+            'ditolak_games6' => $tolak6 !== null,
+            'alasan_games5' => $tolak5?->catatan,
+            'alasan_games6' => $tolak6?->catatan,
+            'tercapai_games5' => $dapat5 && $tolak5 === null,
+            'tercapai_games6' => $dapat6 && $tolak6 === null,
             'minimal_omset' => (float) $settings->omset_games5_minimal,
             'minimal_unit' => $minimalUnit,
             'dapat_games5' => $dapat5,
@@ -250,6 +267,11 @@ class TechnicianIncentiveService
                 ->first();
 
             if ($ada !== null && $ada->sumber !== IncentiveSumber::Otomatis) {
+                continue;
+            }
+
+            // Sudah ditolak Admin/HR: jangan dikembalikan ke "disetujui" oleh hitung ulang.
+            if ($tercapai && $ada !== null && $ada->status_verifikasi === IncentiveStatusVerifikasi::Ditolak) {
                 continue;
             }
 

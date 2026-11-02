@@ -85,9 +85,11 @@ class Keuangan extends Component
     }
 
     /**
-     * Daftar pendapatan sesuai filter terpilih (harian/bulanan).
+     * Riwayat sesuai filter (harian/bulanan): order tim - PIC DAN anggota. Order
+     * tempat dia hanya pendamping tampil sebagai "Anggota" supaya ada riwayat,
+     * tetapi tidak dihitung ke pendapatan pribadi (aturan revisi client 1 Nov).
      *
-     * @return array<int, array{tanggal: string, order_id: int, customer: string, layanan: string, total: float}>
+     * @return array<int, array{tanggal: string, order_id: int, customer: string, layanan: string, total: float, peran: string, unit: int}>
      */
     #[Computed]
     public function daftarPendapatan(): array
@@ -101,13 +103,17 @@ class Keuangan extends Component
             $selesai = $bulan->endOfMonth();
         }
 
-        return $this->orderSelesaiRentang($mulai, $selesai)
+        $userId = auth()->id();
+
+        return app(TeknisiKeuanganService::class)->orderTimSelesaiRentang(auth()->user(), $mulai, $selesai)
             ->map(fn (Order $order) => [
                 'tanggal' => ($order->tanggal_jadwal ?? $order->updated_at)->translatedFormat('d M Y'),
                 'order_id' => $order->id,
                 'customer' => $order->customer?->nama ?? 'Tanpa nama',
                 'layanan' => $order->ringkasanLayanan(),
                 'total' => $order->omsetJasa(),
+                'unit' => (int) $order->jumlahUnit(),
+                'peran' => (int) $order->teknisi_id === (int) $userId ? 'PIC' : 'Anggota',
             ])
             ->all();
     }
@@ -124,39 +130,11 @@ class Keuangan extends Component
             ->ringkasanGames56(auth()->user(), \Illuminate\Support\Carbon::parse($this->filterTanggal));
     }
 
-    /**
-     * Order tim yang dihitung untuk Games 5/6 pada tanggal terpilih (mode harian),
-     * supaya angka omset & unit di kartu bisa ditelusuri. Termasuk order yang
-     * teknisi hanya jadi anggota (bukan PIC).
-     *
-     * @return array<int, array{order_id: int, customer: string, layanan: string, jasa: float, unit: int, peran: string}>
-     */
-    #[Computed]
-    public function daftarOrderTim(): array
-    {
-        if ($this->modePendapatan !== 'harian' || ! $this->filterTanggal) {
-            return [];
-        }
-
-        $userId = auth()->id();
-
-        return app(TechnicianIncentiveService::class)
-            ->ordersGames56(auth()->user(), \Illuminate\Support\Carbon::parse($this->filterTanggal))
-            ->map(fn (Order $order) => [
-                'order_id' => $order->id,
-                'customer' => $order->customer?->nama ?? 'Tanpa nama',
-                'layanan' => $order->ringkasanLayanan(),
-                'jasa' => $order->omsetJasa(),
-                'unit' => (int) $order->jumlahUnit(),
-                'peran' => $order->teknisi_id === $userId ? 'PIC' : 'Anggota',
-            ])
-            ->all();
-    }
-
     #[Computed]
     public function totalPendapatanFilter(): float
     {
-        return (float) collect($this->daftarPendapatan)->sum('total');
+        // Hanya order yang dia jadi PIC - anggota/pendamping hanya riwayat.
+        return (float) collect($this->daftarPendapatan)->where('peran', 'PIC')->sum('total');
     }
 
     public function formatRupiah(float|int $nominal): string
