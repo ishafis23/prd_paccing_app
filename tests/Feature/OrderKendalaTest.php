@@ -167,6 +167,7 @@ it('aksi tandaiKendala via Livewire mengubah status & flash pesan status', funct
     Livewire::actingAs($teknisi)
         ->test(OrderDetail::class, ['order' => $order])
         ->set('alasanKendala', 'customer tidak jadi')
+        ->set('jenisKendala', 'besok')
         ->call('tandaiKendala')
         ->assertOk();
 

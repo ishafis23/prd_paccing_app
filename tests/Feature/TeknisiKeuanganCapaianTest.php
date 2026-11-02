@@ -41,7 +41,7 @@ class TeknisiKeuanganCapaianTest extends TestCase
             ->get('/teknisi/capaian')
             ->assertOk()
             ->assertSee('Selesai Hari Ini')
-            ->assertSee('Total Selesai')
+            ->assertDontSee('Total Selesai')
             ->assertSee('Rincian Harian')
             ->assertSee('Terkendala');
     }

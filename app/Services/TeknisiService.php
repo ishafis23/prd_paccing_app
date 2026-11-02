@@ -633,10 +633,10 @@ class TeknisiService
         }
 
         return DB::transaction(function () use ($order, $alasan, $jenis): Order {
-            $label = $jenis === self::KENDALA_SORE ? 'PENDING SORE' : 'PENDING BESOK';
+            $label = $jenis === self::KENDALA_SORE ? 'KENDALA - PENDING SORE' : 'KENDALA';
             $order->jenis_kendala = $jenis;
             $order->alasan_kendala = $alasan;
-            $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[KENDALA - {$label}] ".$alasan);
+            $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[{$label}] ".$alasan);
 
             if ($jenis === self::KENDALA_SORE) {
                 // Status tidak berubah: order masih bisa dikerjakan sore.
