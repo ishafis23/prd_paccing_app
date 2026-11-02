@@ -2,10 +2,9 @@
 
 namespace App\Livewire\Teknisi;
 
-use App\Enums\RoleName;
-use App\Models\Order;
+use App\Exceptions\BusinessRuleException;
 use App\Models\TeknisiExpense;
-use App\Models\User;
+use App\Services\TeknisiExpenseService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -76,16 +75,11 @@ class LaporanPengeluaran extends Component
         ];
     }
 
-    private function partnerQuery()
-    {
-        return User::role(RoleName::Teknisi->value)->where('users.id', '!=', auth()->id());
-    }
-
     /** Teknisi lain yang bisa dipilih sebagai partner/pendamping. */
     #[Computed]
     public function partnerOptions(): array
     {
-        return $this->partnerQuery()->orderBy('name')->pluck('name', 'id')->all();
+        return app(TeknisiExpenseService::class)->opsiPartner(auth()->user());
     }
 
     public function mount(): void
@@ -118,19 +112,7 @@ class LaporanPengeluaran extends Component
     #[Computed]
     public function orderOptions(): array
     {
-        $userId = auth()->id();
-
-        return Order::query()
-            ->where(function ($q) use ($userId) {
-                $q->where('teknisi_id', $userId)
-                    ->orWhereHas('orderTechnicians', fn ($t) => $t->where('teknisi_id', $userId));
-            })
-            ->with('customer')
-            ->latest('id')
-            ->limit(100)
-            ->get()
-            ->mapWithKeys(fn (Order $o) => [$o->id => "#{$o->id} — ".($o->customer?->nama ?? 'Tanpa nama')])
-            ->all();
+        return app(TeknisiExpenseService::class)->opsiOrder(auth()->user());
     }
 
     /**
@@ -139,17 +121,7 @@ class LaporanPengeluaran extends Component
     #[Computed]
     public function summaryBulanIni(): array
     {
-        $expenses = TeknisiExpense::query()
-            ->byTeknisi(auth()->id())
-            ->byMonth($this->filterBulan)
-            ->get();
-
-        return [
-            'total_pending' => $expenses->where('status', 'pending')->sum('nominal'),
-            'total_approved' => $expenses->where('status', 'approved')->sum('nominal'),
-            'total_rejected' => $expenses->where('status', 'rejected')->sum('nominal'),
-            'total_items' => $expenses->count(),
-        ];
+        return app(TeknisiExpenseService::class)->ringkasanBulan(auth()->user(), $this->filterBulan);
     }
 
     /**
@@ -158,26 +130,7 @@ class LaporanPengeluaran extends Component
     #[Computed]
     public function summaryHariIni(): array
     {
-        $expenses = TeknisiExpense::query()
-            ->byTeknisi(auth()->id())
-            ->byDate(today()->format('Y-m-d'))
-            ->get();
-
-        return [
-            'total_pending' => $expenses->where('status', 'pending')->sum('nominal'),
-            'total_approved' => $expenses->where('status', 'approved')->sum('nominal'),
-            'total_items' => $expenses->count(),
-        ];
-    }
-
-    /** Batasi query ke periode terpilih: satu hari (harian) atau satu bulan (bulanan). */
-    private function terapkanPeriode($query)
-    {
-        if ($this->modeFilter === 'harian') {
-            return $this->filterTanggal ? $query->byDate($this->filterTanggal) : $query;
-        }
-
-        return $this->filterBulan ? $query->byMonth($this->filterBulan) : $query;
+        return app(TeknisiExpenseService::class)->ringkasanHariIni(auth()->user());
     }
 
     /** Label periode aktif untuk judul breakdown. */
@@ -192,21 +145,7 @@ class LaporanPengeluaran extends Component
     #[Computed]
     public function kategoriBreakdown(): array
     {
-        $expenses = $this->terapkanPeriode(TeknisiExpense::query()->byTeknisi(auth()->id()))->get();
-
-        $result = [];
-
-        foreach (TeknisiExpense::KATEGORI as $kat) {
-            $filtered = $expenses->where('kategori', $kat);
-            $result[$kat] = [
-                'pending' => $filtered->where('status', 'pending')->sum('nominal'),
-                'approved' => $filtered->where('status', 'approved')->sum('nominal'),
-                'total' => $filtered->sum('nominal'),
-                'count' => $filtered->count(),
-            ];
-        }
-
-        return $result;
+        return app(TeknisiExpenseService::class)->breakdownKategori(auth()->user(), $this->modeFilter, $this->filterBulan, $this->filterTanggal);
     }
 
     /**
@@ -216,23 +155,13 @@ class LaporanPengeluaran extends Component
     public function expenses(): LengthAwarePaginator
     {
         // Termasuk pengeluaran rekan yang menautkan saya sebagai partner (tampil, tidak bisa dihapus).
-        $query = TeknisiExpense::query()
-            ->tercatatUntuk(auth()->id())
-            ->with(['teknisi', 'partner']);
-
-        $this->terapkanPeriode($query);
-
-        if ($this->filterKategori) {
-            $query->where('kategori', $this->filterKategori);
-        }
-
-        if ($this->filterStatus) {
-            $query->where('status', $this->filterStatus);
-        }
-
-        return $query->orderBy('tanggal_input', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(15);
+        return app(TeknisiExpenseService::class)->riwayat(auth()->user(), [
+            'mode' => $this->modeFilter,
+            'bulan' => $this->filterBulan,
+            'tanggal' => $this->filterTanggal,
+            'kategori' => $this->filterKategori,
+            'status' => $this->filterStatus,
+        ]);
     }
 
     /** Buka form dalam mode ubah untuk pengeluaran milik sendiri (pencatat). */
@@ -298,25 +227,14 @@ class LaporanPengeluaran extends Component
                 'keterangan' => $this->keterangan,
             ];
 
+            $service = app(TeknisiExpenseService::class);
+
             if ($this->editId !== null) {
                 $e = TeknisiExpense::query()->where('teknisi_id', auth()->id())->findOrFail($this->editId);
-
-                $uangBerubah = $e->tanggal_input->format('Y-m-d') !== $data['tanggal_input']
-                    || $e->kategori !== $data['kategori']
-                    || (int) $e->qty !== (int) $data['qty']
-                    || (int) $e->harga !== (int) $data['harga']
-                    || (int) $e->nominal !== (int) $data['nominal'];
-
-                $kembaliMenunggu = $uangBerubah && $e->status !== 'pending';
-
-                if ($kembaliMenunggu) {
-                    $data += ['status' => 'pending', 'approved_by' => null, 'catatan_approval' => null];
-                }
-
-                $e->update($data);
-                session()->flash('status', 'Pengeluaran berhasil diubah.'.($kembaliMenunggu ? ' Menunggu persetujuan ulang admin.' : ''));
+                $hasil = $service->ubah(auth()->user(), $e, $data);
+                session()->flash('status', 'Pengeluaran berhasil diubah.'.($hasil['perlu_acc_ulang'] ? ' Menunggu persetujuan ulang admin.' : ''));
             } else {
-                TeknisiExpense::create($data + ['teknisi_id' => auth()->id(), 'status' => 'pending']);
+                $service->catat(auth()->user(), $data);
                 session()->flash('status', 'Pengeluaran berhasil dicatat.');
             }
 
@@ -333,19 +251,11 @@ class LaporanPengeluaran extends Component
      */
     public function deletePengeluaran(TeknisiExpense $expense): void
     {
-        if ($expense->teknisi_id !== auth()->id()) {
-            session()->flash('error', 'Anda tidak memiliki akses.');
-            return;
-        }
-
-        if ($expense->status !== 'pending') {
-            session()->flash('error', 'Hanya pengeluaran pending yang bisa dihapus.');
-            return;
-        }
-
         try {
-            $expense->delete();
+            app(TeknisiExpenseService::class)->hapus(auth()->user(), $expense);
             session()->flash('status', 'Pengeluaran berhasil dihapus.');
+        } catch (BusinessRuleException $e) {
+            session()->flash('error', $e->getMessage());
         } catch (\Exception $e) {
             session()->flash('error', 'Gagal menghapus pengeluaran.');
         }

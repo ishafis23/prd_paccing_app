@@ -4,7 +4,7 @@ namespace App\Livewire\Teknisi;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
-use App\Services\OmsetService;
+use App\Services\TeknisiKeuanganService;
 use App\Services\TechnicianIncentiveService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -48,14 +48,7 @@ class Keuangan extends Component
      */
     private function orderSelesaiRentang(CarbonImmutable $mulai, CarbonImmutable $selesai): Collection
     {
-        return Order::query()
-            ->where('teknisi_id', auth()->id())
-            ->where('status', OrderStatus::Selesai->value)
-            ->whereRaw(OmsetService::tanggalPendapatanSql().' BETWEEN ? AND ?', [$mulai->toDateString(), $selesai->toDateString()])
-            ->with(['customer', 'orderItems', 'latestPayment'])
-            ->orderByRaw(OmsetService::tanggalPendapatanSql())
-            ->orderBy('id')
-            ->get();
+        return app(TeknisiKeuanganService::class)->orderSelesaiRentang(auth()->user(), $mulai, $selesai);
     }
 
     /**
@@ -88,12 +81,7 @@ class Keuangan extends Component
     #[Computed]
     public function pendapatanTotal(): float
     {
-        return (float) Order::query()
-            ->where('teknisi_id', auth()->id())
-            ->where('status', OrderStatus::Selesai->value)
-            ->with(['orderItems', 'latestPayment'])
-            ->get()
-            ->sum(fn (Order $order) => $order->omsetJasa());
+        return app(TeknisiKeuanganService::class)->pendapatanTotal(auth()->user());
     }
 
     /**

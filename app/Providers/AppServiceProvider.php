@@ -25,6 +25,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // API mobile: batasi percobaan login per email+IP, dan aksi tulis berat per token.
+        \Illuminate\Support\Facades\RateLimiter::for('api-login', fn (\Illuminate\Http\Request $r) => \Illuminate\Cache\RateLimiting\Limit::perMinute(5)
+            ->by(mb_strtolower((string) $r->input('email')).'|'.$r->ip()));
+        \Illuminate\Support\Facades\RateLimiter::for('api-tulis', fn (\Illuminate\Http\Request $r) => \Illuminate\Cache\RateLimiting\Limit::perMinute(120)
+            ->by((string) ($r->user()?->id ?? $r->ip())));
+        \Illuminate\Support\Facades\RateLimiter::for('api', fn (\Illuminate\Http\Request $r) => \Illuminate\Cache\RateLimiting\Limit::perMinute(240)
+            ->by((string) ($r->user()?->id ?? $r->ip())));
+
         // Draft gaji = hasil hitung yang ikut berubah bila data sumbernya
         // (OFF, pulang cepat, absensi, insentif) berubah — tanpa harus klik
         // "Hitung Ulang" manual. Gaji ACC/dibayar tidak disentuh.

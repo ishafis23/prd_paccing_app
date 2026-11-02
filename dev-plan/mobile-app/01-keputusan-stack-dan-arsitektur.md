@@ -45,22 +45,24 @@ Pendukung:
 - Foto: unggah per foto bertahap ke endpoint khusus, memakai kuota & pembersihan storage yang sudah ada (`15-upload-foto-dan-offline.md`).
 - Penyimpanan lokal app: token (secure store), cache baca jadwal hari ini, antrean unggah (SQLite/file).
 
-## 4. Struktur repo
+## 4. Struktur repo (keputusan 2026-11-02: repo terpisah)
 
 ```
-crm_paccing/            (Laravel — repo yang sekarang)
-  app/Http/Controllers/Api/V1/*
-  app/Http/Resources/*
+D:\myproject\crm_paccing\          (Laravel — repo backend)
+  app/Http/Controllers/Api/V1/*       controller API tipis -> Service
+  app/Support/Api/Presenter.php       bentuk JSON (kontrak)
   routes/api.php
   tests/Feature/Api/*
-mobile/                 (folder baru, project Expo, build & dependensi terpisah)
+  dev-plan/32-api-teknisi-v1.md       kontrak endpoint (sumber kebenaran untuk app)
+  dev-plan/mobile-app/*               rencana (dokumen ini)
+D:\myproject\crm_paccing_mobile\   (Expo + TypeScript — repo git sendiri)
   app/            layar (expo-router)
   src/api/        klien HTTP + tipe respons
   src/features/   absensi, order, keuangan, ...
   src/ui/         komponen & design token (lihat dokumen 20)
 ```
 
-Alternatif: repo terpisah `crm_paccing_mobile`. Rekomendasi: folder `mobile/` di repo yang sama selama developer-nya sama (kontrak API & tipe mudah disinkronkan); pisah bila tim berbeda.
+Alasan dipisah: toolchain berbeda (Node/Expo vs PHP/Composer), siklus rilis berbeda (build toko vs deploy server), `node_modules` tidak ikut ke server, riwayat git bersih, akses bisa dipisah. Satu-satunya kopling adalah kontrak API di `dev-plan/32-api-teknisi-v1.md`; repo mobile mencatat versi API yang didukung dan app mengirim `X-App-Version` (server menolak yang terlalu lama dengan 426).
 
 ## 5. Yang sengaja tidak dilakukan
 

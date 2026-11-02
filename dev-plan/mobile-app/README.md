@@ -1,6 +1,6 @@
 # Mobile App Teknisi — Indeks Rencana
 
-Status: **perencanaan** (dibuat 2026-11-01). Belum ada kode yang dieksekusi. Keputusan yang masih terbuka ada di bagian bawah file ini.
+Status (2026-11-02): **Fase 0 API selesai** (`dev-plan/32-api-teknisi-v1.md`, tes di `tests/Feature/Api`). Scaffold app: repo terpisah `D:\myproject\crm_paccing_mobile` (Expo + TypeScript). Keputusan yang masih terbuka ada di bagian bawah file ini.
 
 ## Tujuan
 
@@ -26,6 +26,7 @@ Aplikasi Android (iOS menyusul bila perlu) untuk teknisi, menggantikan portal we
 | `15-upload-foto-dan-offline.md` | Unggah foto tahan sinyal lemah, antrean, kompresi, aturan offline |
 | `20-adopsi-ui-ux-portal-web.md` | Pemetaan halaman web → layar app, design token, navigasi |
 | `30-fase-estimasi-risiko-rilis.md` | Fase, estimasi, risiko, pengujian, rilis, pensiun portal web |
+| `../32-api-teknisi-v1.md` | **Kontrak endpoint v1** (dibuat saat Fase 0 selesai) |
 
 Aturan penamaan: `0x` fondasi, `1x` proses bisnis, `2x` UI/UX, `3x` pelaksanaan.
 
