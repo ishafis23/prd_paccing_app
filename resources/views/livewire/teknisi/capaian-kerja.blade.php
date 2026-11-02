@@ -3,7 +3,7 @@
         <p class="text-sm font-semibold text-white">Capaian pengerjaan order Anda sejauh ini.</p>
     </div>
 
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-2 gap-3">
         <div class="rounded-2xl bg-white p-4 text-center shadow-sm ring-1 ring-gray-100">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                 <x-heroicon-o-bolt class="h-5 w-5" />
@@ -17,13 +17,6 @@
             </span>
             <p class="mt-2 text-2xl font-extrabold text-gray-900">{{ $this->bulanIni }}</p>
             <p class="mt-0.5 text-[11px] font-medium text-gray-500">Selesai Bulan Ini</p>
-        </div>
-        <div class="rounded-2xl bg-white p-4 text-center shadow-sm ring-1 ring-gray-100">
-            <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                <x-heroicon-o-trophy class="h-5 w-5" />
-            </span>
-            <p class="mt-2 text-2xl font-extrabold text-gray-900">{{ $this->totalSelesai }}</p>
-            <p class="mt-0.5 text-[11px] font-medium text-gray-500">Total Selesai</p>
         </div>
     </div>
 

@@ -19,7 +19,7 @@
         <livewire:teknisi.laporan-pengeluaran />
     @else
         {{-- Summary Cards --}}
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 gap-3">
             <div class="rounded-2xl bg-white p-4 text-center shadow-sm ring-1 ring-gray-100">
                 <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                     <x-heroicon-o-bolt class="h-5 w-5" />
@@ -33,13 +33,6 @@
                 </span>
                 <p class="mt-2 text-sm font-extrabold text-gray-900">{{ $this->formatRupiah($this->pendapatanBulanIni) }}</p>
                 <p class="mt-0.5 text-[11px] font-medium text-gray-500">Bulan Ini</p>
-            </div>
-            <div class="rounded-2xl bg-white p-4 text-center shadow-sm ring-1 ring-gray-100">
-                <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                    <x-heroicon-o-trophy class="h-5 w-5" />
-                </span>
-                <p class="mt-2 text-sm font-extrabold text-gray-900">{{ $this->formatRupiah($this->pendapatanTotal) }}</p>
-                <p class="mt-0.5 text-[11px] font-medium text-gray-500">Total</p>
             </div>
         </div>
 

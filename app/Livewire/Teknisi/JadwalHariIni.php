@@ -51,10 +51,20 @@ class JadwalHariIni extends Component
         $administrasi = app(SyaratAdministrasiService::class);
         $penghalang = $administrasi->penghalang(auth()->user());
 
+        // Titik berurutan: order yang belum dimulai terkunci selama Titik sebelumnya belum beres.
+        $svc = app(\App\Services\TeknisiService::class);
+        $terkunci = [];
+        foreach ($ordersSebelumnya->concat($ordersHariIni) as $o) {
+            if ($o->status === OrderStatus::Terjadwal && ($p = $svc->titikPenghalang($o, auth()->user())) !== null) {
+                $terkunci[$o->id] = $p->titik->nama;
+            }
+        }
+
         return view('livewire.teknisi.jadwal-hari-ini', [
             'ordersSebelumnya' => $ordersSebelumnya,
             'ordersHariIni' => $ordersHariIni,
             'sudahAbsen' => $sudahAbsen,
+            'terkunci' => $terkunci,
             'penghalang' => $penghalang,
             'tertahan' => $administrasi->tertahanSetoran($penghalang),
         ])->layout('layouts.teknisi', ['title' => 'Jadwal Saya']);

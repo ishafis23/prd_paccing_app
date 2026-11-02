@@ -240,6 +240,15 @@
         />
     @endif
 
+    @if ($order->jenis_kendala === 'sore' && in_array($order->status, [$orderStatus::Terjadwal, $orderStatus::MenujuLokasi, $orderStatus::Dikerjakan]))
+        <div class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
+            <p class="flex items-center gap-2 font-bold text-amber-700">
+                <x-heroicon-o-clock class="h-5 w-5" /> Pending — dikerjakan sore
+            </p>
+            <p class="mt-1 text-sm text-amber-900/80">{{ $order->alasan_kendala }}</p>
+        </div>
+    @endif
+
     {{-- Tombol Terkendala/Gagal: tersedia selama order masih berjalan aktif
          (belum submit laporan), utk lapor kendala lapangan mis. customer
          tidak jadi / tidak ada di lokasi. --}}
@@ -250,6 +259,16 @@
                 <x-heroicon-o-exclamation-triangle class="h-4 w-4" /> Terkendala / Gagal
             </button>
             <div x-show="buka" x-cloak class="space-y-2">
+                <p class="text-sm font-semibold text-gray-700">Jenis kendala</p>
+                <label class="flex items-start gap-2 rounded-xl border border-gray-200 p-2.5 text-sm">
+                    <input type="radio" wire:model="jenisKendala" value="besok" class="mt-0.5">
+                    <span><b>Pending, dikerjakan besok / hari lain</b><br><span class="text-xs text-gray-500">Admin akan menjadwalkan ulang order ini.</span></span>
+                </label>
+                <label class="flex items-start gap-2 rounded-xl border border-gray-200 p-2.5 text-sm">
+                    <input type="radio" wire:model="jenisKendala" value="sore" class="mt-0.5">
+                    <span><b>Pending, bisa dikerjakan sore</b><br><span class="text-xs text-gray-500">Titik berikutnya terbuka; order ini tetap bisa dikerjakan sore.</span></span>
+                </label>
+                @error('jenisKendala') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
                 <label class="block text-sm font-semibold text-gray-700">Alasan kendala</label>
                 <textarea wire:model="alasanKendala" rows="3" placeholder="mis. customer tidak jadi / tidak ada di lokasi"
                     class="w-full rounded-xl border border-gray-300 text-sm"></textarea>

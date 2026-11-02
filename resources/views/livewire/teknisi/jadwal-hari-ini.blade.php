@@ -68,10 +68,11 @@
                                 'service_ac' => 'bg-blue-50 text-blue-600',
                                 default => 'bg-gray-50 text-gray-600',
                             };
+                            $bisaBuka = $sudahAbsen && ! isset($terkunci[$order->id]);
                         @endphp
-                        <{{ $sudahAbsen ? 'a' : 'div' }}
-                            @if ($sudahAbsen) href="{{ \App\Support\Url::absolute('teknisi.order', ['order' => $order->id]) }}" wire:navigate @endif
-                            class="block rounded-2xl bg-white p-4 shadow-sm ring-1 {{ $g['nyala'] ? 'ring-red-100' : 'ring-gray-100' }} {{ $sudahAbsen ? 'transition active:scale-[0.99] active:bg-gray-50' : 'opacity-80' }}">
+                        <{{ $bisaBuka ? 'a' : 'div' }}
+                            @if ($bisaBuka) href="{{ \App\Support\Url::absolute('teknisi.order', ['order' => $order->id]) }}" wire:navigate @endif
+                            class="block rounded-2xl bg-white p-4 shadow-sm ring-1 {{ $g['nyala'] ? 'ring-red-100' : 'ring-gray-100' }} {{ $bisaBuka ? 'transition active:scale-[0.99] active:bg-gray-50' : 'opacity-60' }}">
                             <div class="flex items-center gap-3">
                                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ $serviceColor }}">
                                     <x-dynamic-component :component="$serviceIcon" class="h-5 w-5" />
@@ -82,6 +83,12 @@
                                         <x-teknisi-status-badge :status="$order->status" />
                                     </div>
                                     <p class="mt-0.5 truncate text-sm text-gray-500">{{ $order->alamat_pengerjaan }}</p>
+                                    @if (isset($terkunci[$order->id]))
+                                        <span class="mt-1 inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">Terkunci — selesaikan {{ $terkunci[$order->id] }} dulu</span>
+                                    @endif
+                                    @if ($order->jenis_kendala === 'sore' && $order->status !== \App\Enums\OrderStatus::Terkendala)
+                                        <span class="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Pending — dikerjakan sore</span>
+                                    @endif
                                     @if (app(\App\Services\TeknisiService::class)->perluDilengkapi($order))
                                         <span class="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Perlu dilengkapi</span>
                                     @endif
@@ -93,13 +100,13 @@
                                         @endif
                                     </p>
                                 </div>
-                                @if ($sudahAbsen)
+                                @if ($bisaBuka)
                                     <x-heroicon-o-chevron-right class="h-5 w-5 shrink-0 text-gray-300" />
                                 @else
                                     <x-heroicon-o-lock-closed class="h-5 w-5 shrink-0 text-gray-300" />
                                 @endif
                             </div>
-                        </{{ $sudahAbsen ? 'a' : 'div' }}>
+                        </{{ $bisaBuka ? 'a' : 'div' }}>
                     @endforeach
                 </div>
             </div>

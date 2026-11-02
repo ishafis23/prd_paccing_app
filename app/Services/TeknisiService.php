@@ -45,6 +45,11 @@ class TeknisiService
             throw new BusinessRuleException('Order harus berstatus terjadwal sebelum berangkat.');
         }
 
+        $penghalangTitik = $this->titikPenghalang($order, $teknisi);
+        if ($penghalangTitik !== null) {
+            throw new BusinessRuleException($this->pesanTitikTerkunci($penghalangTitik));
+        }
+
         // dev-plan/17, B63: tidak boleh berangkat ke order berikutnya selama
         // masih ada order lain (belum ditutup) yang foto wajibnya belum
         // lengkap — foto boleh diisi belakangan, tapi tetap menahan
@@ -560,13 +565,56 @@ class TeknisiService
         }
     }
 
+    public const KENDALA_BESOK = 'besok';
+
+    public const KENDALA_SORE = 'sore';
+
+    /**
+     * Order lain pada hari & tim yang sama dengan Titik LEBIH AWAL yang belum
+     * dikerjakan / belum dikonfirmasi terkendala. Titik berikutnya baru terbuka
+     * setelah Titik sebelumnya: selesai, terkendala (pending besok), atau
+     * terkendala pending-sore (boleh dikerjakan sore, urutan tetap lanjut).
+     * Null = tidak terkunci (atau order tanpa Titik).
+     */
+    public function titikPenghalang(Order $order, User $teknisi): ?Order
+    {
+        $order->loadMissing('titik');
+        if ($order->titik === null || $order->tanggal_jadwal === null) {
+            return null;
+        }
+
+        return Order::query()
+            ->untukTeknisi($teknisi->id)
+            ->where('id', '!=', $order->id)
+            ->whereDate('tanggal_jadwal', $order->tanggal_jadwal->toDateString())
+            ->whereIn('status', [OrderStatus::Terjadwal->value, OrderStatus::MenujuLokasi->value, OrderStatus::Dikerjakan->value])
+            ->where(fn ($q) => $q->whereNull('jenis_kendala')->orWhere('jenis_kendala', '!=', self::KENDALA_SORE))
+            ->whereHas('titik', fn ($q) => $q->where('urutan', '<', $order->titik->urutan))
+            ->with('titik')
+            ->get()
+            ->sortBy(fn (Order $o) => $o->titik->urutan)
+            ->first();
+    }
+
+    public function pesanTitikTerkunci(Order $penghalang): string
+    {
+        return sprintf(
+            '%s belum dikerjakan. Selesaikan %s dulu, atau tandai terkendala (pending besok / pending sore), baru titik ini terbuka.',
+            $penghalang->titik->nama,
+            $penghalang->titik->nama,
+        );
+    }
+
     /**
      * Tombol "Terkendala / Gagal": teknisi lapor order tidak bisa
      * dilanjutkan di lapangan (mis. customer tidak jadi / tidak ada di
-     * lokasi). Menutup attendance terbuka (kalau ada) dan menunggu admin
-     * menjadwalkan ulang lewat OrderService::reschedule().
+     * lokasi). Dua jenis:
+     *  - besok: pending dikerjakan besok/hari lain. Status -> terkendala,
+     *    attendance ditutup, menunggu admin menjadwalkan ulang (OrderService::reschedule()).
+     *  - sore: pending tapi bisa dikerjakan sore. Status TETAP aktif supaya masih
+     *    bisa dikerjakan nanti, tetapi titik berikutnya langsung terbuka.
      */
-    public function tandaiKendala(Order $order, User $teknisi, string $alasan): Order
+    public function tandaiKendala(Order $order, User $teknisi, string $alasan, string $jenis = self::KENDALA_BESOK): Order
     {
         $this->pastikanAnggota($order, $teknisi);
         $this->assertRole($teknisi, [RoleName::Teknisi]);
@@ -575,15 +623,29 @@ class TeknisiService
             throw new BusinessRuleException('Order harus berstatus terjadwal/menuju lokasi/dikerjakan untuk ditandai terkendala.');
         }
 
+        if (! in_array($jenis, [self::KENDALA_BESOK, self::KENDALA_SORE], true)) {
+            throw new BusinessRuleException('Pilih jenis kendala: pending dikerjakan besok/hari lain, atau pending bisa dikerjakan sore.');
+        }
+
         $alasan = trim($alasan);
         if ($alasan === '') {
             throw new BusinessRuleException('Alasan kendala wajib diisi.');
         }
 
-        return DB::transaction(function () use ($order, $alasan): Order {
-            $order->status = OrderStatus::Terkendala;
+        return DB::transaction(function () use ($order, $alasan, $jenis): Order {
+            $label = $jenis === self::KENDALA_SORE ? 'PENDING SORE' : 'PENDING BESOK';
+            $order->jenis_kendala = $jenis;
             $order->alasan_kendala = $alasan;
-            $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[KENDALA] ".$alasan);
+            $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[KENDALA - {$label}] ".$alasan);
+
+            if ($jenis === self::KENDALA_SORE) {
+                // Status tidak berubah: order masih bisa dikerjakan sore.
+                $order->save();
+
+                return $order->fresh();
+            }
+
+            $order->status = OrderStatus::Terkendala;
             $order->save();
 
             // B21: attendance terbuka (kalau order sempat dikerjakan) ikut ditutup.

@@ -47,6 +47,7 @@ class Order extends Model
         'ditutup_pada',
         'catatan_admin',
         'alasan_kendala',
+        'jenis_kendala',
         'perbaikan_menunggu_konfirmasi',
         'perbaikan_catatan',
         'perbaikan_estimasi_harga',

@@ -46,6 +46,9 @@ class OrderDetail extends Component
 
     public string $alasanKendala = '';
 
+    /** besok | sore — wajib dipilih saat lapor kendala. */
+    public string $jenisKendala = '';
+
     public string $catatanPerbaikan = '';
 
     public string $estimasiHargaPerbaikan = '';
@@ -128,6 +131,18 @@ class OrderDetail extends Component
             session()->flash('error', sprintf('Akses order ditahan. Laporkan setoran order #%d sebesar Rp %s terlebih dahulu.', $tertunda->id, number_format((float) $tertunda->total(), 0, ',', '.')));
             $this->redirect(route('teknisi.setoran'), navigate: true);
             return;
+        }
+
+        // Titik berurutan: order yang belum dimulai terkunci selama Titik sebelumnya belum beres.
+        if ($order->status === \App\Enums\OrderStatus::Terjadwal) {
+            $svc = app(TeknisiService::class);
+            $penghalang = $svc->titikPenghalang($order, auth()->user());
+            if ($penghalang !== null) {
+                session()->flash('error', $svc->pesanTitikTerkunci($penghalang));
+                $this->redirect(\App\Support\Url::absolute('teknisi.jadwal'), navigate: true);
+
+                return;
+            }
         }
 
         $this->customerSudahBayar = (bool) $order->bayar_dilaporkan_teknisi;
@@ -673,9 +688,11 @@ class OrderDetail extends Component
     public function tandaiKendala(): void
     {
         try {
-            app(TeknisiService::class)->tandaiKendala($this->order, auth()->user(), $this->alasanKendala);
-            session()->flash('status', 'Order ditandai terkendala. Admin akan menjadwalkan ulang.');
-            $this->reset('alasanKendala');
+            app(TeknisiService::class)->tandaiKendala($this->order, auth()->user(), $this->alasanKendala, $this->jenisKendala);
+            session()->flash('status', $this->jenisKendala === TeknisiService::KENDALA_SORE
+                ? 'Ditandai pending sore. Titik berikutnya sudah terbuka; order ini bisa dikerjakan sore.'
+                : 'Order ditandai terkendala (pending besok/hari lain). Admin akan menjadwalkan ulang.');
+            $this->reset('alasanKendala', 'jenisKendala');
         } catch (BusinessRuleException|AuthorizationException $e) {
             session()->flash('error', $e->getMessage());
         }
