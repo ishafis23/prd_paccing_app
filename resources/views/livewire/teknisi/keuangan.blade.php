@@ -93,6 +93,9 @@
                         <p class="text-[10px]">@if ($g['minimal_unit'] !== null)Target {{ $g['minimal_unit'] }} unit @if ($g['dapat_games6']) · Bonus {{ $this->formatRupiah($g['nominal_games6']) }}@endif @else Belum ada order @endif</p>
                     </div>
                 </div>
+                <p class="border-b border-gray-100 px-4 pb-3 text-[11px] text-gray-500">
+                    Omset &amp; unit di atas adalah hitungan <b>tim</b> (termasuk order yang Anda bukan PIC). Daftar pendapatan di bawah hanya order yang Anda jadi PIC.
+                </p>
             @endif
 
             @if (count($this->daftarPendapatan) > 0)
@@ -125,7 +128,31 @@
             @else
                 <div class="px-4 py-8 text-center">
                     <x-heroicon-o-inbox class="mx-auto h-12 w-12 text-gray-300" />
-                    <p class="mt-2 text-sm text-gray-500">Belum ada pendapatan pada periode ini</p>
+                    <p class="mt-2 text-sm text-gray-500">
+                        {{ $modePendapatan === 'harian' && count($this->daftarOrderTim) > 0 ? 'Belum ada pendapatan pribadi (sebagai PIC) pada tanggal ini' : 'Belum ada pendapatan pada periode ini' }}
+                    </p>
+                </div>
+            @endif
+
+            @if (count($this->daftarOrderTim) > 0)
+                <div class="border-t border-gray-100 px-4 py-3">
+                    <h3 class="text-sm font-bold text-gray-900">Order Tim (dihitung Game 5 &amp; 6)</h3>
+                    <ul class="mt-2 divide-y divide-gray-50">
+                        @foreach ($this->daftarOrderTim as $o)
+                            <li class="flex items-start justify-between gap-2 py-2">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-medium text-gray-800">{{ $o['customer'] }}</p>
+                                    <p class="text-[10px] text-blue-500">Order #{{ $o['order_id'] }}</p>
+                                    <p class="text-[10px] text-gray-500">{{ $o['layanan'] }}</p>
+                                </div>
+                                <div class="shrink-0 text-right">
+                                    <p class="text-xs font-bold text-gray-900">{{ $this->formatRupiah($o['jasa']) }}</p>
+                                    <p class="text-[10px] text-gray-500">{{ $o['unit'] }} unit</p>
+                                    <span class="mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $o['peran'] === 'PIC' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }}">{{ $o['peran'] }}</span>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
             @endif
         </div>

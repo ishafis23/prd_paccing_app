@@ -165,6 +165,23 @@ class TechnicianIncentiveService
     }
 
     /**
+     * Order tim (PIC atau anggota) yang dihitung untuk Games 5 & 6 pada satu tanggal.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Order>
+     */
+    public function ordersGames56(User $teknisi, Carbon $tanggal): \Illuminate\Database\Eloquent\Collection
+    {
+        return Order::query()
+            ->untukTeknisi($teknisi->id)
+            ->where('status', OrderStatus::Selesai->value)
+            ->where('is_klaim', false)
+            ->whereRaw(OmsetService::tanggalPendapatanSql().' = ?', [$tanggal->toDateString()])
+            ->with(['customer', 'orderItems', 'latestPayment', 'orderTechnicians'])
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * Ringkasan Games 5 (omset jasa tim) & Games 6 (unit) satu teknisi pada
      * satu tanggal. Tanggal = tanggal order DIJADWALKAN/dikerjakan (sama dengan
      * omset di admin & portal teknisi), bukan tanggal laporan/pembayaran.
@@ -176,13 +193,7 @@ class TechnicianIncentiveService
     {
         $settings = app(AttendanceSettingService::class)->data();
 
-        $orders = Order::query()
-            ->untukTeknisi($teknisi->id)
-            ->where('status', OrderStatus::Selesai->value)
-            ->where('is_klaim', false)
-            ->whereRaw(OmsetService::tanggalPendapatanSql().' = ?', [$tanggal->toDateString()])
-            ->with(['orderItems', 'latestPayment', 'orderTechnicians'])
-            ->get();
+        $orders = $this->ordersGames56($teknisi, $tanggal);
 
         $omset = (float) $orders->sum(fn (Order $o): float => $o->omsetJasa());
         $unit = (int) $orders->sum(fn (Order $o): int => $o->jumlahUnit());
