@@ -24,8 +24,7 @@
             <input wire:model="diserahkanKe" class="w-full rounded-xl border-gray-300 text-sm" placeholder="Diserahkan kepada siapa">
             <input wire:model="tanggalSetor" type="date" class="w-full rounded-xl border-gray-300 text-sm">
             <textarea wire:model="catatan" class="w-full rounded-xl border-gray-300 text-sm" placeholder="Catatan (opsional)"></textarea>
-            <input type="file" accept="image/*" capture="environment" wire:model="foto" class="w-full text-sm">
-            @if ($foto) <img src="{{ $foto->temporaryUrl() }}" class="h-32 w-full rounded-xl object-cover"> @endif
+            <x-photo-upload-dialog field-name="foto" label="Foto Bukti Setoran" height="h-40" />
             @error('foto') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
             <button class="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white active:bg-blue-700" wire:loading.attr="disabled">Kirim Laporan Setoran</button>
         </form>

@@ -1,14 +1,14 @@
 @props([
     'fieldName',     // fotoSebelum, fotoSesudah, dll
     'label',         // Label untuk display
-    'orderId',       // Order ID untuk upload
+    'orderId' => null, // Order ID untuk upload (null = tanpa draft per order, mis. setoran tunai)
     'showRemoveBtn' => true, // Tampilkan tombol remove
     'height' => 'h-44', // Tinggi box
     'afterUploadMethod' => null, // Method Livewire yg dipanggil otomatis setelah upload (mis. ganti foto tersimpan)
     'afterUploadId' => null,     // Argumen id utk afterUploadMethod
 ])
 
-<div x-data="photoUpload('{{ $fieldName }}', {{ $orderId }}, {{ $afterUploadMethod ? "'".e($afterUploadMethod)."'" : 'null' }}, {{ $afterUploadId !== null ? (int) $afterUploadId : 'null' }})">
+<div x-data="photoUpload('{{ $fieldName }}', {{ $orderId !== null ? (int) $orderId : 'null' }},{{ $afterUploadMethod ? "'".e($afterUploadMethod)."'" : 'null' }}, {{ $afterUploadId !== null ? (int) $afterUploadId : 'null' }})">
     {{-- Tombol membuka dialog --}}
     <button
         type="button"
