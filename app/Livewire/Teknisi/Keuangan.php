@@ -118,6 +118,14 @@ class Keuangan extends Component
             ->all();
     }
 
+    /** Capaian Games bulan berjalan: jumlah kali Game 5 & Game 6 tercapai. */
+    #[Computed]
+    public function capaianGamesBulanIni(): array
+    {
+        return app(TechnicianIncentiveService::class)
+            ->jumlahGamesBulan(auth()->user(), \Illuminate\Support\Carbon::now());
+    }
+
     /** Games 5 & 6 untuk tanggal terpilih (hanya mode harian). */
     #[Computed]
     public function gamesHarian(): ?array

@@ -339,7 +339,8 @@
                         <button
                             type="submit"
                             wire:loading.attr="disabled"
-                            class="flex-1 rounded-lg bg-red-600 py-2 font-semibold text-white disabled:opacity-50">
+                            style="background-color:#dc2626;color:#fff"
+                            class="flex-1 rounded-lg py-2 font-semibold text-white disabled:opacity-50">
                             <span wire:loading.remove>Tolak</span>
                             <span wire:loading><x-heroicon-o-arrow-path class="inline h-4 w-4 animate-spin" /></span>
                         </button>

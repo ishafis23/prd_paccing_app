@@ -33,6 +33,10 @@
                 </span>
                 <p class="mt-2 text-sm font-extrabold text-gray-900">{{ $this->formatRupiah($this->pendapatanBulanIni) }}</p>
                 <p class="mt-0.5 text-[11px] font-medium text-gray-500">Bulan Ini</p>
+                <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2 text-[11px] font-semibold text-gray-700">
+                    <p>🏆 Game 5 (omset): {{ $this->capaianGamesBulanIni['games5'] }} kali</p>
+                    <p>Game 6 (unit): {{ $this->capaianGamesBulanIni['games6'] }} kali</p>
+                </div>
             </div>
         </div>
 

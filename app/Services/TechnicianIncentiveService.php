@@ -248,6 +248,28 @@ class TechnicianIncentiveService
     }
 
     /**
+     * Berapa kali Game 5 (omset) & Game 6 (unit) tercapai dalam satu bulan —
+     * hitung entri ledger yang tidak ditolak Admin/HR.
+     *
+     * @return array{games5: int, games6: int}
+     */
+    public function jumlahGamesBulan(User $teknisi, Carbon $bulan): array
+    {
+        $rows = TechnicianIncentive::query()
+            ->where('user_id', $teknisi->id)
+            ->whereBetween('tanggal', [$bulan->copy()->startOfMonth()->toDateString(), $bulan->copy()->endOfMonth()->toDateString()])
+            ->whereIn('kategori', [IncentiveKategori::Games5OmsetTim->value, IncentiveKategori::Games6Unit->value])
+            ->where('status_verifikasi', '!=', IncentiveStatusVerifikasi::Ditolak->value)
+            ->get()
+            ->groupBy(fn (TechnicianIncentive $e) => $e->kategori instanceof IncentiveKategori ? $e->kategori->value : $e->kategori);
+
+        return [
+            'games5' => $rows->get(IncentiveKategori::Games5OmsetTim->value, collect())->count(),
+            'games6' => $rows->get(IncentiveKategori::Games6Unit->value, collect())->count(),
+        ];
+    }
+
+    /**
      * Sinkronkan ledger Games 5 & 6 teknisi pada satu tanggal: catat bila
      * tercapai, hapus entri otomatis bila tidak lagi tercapai (mis. order
      * dibatalkan / omset berubah). Entri manual Admin/HR tidak disentuh.
