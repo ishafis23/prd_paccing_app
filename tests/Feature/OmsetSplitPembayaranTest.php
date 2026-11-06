@@ -142,3 +142,17 @@ it('menolak saat Total Tagihan berubah tetapi split lama tidak lagi cocok', func
         $order->fresh(), PaymentMethod::Cash, 100000, $this->admin, null, 600000, 'tambah ongkir',
     ))->toThrow(BusinessRuleException::class, 'isi ulang Omset Jasa');
 });
+
+it('koreksiSplitOmset mengubah split pada pembayaran yang sudah lunas', function () {
+    $order = ($this->buatOrder)();
+    ($this->paymentService)()->recordPayment($order, PaymentMethod::Cash, 550000, $this->admin, '2026-10-05', null, null, 550000, 0);
+
+    $payment = ($this->paymentService)()->koreksiSplitOmset($order->fresh(), 300000, 250000, $this->admin);
+
+    expect($payment->status)->toBe(PaymentStatus::Lunas)
+        ->and((float) $payment->omset_jasa)->toBe(300000.0)
+        ->and((float) $payment->omset_material)->toBe(250000.0);
+
+    expect(fn () => ($this->paymentService)()->koreksiSplitOmset($order->fresh(), 100000, 100000, $this->admin))
+        ->toThrow(BusinessRuleException::class);
+});

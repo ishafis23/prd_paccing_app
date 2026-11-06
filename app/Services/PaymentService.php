@@ -137,6 +137,32 @@ class PaymentService
     }
 
     /**
+     * Koreksi split omset jasa/material pada pembayaran yang sudah tercatat
+     * (termasuk yang sudah lunas). Tidak menyentuh nominal bayar, status,
+     * income, atau reminder — hanya pembagian jasa/material; Σ harus = total.
+     *
+     * @throws BusinessRuleException|AuthorizationException
+     */
+    public function koreksiSplitOmset(Order $order, float $omsetJasa, float $omsetMaterial, User $by): Payment
+    {
+        $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
+
+        $payment = $order->payments()->first();
+
+        if (! $payment) {
+            throw new BusinessRuleException('Order ini belum punya pembayaran tercatat.');
+        }
+
+        $split = $this->validasiSplit($omsetJasa, $omsetMaterial, (float) $payment->total_tagihan, $payment);
+
+        $payment->omset_jasa = $split['jasa'];
+        $payment->omset_material = $split['material'];
+        $payment->save();
+
+        return $payment->fresh();
+    }
+
+    /**
      * Validasi & normalisasi split omset jasa/material (dev-plan/24).
      * - Bila salah satu diisi: keduanya wajib > 0 (tidak negatif) dan
      *   Σ harus sama dengan Total Tagihan.

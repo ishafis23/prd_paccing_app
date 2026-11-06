@@ -1283,6 +1283,35 @@ class OrderResource extends BaseResource
                             }
                         }),
 
+                    Tables\Actions\Action::make('editOmsetPembayaran')
+                        ->label('Edit Omset Pembayaran')
+                        ->icon('heroicon-o-pencil-square')
+                        ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Finance->value, RoleName::Owner->value])
+                            && $record->latestPayment !== null)
+                        ->modalHeading('Edit Omset Jasa & Material')
+                        ->modalDescription(fn (Order $record) => 'Total Tagihan: Rp '.number_format((float) $record->latestPayment?->total_tagihan, 0, ',', '.').' — Jasa + Material harus sama dengan total ini.')
+                        ->fillForm(fn (Order $record) => [
+                            'omset_jasa' => $record->latestPayment?->omset_jasa ?? $record->totalPerKomponen()['jasa'],
+                            'omset_material' => $record->latestPayment?->omset_material ?? $record->totalPerKomponen()['material'],
+                        ])
+                        ->form([
+                            Forms\Components\TextInput::make('omset_jasa')->label('Omset Jasa')->numeric()->prefix('Rp')->minValue(0)->required(),
+                            Forms\Components\TextInput::make('omset_material')->label('Omset Material')->numeric()->prefix('Rp')->minValue(0)->required(),
+                        ])
+                        ->action(function (Order $record, array $data) {
+                            try {
+                                app(PaymentService::class)->koreksiSplitOmset(
+                                    $record,
+                                    (float) $data['omset_jasa'],
+                                    (float) $data['omset_material'],
+                                    auth()->user(),
+                                );
+                                Notification::make()->success()->title('Omset pembayaran diperbarui')->send();
+                            } catch (BusinessRuleException|AuthorizationException $e) {
+                                Notification::make()->danger()->title('Gagal memperbarui omset')->body($e->getMessage())->send();
+                            }
+                        }),
+
                     Tables\Actions\Action::make('jadwalkanUlang')
                         ->label('Jadwalkan Ulang')
                         ->icon('heroicon-o-calendar-days')
