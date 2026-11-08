@@ -61,28 +61,37 @@ it('kirim ulang client_uuid yang sama tidak menggandakan', function () {
     expect(TeknisiLokasiLog::count())->toBe(1);
 });
 
-it('menolak titik di luar jam kerja: belum absen, sebelum datang, sesudah pulang', function () {
+it('menerima titik di luar jam kerja (belum absen, sebelum datang, sesudah pulang)', function () {
     $this->travelTo('2026-11-09 18:00:00');
     Sanctum::actingAs($this->teknisi);
 
-    // Belum absen sama sekali.
+    // Belum absen sama sekali — tetap diterima.
     $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-09 09:00:00')]], $this->json)
-        ->assertJsonPath('data.ditolak', 1)
-        ->assertJsonPath('data.diterima', 0);
+        ->assertJsonPath('data.diterima', 1)
+        ->assertJsonPath('data.ditolak', 0);
 
     DailyAttendance::create([
         'user_id' => $this->teknisi->id, 'tanggal' => '2026-11-09',
         'jam_datang' => '2026-11-09 08:00:00', 'jam_pulang' => '2026-11-09 16:00:00',
     ]);
 
+    $this->postJson('/api/v1/lokasi/batch', ['titik' => [
+        ($this->titik)('2026-11-09 07:00:00'),
+        ($this->titik)('2026-11-09 17:00:00'),
+    ]], $this->json)->assertJsonPath('data.diterima', 2);
+});
+
+it('menolak titik dari masa depan dan titik yang terlalu lama; keduanya dilaporkan selesai', function () {
+    $this->travelTo('2026-11-09 10:00:00');
+    Sanctum::actingAs($this->teknisi);
+
     $respons = $this->postJson('/api/v1/lokasi/batch', ['titik' => [
-        ($this->titik)('2026-11-09 07:00:00'), // sebelum datang
-        ($this->titik)('2026-11-09 12:00:00'), // sah
-        ($this->titik)('2026-11-09 17:00:00'), // sesudah pulang
+        ($this->titik)('2026-11-09 12:00:00'), // masa depan
+        ($this->titik)('2026-10-20 09:00:00'), // > 7 hari
+        ($this->titik)('2026-11-09 09:00:00'), // sah
     ]], $this->json)->assertOk();
 
     $respons->assertJsonPath('data.diterima', 1)->assertJsonPath('data.ditolak', 2);
-    // Titik yang ditolak permanen ikut dilaporkan selesai agar app tidak mengulang selamanya.
     $respons->assertJsonCount(3, 'data.uuid_selesai');
 });
 

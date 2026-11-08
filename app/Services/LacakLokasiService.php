@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\DailyAttendance;
 use App\Models\TeknisiLokasiLog;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
 /**
- * Pelacakan posisi teknisi terus-menerus selama jam kerja (absen datang → absen pulang).
+ * Pelacakan posisi teknisi terus-menerus selama teknisi login di app (juga di luar jam kerja,
+ * agar admin bisa menugaskan teknisi terdekat).
  * App merekam titik di perangkat (juga saat offline) lalu mengirimnya berkelompok;
  * `client_uuid` membuat pengiriman ulang aman (tidak menggandakan).
  */
@@ -16,9 +16,12 @@ class LacakLokasiService
 {
     public const MAKS_TITIK = 100;
 
+    /** Titik yang lebih lama dari ini (hari) dianggap basi & dibuang — mencegah antrean offline lawas menyumbat. */
+    public const MAKS_UMUR_HARI = 7;
+
     /**
      * `uuid_selesai` = titik yang boleh dihapus dari antrean app
-     * (diterima, duplikat, atau ditolak permanen karena di luar jam kerja).
+     * (diterima, duplikat, atau ditolak permanen: waktu di masa depan / terlalu lama).
      *
      * @param  array<int, array{client_uuid: string, lat: float|int|string, lng: float|int|string, akurasi?: int|null, direkam_pada: string}>  $titik
      * @return array{diterima: int, duplikat: int, ditolak: int, uuid_selesai: list<string>}
@@ -28,12 +31,11 @@ class LacakLokasiService
         $diterima = $duplikat = $ditolak = 0;
         $selesai = [];
         $terbaru = null;
-        $absenPerTanggal = [];
 
         foreach ($titik as $t) {
             $waktu = Carbon::parse($t['direkam_pada']);
 
-            if ($waktu->gt(now()->addMinutes(5)) || ! $this->dalamJamKerja($teknisi, $waktu, $absenPerTanggal)) {
+            if ($waktu->gt(now()->addMinutes(5)) || $waktu->lt(now()->subDays(self::MAKS_UMUR_HARI))) {
                 $ditolak++;
                 $selesai[] = $t['client_uuid'];
 
@@ -68,34 +70,5 @@ class LacakLokasiService
         }
 
         return ['diterima' => $diterima, 'duplikat' => $duplikat, 'ditolak' => $ditolak, 'uuid_selesai' => $selesai];
-    }
-
-    /**
-     * Titik sah bila direkam di antara jam datang dan jam pulang (atau sekarang)
-     * pada tanggal absensinya.
-     *
-     * @param  array<string, DailyAttendance|null>  $cache
-     */
-    private function dalamJamKerja(User $teknisi, Carbon $waktu, array &$cache): bool
-    {
-        $tanggal = $waktu->toDateString();
-
-        if (! array_key_exists($tanggal, $cache)) {
-            $cache[$tanggal] = DailyAttendance::query()
-                ->where('user_id', $teknisi->id)
-                ->where('tanggal', $tanggal)
-                ->whereNotNull('jam_datang')
-                ->first();
-        }
-
-        $absen = $cache[$tanggal];
-        if ($absen === null) {
-            return false;
-        }
-
-        $mulai = Carbon::parse($absen->jam_datang)->subMinute();
-        $akhir = $absen->jam_pulang !== null ? Carbon::parse($absen->jam_pulang)->addMinute() : now()->addMinutes(5);
-
-        return $waktu->betweenIncluded($mulai, $akhir);
     }
 }
