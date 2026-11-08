@@ -1022,6 +1022,11 @@ class OrderService
             ]);
             $order->unsetRelation('orderItems');
 
+            AuditLogService::catat(
+                AuditLogService::ORDER_KOREKSI_TOTAL, $actor, $koreksi, $order->id,
+                ['total' => $totalAsli], ['total' => $totalBaru], $alasan,
+            );
+
             // Order sudah punya pembayaran? Selaraskan agar tidak tetap membaca tagihan awal.
             app(PaymentService::class)->sinkronkanTotalDenganOrder($order, $actor);
 

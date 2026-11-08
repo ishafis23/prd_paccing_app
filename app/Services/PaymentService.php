@@ -107,6 +107,8 @@ class PaymentService
         return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar, $catatan, $split, $totalDiubahEksplisit): Payment {
             $baruDibayar = $sudahDibayar + $jumlahDibayar;
 
+            $sebelumAudit = $payment ? $this->ringkasPayment($payment) : null;
+
             $payment ??= new Payment(['order_id' => $order->id]);
             $payment->metode = $metode;
             $payment->total_tagihan = $total;
@@ -130,6 +132,11 @@ class PaymentService
             }
 
             $payment->save();
+
+            AuditLogService::catat(
+                AuditLogService::PAYMENT_CATAT, $by, $payment, $order->id, $sebelumAudit, $this->ringkasPayment($payment),
+                sprintf('Bayar Rp %s (%s)%s', number_format($jumlahDibayar, 0, ',', '.'), $metode->value, $catatan ? ' — '.$catatan : ''),
+            );
 
             // Admin menetapkan total tagihan secara eksplisit di sini → koreksi total yang belum
             // tersinkron dianggap sudah diperhitungkan (jangan ditambahkan lagi nanti).
@@ -171,11 +178,27 @@ class PaymentService
 
         $split = $this->validasiSplit($omsetJasa, $omsetMaterial, (float) $payment->total_tagihan, $payment);
 
+        $sebelum = $this->ringkasPayment($payment);
+
         $payment->omset_jasa = $split['jasa'];
         $payment->omset_material = $split['material'];
         $payment->save();
 
+        AuditLogService::catat(AuditLogService::PAYMENT_EDIT_OMSET, $by, $payment, $order->id, $sebelum, $this->ringkasPayment($payment));
+
         return $payment->fresh();
+    }
+
+    /** @return array<string, mixed> */
+    private function ringkasPayment(Payment $p): array
+    {
+        return [
+            'total_tagihan' => (float) $p->total_tagihan,
+            'jumlah_dibayar' => (float) $p->jumlah_dibayar,
+            'status' => $p->status instanceof \BackedEnum ? $p->status->value : $p->status,
+            'omset_jasa' => $p->omset_jasa !== null ? (float) $p->omset_jasa : null,
+            'omset_material' => $p->omset_material !== null ? (float) $p->omset_material : null,
+        ];
     }
 
     /**
@@ -252,7 +275,8 @@ class PaymentService
             }
         }
 
-        return DB::transaction(function () use ($order, $payment, $pending, $totalLama, $totalBaru, $lunas, $jasa, $material, $split): Payment {
+        return DB::transaction(function () use ($order, $payment, $pending, $totalLama, $totalBaru, $lunas, $jasa, $material, $split, $by): Payment {
+            $sebelumAudit = $this->ringkasPayment($payment);
             $payment->total_tagihan = $totalBaru;
 
             if ($lunas) {
@@ -272,6 +296,10 @@ class PaymentService
             );
             $payment->catatan = trim(($payment->catatan ? $payment->catatan."\n" : '').$catatan);
             $payment->save();
+
+            AuditLogService::catat(
+                AuditLogService::PAYMENT_SINKRON_TOTAL, $by, $payment, $order->id, $sebelumAudit, $this->ringkasPayment($payment), $catatan,
+            );
 
             if ($lunas) {
                 // Income otomatis dari pelunasan = total tagihan; ikut total baru.
