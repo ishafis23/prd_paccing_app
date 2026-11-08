@@ -63,6 +63,7 @@ Absen tidak diantre offline; waktu server adalah acuan.
 | `GET /order/{id}` | detail lengkap (lihat §4.1) |
 | `POST /order/{id}/berangkat` | 422 + pesan penghalang bila tertahan |
 | `POST /order/{id}/lokasi` | `lat`,`lng` → `{tercatat}` (gagal diam-diam) |
+| `POST /lokasi/batch` | **Pelacakan terus-menerus selama jam kerja** (absen datang → pulang). Body `titik[]` (1–100): `client_uuid`(uuid), `lat`, `lng`, `akurasi?`(m), `direkam_pada`(ISO, waktu perekaman di HP). Respons `{diterima, duplikat, ditolak, uuid_selesai[]}`. Idempoten per `client_uuid`; titik di luar jam kerja ditolak permanen (tetap masuk `uuid_selesai` → app menghapusnya dari antrean). `users.last_*` hanya maju (titik lama hasil sync offline tidak menimpa). Riwayat di tabel `teknisi_lokasi_logs`. Tes: `tests/Feature/Api/LokasiTest.php` |
 | `POST /order/{id}/check-in` | multipart `foto_titik_pertama` **wajib bila ini check-in pertama hari itu** (`detail.butuh_foto_titik_pertama`), kalau tidak 422 `foto_titik_pertama_wajib` |
 | `POST /order/{id}/kendala` | `alasan` |
 | `POST /order/{id}/perbaikan` | `catatan`, `estimasi_harga?` |

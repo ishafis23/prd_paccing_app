@@ -15,6 +15,7 @@ class TeknisiExpense extends Model
     public const KATEGORI = ['bensin', 'makan', 'material', 'perawatan', 'gaji_honor', 'bonus', 'lainnya'];
 
     protected $fillable = [
+        'client_uuid',
         'teknisi_id',
         'partner_id',
         'order_id',

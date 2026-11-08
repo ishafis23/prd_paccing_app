@@ -89,3 +89,21 @@ it('teknisi dengan sinyal gps terbaru tampil live di daftar & peta', function ()
         ->assertSee($teknisi->name)
         ->assertSee('Live');
 });
+
+it('teknisi dalam jam kerja (absen datang, belum pulang) tanpa order aktif tampil di peta', function () {
+    $admin = ptUser(RoleName::Admin->value);
+    $bekerja = ptUser(RoleName::Teknisi->value);
+    $sudahPulang = ptUser(RoleName::Teknisi->value);
+    $belumAbsen = ptUser(RoleName::Teknisi->value);
+
+    $bekerja->update(['last_latitude' => -6.2, 'last_longitude' => 106.8, 'last_location_at' => now()]);
+    \App\Models\DailyAttendance::create(['user_id' => $bekerja->id, 'tanggal' => today(), 'jam_datang' => now()->subHours(2)]);
+    \App\Models\DailyAttendance::create(['user_id' => $sudahPulang->id, 'tanggal' => today(), 'jam_datang' => now()->subHours(8), 'jam_pulang' => now()->subHour()]);
+
+    $this->actingAs($admin)->get(PetaTeknisi::getUrl())
+        ->assertOk()
+        ->assertSee($bekerja->name)
+        ->assertSee('Jam kerja')
+        ->assertDontSee($sudahPulang->name)
+        ->assertDontSee($belumAbsen->name);
+});

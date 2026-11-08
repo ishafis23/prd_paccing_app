@@ -4,15 +4,16 @@ namespace App\Filament\Pages;
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Models\DailyAttendance;
 use App\Models\Order;
 use App\Models\User;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 
 /**
- * Halaman "Peta Teknisi": posisi GPS terakhir teknisi yang sedang
- * menuju_lokasi/dikerjakan, dikirim berkala dari HP teknisi (lihat
- * TeknisiService::updateLokasi & OrderDetail Livewire).
+ * Halaman "Peta Teknisi": posisi GPS terakhir teknisi yang sedang bertugas, yaitu
+ * (a) menuju_lokasi/dikerjakan, atau (b) sedang jam kerja (sudah absen datang,
+ * belum absen pulang) menurut pelacakan app mobile (LacakLokasiService).
  */
 class PetaTeknisi extends Page
 {
@@ -53,7 +54,7 @@ class PetaTeknisi extends Page
             ->map(fn (array $t) => [
                 ...$t,
                 'updated_label' => $t['updated_at']?->diffForHumans() ?? '-',
-                'order_status' => $t['order_status']->value,
+                'order_status' => $t['order_status']?->value,
             ])
             ->values();
 
@@ -111,7 +112,52 @@ class PetaTeknisi extends Page
                 });
             })
             ->unique('teknisi_id')
+            ->concat($this->teknisiJamKerjaTanpaOrder($orders))
             ->sortBy('nama')
+            ->values();
+    }
+    /**
+     * Teknisi yang sedang jam kerja (absen datang hari ini, belum pulang) tetapi
+     * tidak punya order aktif — tetap dilacak oleh app mobile.
+     *
+     * @param  Collection<int, Order>  $ordersAktif
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function teknisiJamKerjaTanpaOrder(Collection $ordersAktif): Collection
+    {
+        $sudahAda = $ordersAktif
+            ->flatMap(fn (Order $o) => $o->timTeknisi->pluck('id')->push($o->teknisi_id))
+            ->filter()
+            ->unique();
+
+        return DailyAttendance::query()
+            ->whereDate('tanggal', today())
+            ->whereNotNull('jam_datang')
+            ->whereNull('jam_pulang')
+            ->whereNotIn('user_id', $sudahAda)
+            ->with('user')
+            ->get()
+            ->map(function (DailyAttendance $a): ?array {
+                $t = $a->user;
+                if ($t === null || ! $t->hasRole(RoleName::Teknisi->value)) {
+                    return null;
+                }
+                $updatedAt = $t->last_location_at;
+
+                return [
+                    'teknisi_id' => $t->id,
+                    'nama' => $t->name,
+                    'lat' => $t->last_latitude !== null ? (float) $t->last_latitude : null,
+                    'lng' => $t->last_longitude !== null ? (float) $t->last_longitude : null,
+                    'updated_at' => $updatedAt,
+                    'stale' => $updatedAt !== null && $updatedAt->lt(now()->subMinutes(self::STALE_MENIT)),
+                    'order_id' => null,
+                    'order_status' => null,
+                    'customer' => 'Jam kerja (tanpa order aktif)',
+                    'alamat' => '-',
+                ];
+            })
+            ->filter()
             ->values();
     }
 }

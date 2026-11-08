@@ -1,6 +1,6 @@
 # Mobile App Teknisi — Indeks Rencana
 
-Status (2026-11-02): **Fase 0 API selesai** (`dev-plan/32-api-teknisi-v1.md`, tes di `tests/Feature/Api`). Scaffold app: repo terpisah `D:\myproject\crm_paccing_mobile` (Expo + TypeScript). Keputusan yang masih terbuka ada di bagian bawah file ini.
+Status (2026-11-08): **kode app Fase 1–3 selesai, belum diuji di perangkat** — lihat `../33-eksekusi-mobile-app.md` (keputusan baru: pelacakan terus-menerus selama jam kerja + kerja offline). Status sebelumnya (2026-11-02): **Fase 0 API selesai** (`dev-plan/32-api-teknisi-v1.md`, tes di `tests/Feature/Api`). Scaffold app: repo terpisah `D:\myproject\crm_paccing_mobile` (Expo + TypeScript). Keputusan yang masih terbuka ada di bagian bawah file ini.
 
 ## Tujuan
 

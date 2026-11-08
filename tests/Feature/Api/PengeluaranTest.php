@@ -108,3 +108,16 @@ it('opsi form memuat kategori, order & calon partner (bukan diri sendiri)', func
     expect(collect($res->json('data.partner'))->pluck('id')->all())->toBe([$b->id])
         ->and(collect($res->json('data.kategori'))->pluck('kode')->all())->toContain('bensin');
 });
+
+it('kirim ulang dengan client_uuid yang sama tidak menggandakan pengeluaran', function () {
+    Sanctum::actingAs(($this->mk)());
+    $uuid = (string) \Illuminate\Support\Str::uuid();
+    $body = ($this->body)(['client_uuid' => $uuid]);
+
+    $a = $this->postJson('/api/v1/pengeluaran', $body);
+    $b = $this->postJson('/api/v1/pengeluaran', $body);
+
+    $a->assertCreated();
+    $b->assertOk()->assertJsonPath('data.id', $a->json('data.id'));
+    expect(TeknisiExpense::where('client_uuid', $uuid)->count())->toBe(1);
+});

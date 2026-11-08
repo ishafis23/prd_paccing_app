@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\JadwalController;
 use App\Http\Controllers\Api\V1\KeuanganController;
 use App\Http\Controllers\Api\V1\LaporanController;
+use App\Http\Controllers\Api\V1\LokasiController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PengeluaranController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/cuci-motor', [AbsensiController::class, 'cuciMotor'])->middleware('throttle:api-tulis');
         Route::get('/pulang-cepat', [AbsensiController::class, 'pulangCepat']);
         Route::post('/pulang-cepat', [AbsensiController::class, 'ajukanPulangCepat']);
+
+        // Pelacakan posisi terus-menerus selama jam kerja (batch, idempoten per client_uuid)
+        Route::post('/lokasi/batch', [LokasiController::class, 'batch'])->middleware('throttle:api-tulis');
 
         // Jadwal, riwayat, lengkapi laporan
         Route::get('/jadwal', [JadwalController::class, 'jadwal']);

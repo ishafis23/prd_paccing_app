@@ -55,7 +55,7 @@
             <h2 class="mb-3 text-sm font-semibold text-gray-950">Teknisi Sedang Bertugas ({{ $teknisi->count() }})</h2>
 
             @if ($teknisi->isEmpty())
-                <p class="text-sm text-gray-400">Tidak ada teknisi yang sedang menuju lokasi atau mengerjakan order.</p>
+                <p class="text-sm text-gray-400">Tidak ada teknisi yang sedang bekerja (menuju lokasi, mengerjakan order, atau dalam jam kerja).</p>
             @else
                 <div class="divide-y divide-gray-100">
                     @foreach ($teknisi as $t)
@@ -63,7 +63,11 @@
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <p class="font-semibold text-gray-900">{{ $t['nama'] }}</p>
-                                    <x-teknisi-status-badge :status="$t['order_status']" />
+                                    @if ($t['order_status'])
+                                        <x-teknisi-status-badge :status="$t['order_status']" />
+                                    @else
+                                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">Jam kerja</span>
+                                    @endif
                                 </div>
                                 <p class="truncate text-xs text-gray-500">{{ $t['customer'] }} &middot; {{ $t['alamat'] }}</p>
                             </div>

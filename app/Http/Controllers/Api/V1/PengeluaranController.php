@@ -70,9 +70,23 @@ class PengeluaranController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
+        $uuid = $request->validate(['client_uuid' => ['nullable', 'uuid']])['client_uuid'] ?? null;
+
+        // Kirim ulang dari antrean offline: kembalikan yang sudah tercatat, jangan gandakan.
+        if ($uuid !== null) {
+            $ada = TeknisiExpense::query()->where('teknisi_id', $user->id)->where('client_uuid', $uuid)->first();
+            if ($ada !== null) {
+                return response()->json(['data' => Presenter::pengeluaran($ada->load(['partner', 'teknisi', 'order.customer']), $user->id)]);
+            }
+        }
+
         $data = $this->service->validasi($user, $request->all());
 
-        $e = $this->service->catat($user, $data)->load(['partner', 'teknisi', 'order.customer']);
+        $e = $this->service->catat($user, $data);
+        if ($uuid !== null) {
+            $e->forceFill(['client_uuid' => $uuid])->save();
+        }
+        $e->load(['partner', 'teknisi', 'order.customer']);
 
         return response()->json(['data' => Presenter::pengeluaran($e, $user->id)], 201);
     }
