@@ -13,6 +13,7 @@ class OrderTotalCorrection extends Model
         'total_terkoreksi',
         'alasan',
         'dikoreksi_oleh',
+        'disinkron_ke_pembayaran_pada',
     ];
 
     protected function casts(): array
@@ -20,6 +21,7 @@ class OrderTotalCorrection extends Model
         return [
             'total_original' => 'decimal:2',
             'total_terkoreksi' => 'decimal:2',
+            'disinkron_ke_pembayaran_pada' => 'datetime',
         ];
     }
 

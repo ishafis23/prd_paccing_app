@@ -11,6 +11,7 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Income;
 use App\Models\Order;
+use App\Models\OrderTotalCorrection;
 use App\Models\Payment;
 use App\Models\ServiceReminder;
 use App\Models\User;
@@ -101,7 +102,9 @@ class PaymentService
         }
 
         // Semua efek (payment, income, reminder, status order) satu transaksi.
-        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar, $catatan, $split): Payment {
+        $totalDiubahEksplisit = $totalTagihanOverride !== null && abs($total - $baseline) > 0.009;
+
+        return DB::transaction(function () use ($order, $metode, $jumlahDibayar, $by, $tanggalBayar, $payment, $total, $sudahDibayar, $catatan, $split, $totalDiubahEksplisit): Payment {
             $baruDibayar = $sudahDibayar + $jumlahDibayar;
 
             $payment ??= new Payment(['order_id' => $order->id]);
@@ -128,6 +131,15 @@ class PaymentService
 
             $payment->save();
 
+            // Admin menetapkan total tagihan secara eksplisit di sini → koreksi total yang belum
+            // tersinkron dianggap sudah diperhitungkan (jangan ditambahkan lagi nanti).
+            if ($totalDiubahEksplisit) {
+                OrderTotalCorrection::query()
+                    ->where('order_id', $order->id)
+                    ->whereNull('disinkron_ke_pembayaran_pada')
+                    ->update(['disinkron_ke_pembayaran_pada' => now()]);
+            }
+
             if ($payment->status === PaymentStatus::Lunas) {
                 $this->finalizeLunas($order, $payment);
             }
@@ -153,6 +165,10 @@ class PaymentService
             throw new BusinessRuleException('Order ini belum punya pembayaran tercatat.');
         }
 
+        // Total order bisa berubah setelah pembayaran dicatat (Koreksi Total, layanan tambahan).
+        // Selaraskan dulu agar acuan Jasa+Material adalah tagihan TERKINI, bukan tagihan awal.
+        $payment = $this->sinkronkanTotalDenganOrder($order, $by) ?? $payment;
+
         $split = $this->validasiSplit($omsetJasa, $omsetMaterial, (float) $payment->total_tagihan, $payment);
 
         $payment->omset_jasa = $split['jasa'];
@@ -160,6 +176,117 @@ class PaymentService
         $payment->save();
 
         return $payment->fresh();
+    }
+
+    /**
+     * Selaraskan pembayaran dengan "Koreksi Total" yang dibuat SETELAH pembayaran dicatat.
+     * `payments.total_tagihan` adalah salinan saat bayar dicatat; tanpa ini sistem tetap
+     * membaca tagihan awal (mis. 170rb padahal tagihan kini 185rb) sehingga Edit Omset /
+     * Catat Pembayaran menuntut tagihan awal.
+     *
+     * Hanya selisih koreksi yang belum tersinkron yang ditambahkan ke total tagihan —
+     * penyesuaian sengaja admin (diskon/ongkir lewat Catat Pembayaran) tidak ditimpa.
+     *
+     * - Lunas: selisih DIANGGAP SUDAH DIBAYAR (jumlah dibayar ikut total baru, tetap lunas),
+     *   income otomatis & split omset ikut disesuaikan.
+     * - DP: hanya total tagihan yang berubah (sisa bertambah/berkurang); total baru tidak
+     *   boleh di bawah jumlah yang sudah dibayar.
+     *
+     * Idempotent: koreksi yang sudah disinkronkan ditandai dan tidak dihitung lagi.
+     * Mengembalikan null bila order belum punya pembayaran.
+     *
+     * @throws BusinessRuleException|AuthorizationException
+     */
+    public function sinkronkanTotalDenganOrder(Order $order, User $by): ?Payment
+    {
+        $this->assertRole($by, [RoleName::Admin, RoleName::Finance, RoleName::Owner]);
+
+        $payment = $order->payments()->first();
+
+        if (! $payment) {
+            return null;
+        }
+
+        $pending = OrderTotalCorrection::query()
+            ->where('order_id', $order->id)
+            ->whereNull('disinkron_ke_pembayaran_pada')
+            ->where('created_at', '>=', $payment->created_at)
+            ->get();
+
+        if ($pending->isEmpty()) {
+            return $payment;
+        }
+
+        $selisih = (float) $pending->sum(fn (OrderTotalCorrection $k): float => (float) $k->total_terkoreksi - (float) $k->total_original);
+        $totalLama = (float) $payment->total_tagihan;
+        $totalBaru = $totalLama + $selisih;
+
+        if ($totalBaru <= 0) {
+            throw new BusinessRuleException('Order ini sudah punya pembayaran — total tagihan harus lebih dari 0.');
+        }
+
+        $lunas = $payment->status === PaymentStatus::Lunas;
+        $dibayar = (float) $payment->jumlah_dibayar;
+
+        if (! $lunas && $totalBaru <= $dibayar + 0.009) {
+            throw new BusinessRuleException(sprintf(
+                'Total baru (Rp %s) tidak boleh di bawah jumlah yang sudah dibayar (Rp %s).',
+                number_format($totalBaru, 0, ',', '.'),
+                number_format($dibayar, 0, ',', '.'),
+            ));
+        }
+
+        $split = $payment->splitOmset();
+        $jasa = $split['jasa'] ?? null;
+        $material = $split['material'] ?? null;
+
+        if ($split !== null) {
+            // Penyesuaian total dicatat sebagai komponen jasa (lihat OrderService::koreksiTotal).
+            $jasa += $selisih;
+            if ($jasa < 0) {
+                $material += $jasa;
+                $jasa = 0.0;
+            }
+            if ($material < 0) {
+                throw new BusinessRuleException('Total baru terlalu kecil untuk Omset Jasa & Material yang tercatat — edit omset dulu.');
+            }
+        }
+
+        return DB::transaction(function () use ($order, $payment, $pending, $totalLama, $totalBaru, $lunas, $jasa, $material, $split): Payment {
+            $payment->total_tagihan = $totalBaru;
+
+            if ($lunas) {
+                $payment->jumlah_dibayar = $totalBaru;
+            }
+
+            if ($split !== null) {
+                $payment->omset_jasa = round($jasa, 2);
+                $payment->omset_material = round($material, 2);
+            }
+
+            $catatan = sprintf(
+                'Total tagihan disesuaikan Rp %s → Rp %s (%s).',
+                number_format($totalLama, 0, ',', '.'),
+                number_format($totalBaru, 0, ',', '.'),
+                $lunas ? 'selisih dianggap sudah dibayar' : 'sisa tagihan ikut berubah',
+            );
+            $payment->catatan = trim(($payment->catatan ? $payment->catatan."\n" : '').$catatan);
+            $payment->save();
+
+            if ($lunas) {
+                // Income otomatis dari pelunasan = total tagihan; ikut total baru.
+                Income::query()
+                    ->where('order_id', $order->id)
+                    ->where('keterangan', 'like', 'Otomatis dari pembayaran lunas order #%')
+                    ->update(['nominal' => $totalBaru]);
+            }
+
+            OrderTotalCorrection::query()
+                ->whereIn('id', $pending->pluck('id'))
+                ->update(['disinkron_ke_pembayaran_pada' => now()]);
+
+            return $payment->fresh();
+        });
     }
 
     /**

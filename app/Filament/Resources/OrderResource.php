@@ -1289,11 +1289,29 @@ class OrderResource extends BaseResource
                         ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Finance->value, RoleName::Owner->value])
                             && $record->latestPayment !== null)
                         ->modalHeading('Edit Omset Jasa & Material')
-                        ->modalDescription(fn (Order $record) => 'Total Tagihan: Rp '.number_format((float) $record->latestPayment?->total_tagihan, 0, ',', '.').' — Jasa + Material harus sama dengan total ini.')
-                        ->fillForm(fn (Order $record) => [
-                            'omset_jasa' => $record->latestPayment?->omset_jasa ?? $record->totalPerKomponen()['jasa'],
-                            'omset_material' => $record->latestPayment?->omset_material ?? $record->totalPerKomponen()['material'],
-                        ])
+                        ->modalDescription(function (Order $record): string {
+                            $terkini = 'Total Tagihan: Rp '.number_format($record->total(), 0, ',', '.').' — Jasa + Material harus sama dengan total ini.';
+                            $awal = (float) $record->latestPayment?->total_tagihan;
+
+                            return abs($record->total() - $awal) > 0.009
+                                ? $terkini.' (Tagihan berubah dari Rp '.number_format($awal, 0, ',', '.').'; pembayaran akan diselaraskan saat disimpan, selisih dianggap sudah dibayar bila sudah lunas.)'
+                                : $terkini;
+                        })
+                        ->fillForm(function (Order $record): array {
+                            $payment = $record->latestPayment;
+                            $selisih = $record->total() - (float) $payment?->total_tagihan; // tagihan berubah sejak dibayar
+                            $jasa = (float) ($payment?->omset_jasa ?? $record->totalPerKomponen()['jasa']);
+                            $material = (float) ($payment?->omset_material ?? $record->totalPerKomponen()['material']);
+
+                            // Selisih tagihan dicatat sebagai komponen jasa (sama seperti Koreksi Total).
+                            $jasa += $selisih;
+                            if ($jasa < 0) {
+                                $material += $jasa;
+                                $jasa = 0.0;
+                            }
+
+                            return ['omset_jasa' => $jasa, 'omset_material' => max(0.0, $material)];
+                        })
                         ->form([
                             Forms\Components\TextInput::make('omset_jasa')->label('Omset Jasa')->numeric()->prefix('Rp')->minValue(0)->required(),
                             Forms\Components\TextInput::make('omset_material')->label('Omset Material')->numeric()->prefix('Rp')->minValue(0)->required(),

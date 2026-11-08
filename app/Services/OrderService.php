@@ -1022,6 +1022,9 @@ class OrderService
             ]);
             $order->unsetRelation('orderItems');
 
+            // Order sudah punya pembayaran? Selaraskan agar tidak tetap membaca tagihan awal.
+            app(PaymentService::class)->sinkronkanTotalDenganOrder($order, $actor);
+
             return $koreksi;
         });
     }
