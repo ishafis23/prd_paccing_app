@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\OrderStatus;
 use App\Enums\RoleName;
+use App\Enums\UserStatus;
 use App\Models\DailyAttendance;
 use App\Models\Order;
 use App\Models\User;
@@ -11,7 +12,7 @@ use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 
 /**
- * Halaman "Peta Teknisi": posisi GPS terakhir teknisi yang sedang bertugas, yaitu
+ * Halaman "Peta Teknisi": posisi GPS terakhir SEMUA teknisi aktif; yang sedang bertugas dulu, yaitu
  * (a) menuju_lokasi/dikerjakan, atau (b) sedang jam kerja (sudah absen datang,
  * belum absen pulang) menurut pelacakan app mobile (LacakLokasiService).
  */
@@ -98,6 +99,7 @@ class PetaTeknisi extends Page
                     $updatedAt = $t->last_location_at;
 
                     return [
+                        'kelompok' => 0,
                         'teknisi_id' => $t->id,
                         'nama' => $t->name,
                         'lat' => $t->last_latitude !== null ? (float) $t->last_latitude : null,
@@ -113,7 +115,43 @@ class PetaTeknisi extends Page
             })
             ->unique('teknisi_id')
             ->concat($this->teknisiJamKerjaTanpaOrder($orders))
-            ->sortBy('nama')
+            ->pipe(fn (Collection $bertugas) => $bertugas->concat($this->teknisiLainnya($bertugas->pluck('teknisi_id'))))
+            ->sortBy([['kelompok', 'asc'], ['nama', 'asc']])
+            ->values();
+    }
+
+    /**
+     * Teknisi aktif lainnya (di luar jam kerja / belum absen): ditampilkan dengan posisi
+     * TERAKHIR yang diketahui agar admin bisa menugaskan yang terdekat. Tidak ada pelacakan
+     * baru di luar jam kerja — titik berasal dari terakhir kali app mengirim lokasi.
+     *
+     * @param  Collection<int, int>  $sudahAda
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function teknisiLainnya(Collection $sudahAda): Collection
+    {
+        return User::query()
+            ->role(RoleName::Teknisi->value)
+            ->where('status', UserStatus::Aktif)
+            ->whereNotIn('id', $sudahAda)
+            ->get()
+            ->map(function (User $t): array {
+                $updatedAt = $t->last_location_at;
+
+                return [
+                    'kelompok' => 2,
+                    'teknisi_id' => $t->id,
+                    'nama' => $t->name,
+                    'lat' => $t->last_latitude !== null ? (float) $t->last_latitude : null,
+                    'lng' => $t->last_longitude !== null ? (float) $t->last_longitude : null,
+                    'updated_at' => $updatedAt,
+                    'stale' => $updatedAt !== null && $updatedAt->lt(now()->subMinutes(self::STALE_MENIT)),
+                    'order_id' => null,
+                    'order_status' => null,
+                    'customer' => 'Di luar jam kerja',
+                    'alamat' => 'Posisi terakhir yang diketahui',
+                ];
+            })
             ->values();
     }
     /**
@@ -145,6 +183,7 @@ class PetaTeknisi extends Page
                 $updatedAt = $t->last_location_at;
 
                 return [
+                    'kelompok' => 1,
                     'teknisi_id' => $t->id,
                     'nama' => $t->name,
                     'lat' => $t->last_latitude !== null ? (float) $t->last_latitude : null,

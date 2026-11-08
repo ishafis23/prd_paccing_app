@@ -39,7 +39,7 @@
 
             @if ($markers->isEmpty())
                 <p class="mt-3 text-sm text-gray-400">
-                    Belum ada teknisi yang mengirim GPS. Peta hanya menyala saat teknisi sedang menuju lokasi atau mengerjakan order.
+                    Belum ada teknisi yang pernah mengirim GPS. Posisi muncul setelah teknisi membuka app saat jam kerja.
                 </p>
             @else
                 <div
@@ -52,10 +52,10 @@
         </div>
 
         <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5">
-            <h2 class="mb-3 text-sm font-semibold text-gray-950">Teknisi Sedang Bertugas ({{ $teknisi->count() }})</h2>
+            <h2 class="mb-3 text-sm font-semibold text-gray-950">Semua Teknisi ({{ $teknisi->count() }})</h2>
 
             @if ($teknisi->isEmpty())
-                <p class="text-sm text-gray-400">Tidak ada teknisi yang sedang bekerja (menuju lokasi, mengerjakan order, atau dalam jam kerja).</p>
+                <p class="text-sm text-gray-400">Belum ada teknisi aktif.</p>
             @else
                 <div class="divide-y divide-gray-100">
                     @foreach ($teknisi as $t)
@@ -65,6 +65,8 @@
                                     <p class="font-semibold text-gray-900">{{ $t['nama'] }}</p>
                                     @if ($t['order_status'])
                                         <x-teknisi-status-badge :status="$t['order_status']" />
+                                    @elseif (($t['kelompok'] ?? 1) === 2)
+                                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">Di luar jam kerja</span>
                                     @else
                                         <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">Jam kerja</span>
                                     @endif
@@ -76,7 +78,7 @@
                                     <span class="font-semibold text-gray-400">Belum ada sinyal GPS</span>
                                 @else
                                     <span class="font-semibold {{ $t['stale'] ? 'text-amber-600' : 'text-emerald-600' }}">
-                                        {{ $t['stale'] ? 'Basi' : 'Live' }} &middot; {{ $t['updated_at']?->diffForHumans() }}
+                                        {{ $t['stale'] ? ($t['kelompok'] === 2 ? 'Terakhir' : 'Basi') : 'Live' }} &middot; {{ $t['updated_at']?->diffForHumans() }}
                                     </span>
                                 @endif
                             </div>

@@ -77,3 +77,19 @@ it('logout mencabut token perangkat ini dan token push', function () {
 
     expect($t->tokens()->count())->toBe(0)->and(DeviceToken::count())->toBe(0);
 });
+
+it('satu akun satu perangkat: login di HP kedua mencabut token HP pertama', function () {
+    $t = ($this->mk)();
+    $login = fn (string $hp) => test()->postJson('/api/v1/login', ['email' => $t->email, 'password' => 'rahasia123', 'device_name' => $hp])->json('data.token');
+
+    $tokenA = $login('HP-A');
+    $this->withHeader('Authorization', 'Bearer '.$tokenA)->getJson('/api/v1/me')->assertOk();
+
+    $tokenB = $login('HP-B');
+    expect($t->tokens()->count())->toBe(1);
+
+    $this->app['auth']->forgetGuards();
+    $this->withHeader('Authorization', 'Bearer '.$tokenA)->getJson('/api/v1/me')->assertUnauthorized();
+    $this->app['auth']->forgetGuards();
+    $this->withHeader('Authorization', 'Bearer '.$tokenB)->getJson('/api/v1/me')->assertOk();
+});

@@ -32,7 +32,7 @@ it('halaman peta teknisi hanya bisa diakses admin/finance/hr, bukan teknisi', fu
     ['teknisi', false],
 ]);
 
-it('daftar teknisi bertugas hanya berisi teknisi dengan order menuju_lokasi/dikerjakan', function () {
+it('teknisi tanpa order aktif tetap tampil sebagai di luar jam kerja dengan posisi terakhir', function () {
     $admin = ptUser(RoleName::Admin->value);
     $teknisiAktif = ptUser(RoleName::Teknisi->value);
     $teknisiIdle = ptUser(RoleName::Teknisi->value);
@@ -52,7 +52,8 @@ it('daftar teknisi bertugas hanya berisi teknisi dengan order menuju_lokasi/dike
 
     $response->assertOk()
         ->assertSee($teknisiAktif->name)
-        ->assertDontSee($teknisiIdle->name);
+        ->assertSee($teknisiIdle->name)
+        ->assertSee('Di luar jam kerja');
 });
 
 it('teknisi tanpa sinyal gps tetap muncul di daftar dengan status belum ada sinyal', function () {
@@ -104,6 +105,8 @@ it('teknisi dalam jam kerja (absen datang, belum pulang) tanpa order aktif tampi
         ->assertOk()
         ->assertSee($bekerja->name)
         ->assertSee('Jam kerja')
-        ->assertDontSee($sudahPulang->name)
-        ->assertDontSee($belumAbsen->name);
+        // Yang sudah pulang / belum absen tetap terdaftar (posisi terakhir) sebagai di luar jam kerja.
+        ->assertSee($sudahPulang->name)
+        ->assertSee($belumAbsen->name)
+        ->assertSee('Di luar jam kerja');
 });

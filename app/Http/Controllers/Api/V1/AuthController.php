@@ -42,6 +42,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'Aplikasi ini hanya untuk akun teknisi.', 'code' => 'bukan_teknisi'], 403);
         }
 
+        // Satu akun = satu perangkat aktif: login baru mencabut semua token lama (HP sebelumnya
+        // otomatis keluar) agar GPS/absen tidak tercampur dari dua HP.
+        $user->tokens()->delete();
+
         $token = $user->createToken($data['device_name'], ['teknisi'], now()->addDays((int) config('api.token_hari', 90)));
 
         return response()->json(['data' => [
