@@ -248,6 +248,10 @@ class CreateOrder extends CreateRecord
                             ->searchable(),
                         Forms\Components\Toggle::make('is_klaim')
                             ->label('Pekerjaan klaim/garansi (tidak ditagih)'),
+                        Forms\Components\Textarea::make('keluhan')
+                            ->label('Keluhan customer (opsional)')
+                            ->helperText('Mis. AC kurang dingin, bocor, bunyi berisik. Tampil di riwayat pelayanan customer.')
+                            ->columnSpanFull(),
                         Forms\Components\Textarea::make('catatan_admin')
                             ->label('Catatan (opsional)')
                             ->columnSpanFull(),

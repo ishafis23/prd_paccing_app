@@ -218,6 +218,9 @@ class OrderResource extends BaseResource
                     ->required(),
                 Forms\Components\DatePicker::make('tanggal_jadwal'),
                 Forms\Components\TimePicker::make('jam_jadwal'),
+                Forms\Components\Textarea::make('keluhan')
+                    ->label('Keluhan customer')
+                    ->columnSpanFull(),
                 Forms\Components\Textarea::make('catatan_admin')
                     ->columnSpanFull(),
                 Forms\Components\Toggle::make('is_klaim')

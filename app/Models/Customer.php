@@ -5,12 +5,15 @@ namespace App\Models;
 use App\Enums\CustomerArea;
 use App\Enums\CustomerJenis;
 use App\Enums\CustomerStatus;
+use App\Enums\CustomerTipe;
 use App\Enums\LeadSource;
+use App\Enums\OrderStatus;
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -37,6 +40,9 @@ class Customer extends Model implements AuthenticatableContract
         'area',
         'sumber_lead',
         'status',
+        'tipe_customer',
+        'tipe_diubah_at',
+        'tipe_diubah_oleh',
         'catatan',
         'wa_group_id',
     ];
@@ -52,8 +58,57 @@ class Customer extends Model implements AuthenticatableContract
             'area' => CustomerArea::class,
             'sumber_lead' => LeadSource::class,
             'status' => CustomerStatus::class,
+            'tipe_customer' => CustomerTipe::class,
+            'tipe_diubah_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Order terakhir yang benar-benar dikerjakan (selesai) — dasar CRM follow-up.
+     */
+    public function orderTerakhir(): HasOne
+    {
+        return $this->hasOne(Order::class)
+            ->where('status', OrderStatus::Selesai->value)
+            ->latestOfMany('tanggal_jadwal');
+    }
+
+    /** Reminder servis terbaru customer (satu customer bisa punya beberapa riwayat). */
+    public function reminderTerbaru(): HasOne
+    {
+        return $this->hasOne(ServiceReminder::class)->latestOfMany();
+    }
+
+    public function isLama(): bool
+    {
+        return $this->tipe_customer === CustomerTipe::Lama;
+    }
+
+    /** Tandai customer baru/lama (manual oleh admin) + catat siapa & kapan. */
+    public function tandaiTipe(CustomerTipe $tipe, ?User $oleh = null): void
+    {
+        $this->forceFill([
+            'tipe_customer' => $tipe->value,
+            'tipe_diubah_at' => now(),
+            'tipe_diubah_oleh' => $oleh?->id,
+        ])->save();
+    }
+
+    /** Alamat WA wa.me dari no_hp (62xxx), null bila kosong. */
+    public function waUrl(): ?string
+    {
+        $nomor = preg_replace('/\D+/', '', (string) $this->no_hp);
+
+        if ($nomor === '') {
+            return null;
+        }
+
+        if (str_starts_with($nomor, '0')) {
+            $nomor = '62'.substr($nomor, 1);
+        }
+
+        return 'https://wa.me/'.$nomor;
     }
 
     /**

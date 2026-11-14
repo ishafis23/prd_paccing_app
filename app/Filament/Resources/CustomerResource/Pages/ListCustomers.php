@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CustomerResource\Pages;
 
 use App\Filament\Resources\CustomerResource;
+use App\Filament\Resources\CustomerResource\Widgets\CustomerTipeStats;
 use App\Models\Customer;
 use App\Services\CustomerImportService;
 use Filament\Actions;
@@ -15,6 +16,11 @@ use Illuminate\Support\Facades\Storage;
 class ListCustomers extends ListRecords
 {
     protected static string $resource = CustomerResource::class;
+
+    protected function getHeaderWidgets(): array
+    {
+        return [CustomerTipeStats::class];
+    }
 
     protected function getHeaderActions(): array
     {

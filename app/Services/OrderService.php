@@ -70,6 +70,7 @@ class OrderService
             'jam_jadwal' => $data['jam_jadwal'] ?? null,
             'status' => $teknisi ? OrderStatus::Terjadwal : OrderStatus::Baru,
             'catatan_admin' => $data['catatan_admin'] ?? null,
+            'keluhan' => filled($data['keluhan'] ?? null) ? $data['keluhan'] : null,
             'is_klaim' => $data['is_klaim'] ?? false,
             'created_by' => $creator->id,
         ]);
@@ -146,6 +147,7 @@ class OrderService
                 'jam_jadwal' => $data['jam_jadwal'] ?? null,
                 'status' => OrderStatus::Baru,
                 'catatan_admin' => filled($data['catatan_admin'] ?? null) ? $data['catatan_admin'] : null,
+                'keluhan' => filled($data['keluhan'] ?? null) ? $data['keluhan'] : null,
                 'created_by' => $creator->id,
             ]);
             $order->save();
@@ -337,6 +339,7 @@ class OrderService
                     'titik_id' => $titik?->id,
                     'status' => $teknisi ? OrderStatus::Terjadwal : OrderStatus::Baru,
                     'catatan_admin' => filled($blok['catatan_admin'] ?? null) ? $blok['catatan_admin'] : null,
+                    'keluhan' => filled($blok['keluhan'] ?? null) ? $blok['keluhan'] : null,
                     'is_klaim' => $blok['is_klaim'] ?? false,
                     'created_by' => $creator->id,
                 ]);

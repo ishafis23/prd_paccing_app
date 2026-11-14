@@ -47,6 +47,7 @@ class Order extends Model
         'surat_jalan_token',
         'ditutup_pada',
         'catatan_admin',
+        'keluhan',
         'alasan_kendala',
         'jenis_kendala',
         'perbaikan_menunggu_konfirmasi',

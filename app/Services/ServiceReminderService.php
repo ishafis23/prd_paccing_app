@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\CustomerJenis;
 use App\Enums\ReminderStatus;
 use App\Exceptions\BusinessRuleException;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ServiceReminder;
 use App\Models\WaLog;
@@ -67,6 +68,42 @@ class ServiceReminderService
         }
 
         return $order->fresh();
+    }
+
+    /**
+     * Revisi 14 Nov 2026 poin 19 — satu klik dari Data Customer: kirim pesan pengingat
+     * cuci/maintenance ke customer. Memakai reminder terbaru customer; bila belum ada,
+     * dibuat dari order selesai terakhir (jatuh tempo hari ini) agar riwayatnya tercatat.
+     *
+     * @return array{hasil: string, reminder: ServiceReminder}
+     */
+    public function kirimSekarangUntukCustomer(Customer $customer): array
+    {
+        $reminder = ServiceReminder::query()
+            ->where('customer_id', $customer->id)
+            ->latest('id')
+            ->first();
+
+        if ($reminder === null) {
+            $order = $customer->orderTerakhir()->first();
+
+            if ($order === null) {
+                throw new BusinessRuleException('Customer belum punya order selesai, belum ada servis yang bisa diingatkan.');
+            }
+
+            [$interval, $sumber] = $this->intervalUntuk($order);
+
+            $reminder = ServiceReminder::create([
+                'customer_id' => $customer->id,
+                'order_id' => $order->id,
+                'interval_bulan' => $interval,
+                'sumber_interval' => $sumber,
+                'tanggal_servis_berikutnya' => CarbonImmutable::today()->toDateString(),
+                'status_notice' => ReminderStatus::SiapDihubungi,
+            ]);
+        }
+
+        return ['hasil' => $this->proses($reminder), 'reminder' => $reminder->fresh()];
     }
 
     /**
