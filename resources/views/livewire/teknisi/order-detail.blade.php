@@ -616,6 +616,8 @@
                                                                     {{ $slotLabel }}
                                                                     @if (in_array($slotKey, $fotoSlotsWajib[$item->id] ?? [], true))
                                                                         <span class="text-rose-500">*Wajib</span>
+                                                                    @elseif (in_array($slotKey, $this->fotoSlotsDianjurkan[$item->id] ?? [], true))
+                                                                        <span class="font-semibold text-amber-600">★ Dianjurkan</span>
                                                                     @endif
                                                                 </span>
                                                             </div>

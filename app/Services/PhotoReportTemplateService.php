@@ -66,6 +66,30 @@ class PhotoReportTemplateService
         );
     }
 
+    /**
+     * Slot aktif yang tidak wajib tetapi DIANJURKAN (ditekankan di form teknisi) — [kode_slot => label].
+     * Tidak pernah menahan laporan/keberangkatan.
+     */
+    public function daftarDianjurkan(ServiceType|ServiceTypeValue|null $kategori): array
+    {
+        if ($kategori === null) {
+            return [];
+        }
+
+        return Cache::remember(
+            "photo_report_templates.{$kategori->value}.dianjurkan",
+            300,
+            fn () => PhotoReportTemplate::query()
+                ->where('kategori', $kategori->value)
+                ->where('aktif', true)
+                ->where('dianjurkan', true)
+                ->where('wajib', false)
+                ->orderBy('urutan')
+                ->pluck('label', 'kode_slot')
+                ->all(),
+        );
+    }
+
     public const FIELD_SET_OPSI = [
         'bebas' => 'Bebas (tanpa keterangan)',
         'indoor_lengkap' => 'Indoor lengkap (posisi, suhu, RPM, kondisi)',
@@ -131,6 +155,7 @@ class PhotoReportTemplateService
             'label' => $label,
             'urutan' => $data['urutan'] ?? 0,
             'wajib' => (bool) ($data['wajib'] ?? false),
+            'dianjurkan' => (bool) ($data['dianjurkan'] ?? false),
             'field_set' => $this->normalisasiFieldSet($data['field_set'] ?? null),
             'aktif' => true,
         ]);
@@ -173,6 +198,10 @@ class PhotoReportTemplateService
             $template->urutan = (int) $data['urutan'];
         }
 
+        if (array_key_exists('dianjurkan', $data)) {
+            $template->dianjurkan = (bool) $data['dianjurkan'];
+        }
+
         if (array_key_exists('wajib', $data)) {
             $template->wajib = (bool) $data['wajib'];
         }
@@ -203,6 +232,7 @@ class PhotoReportTemplateService
     {
         Cache::forget("photo_report_templates.{$kategori}");
         Cache::forget("photo_report_templates.{$kategori}.wajib");
+        Cache::forget("photo_report_templates.{$kategori}.dianjurkan");
         Cache::forget("photo_report_templates.{$kategori}.fieldset");
         Cache::forget("photo_report_templates.{$kategori}.fieldset.wajib");
     }

@@ -74,6 +74,8 @@ class PhotoReportTemplateResource extends BaseResource
                 ->required(),
             Forms\Components\Toggle::make('wajib')
                 ->helperText('dev-plan/17 B63: submit laporan ditolak kalau ini wajib & aktif, tapi belum ada fotonya.'),
+            Forms\Components\Toggle::make('dianjurkan')
+                ->helperText('Tidak wajib, tetapi ditandai "Dianjurkan" di form teknisi agar ditekankan untuk diisi. Tidak menahan laporan.'),
             Forms\Components\Select::make('field_set')
                 ->label('Keterangan unit')
                 ->options(PhotoReportTemplateService::FIELD_SET_OPSI)
@@ -115,6 +117,9 @@ class PhotoReportTemplateResource extends BaseResource
                 Tables\Columns\ToggleColumn::make('wajib')
                     ->disabled(fn (): bool => ! static::bolehKelola())
                     ->afterStateUpdated(fn (PhotoReportTemplate $record) => app(PhotoReportTemplateService::class)->lupakanCache($record->kategori->value)),
+                Tables\Columns\ToggleColumn::make('dianjurkan')
+                    ->disabled(fn (): bool => ! static::bolehKelola())
+                    ->afterStateUpdated(fn (PhotoReportTemplate $record) => app(PhotoReportTemplateService::class)->lupakanCache($record->kategori->value)),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('kategori')
@@ -139,6 +144,8 @@ class PhotoReportTemplateResource extends BaseResource
                             ->required(),
                         Forms\Components\Toggle::make('wajib')
                             ->helperText('dev-plan/17 B63: submit laporan ditolak kalau belum ada fotonya.'),
+                        Forms\Components\Toggle::make('dianjurkan')
+                            ->helperText('Tidak wajib, tetapi ditandai "Dianjurkan" di form teknisi.'),
                         Forms\Components\Select::make('field_set')
                             ->label('Keterangan unit')
                             ->options(PhotoReportTemplateService::FIELD_SET_OPSI)

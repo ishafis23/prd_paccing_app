@@ -22,6 +22,11 @@ Status sisi **backend, API, admin, dan portal web**. Sisi **app mobile** ada di 
 | 16 | Catatan pengerjaan teknisi | Selesai (API) | `catatan_pengerjaan` di riwayat. Web dan admin sudah menampilkan. |
 | 17 | Bukti kendala sudah diberitahu ke customer | Selesai | API dan web wajib bukti + pihak (`KENDALA_BUKTI_WAJIB`). Riwayat tersimpan, tampil di detail order admin. |
 | 18 | Auto-WA laporan + invoice/kuitansi | Selesai | Default MATI (`WA_NOTIF_OTOMATIS_SELESAI`). Idempoten. |
+| 19 | CRM Data Customer (riwayat, keluhan, follow-up, WA satu klik) | Selesai | Kolom Cuci Terakhir/Layanan/Keluhan/Follow-up, tab Riwayat Pelayanan, filter Perlu follow-up, aksi Kirim Pengingat Cuci + Chat WA. `orders.keluhan` baru. |
+| 20 | Penanda customer lama/baru | Selesai | `customers.tipe_customer`; aksi per baris & massal, filter, widget statistik. Import Excel belum punya kolom tipe. |
+| 21 | Dashboard kelengkapan teknisi harian | Selesai | Laporan > Kelengkapan Teknisi: absensi, dokumentasi, dana, setoran tunai per teknisi per tanggal; Siap transfer / Tahan dulu. |
+| 22 | Foto manifold sebelum/sesudah (Isi Freon) | Selesai | Slot `tekanan_*` berlabel "Ukuran Manifold", tidak wajib tetapi ditandai "Dianjurkan" (`photo_report_templates.dianjurkan`). |
+| 23 | Laporan/invoice terkirim otomatis, tidak menahan teknisi | Selesai | Cron `laporan:kirim-otomatis` tiap 5 menit (jeda 15 menit, retry maks 3x). Penghalang "laporan belum terkirim" dicabut. Butuh `WA_NOTIF_OTOMATIS_SELESAI=true`. |
 
 ## Kontrak API baru/berubah (untuk tim app)
 - `POST /pengeluaran`, `PUT /pengeluaran/{id}` (kirim POST + `_method=PUT`): multipart dengan `foto`. Respons: `foto_url`, `foto_diunggah_pada`, `dicatat_pada`. `ringkasan.hari_ini.total`, `ringkasan.bulan_ini.total`.

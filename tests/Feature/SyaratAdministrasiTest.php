@@ -34,14 +34,14 @@ function administrasiOrder(User $teknisi, array $atribut = []): Order
     ], $atribut));
 }
 
-it('mengembalikan penghalang foto dan laporan pada order selesai', function () {
+it('mengembalikan penghalang foto pada order selesai; laporan belum terkirim BUKAN penghalang (poin 23)', function () {
     $teknisi = administrasiTeknisi();
     $order = administrasiOrder($teknisi);
 
     $penghalang = app(SyaratAdministrasiService::class)->penghalang($teknisi);
 
     expect(collect($penghalang)->where('order_id', $order->id)->pluck('jenis')->all())
-        ->toContain('foto')->toContain('laporan');
+        ->toContain('foto')->not->toContain('laporan');
 });
 
 it('mengembalikan penghalang pengeluaran pending dan hilang saat disetujui', function () {
@@ -78,7 +78,7 @@ it('berangkat dan check-in sama-sama menolak bila administrasi belum tuntas', fu
     expect(fn () => $service->checkIn($checkIn, $teknisi))->toThrow(BusinessRuleException::class);
 });
 
-it('laporan belum terkirim tidak menahan penutupan order, tetapi menahan keberangkatan', function () {
+it('laporan belum terkirim tidak menahan penutupan order maupun keberangkatan (dikirim sistem)', function () {
     $teknisi = administrasiTeknisi();
     $order = administrasiOrder($teknisi, [
         'status' => OrderStatus::Selesai,
@@ -97,13 +97,8 @@ it('laporan belum terkirim tidak menahan penutupan order, tetapi menahan keberan
     $ditutup = app(TeknisiService::class)->tutupOrder($order, $teknisi);
     expect($ditutup->ditutup_pada)->not->toBeNull();
 
-    // Tetapi laporan yang belum dikirim Admin tetap menahan keberangkatan
-    // (celah "tutup order dulu" ditutup oleh tenggang laporan).
+    // Revisi 14 Nov 2026 poin 23: laporan dikirim sistem (cron), bukan urusan teknisi -> tidak menahan.
     $berikutnya = administrasiOrder($teknisi, ['status' => OrderStatus::Terjadwal]);
-    expect(fn () => app(TeknisiService::class)->berangkat($berikutnya, $teknisi))
-        ->toThrow(BusinessRuleException::class, 'laporan pengerjaan belum dikirim');
-
-    $order->update(['laporan_terkirim_pada' => now(), 'laporan_terkirim_oleh' => 1]);
 
     expect(app(TeknisiService::class)->berangkat($berikutnya->fresh(), $teknisi)->status)
         ->toBe(OrderStatus::MenujuLokasi);

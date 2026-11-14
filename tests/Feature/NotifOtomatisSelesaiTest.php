@@ -174,3 +174,52 @@ it('job antre bila fitur menyala dan menjalankan pengiriman', function () {
 
     expect(WaLog::where('jenis_kirim', 'laporan_pengerjaan')->count())->toBe(1);
 });
+
+// ---- Poin 23: cron laporan:kirim-otomatis ----
+
+it('cron mengirim order selesai yang sudah lewat jeda; yang baru selesai & yang terlalu lama dilewati', function () {
+    $lewatJeda = ($this->orderSelesai)();
+    $baruSaja = ($this->orderSelesai)();
+    $terlaluLama = ($this->orderSelesai)();
+
+    Order::query()->whereKey($lewatJeda->id)->update(['updated_at' => now()->subMinutes(30)]);
+    Order::query()->whereKey($terlaluLama->id)->update(['updated_at' => now()->subDays(10)]);
+
+    $this->artisan('laporan:kirim-otomatis')->assertSuccessful();
+
+    expect($lewatJeda->fresh()->laporan_terkirim_pada)->not->toBeNull()
+        ->and($baruSaja->fresh()->laporan_terkirim_pada)->toBeNull()
+        ->and($terlaluLama->fresh()->laporan_terkirim_pada)->toBeNull();
+
+    // Putaran berikutnya idempoten: tidak mengirim ulang.
+    $this->artisan('laporan:kirim-otomatis')->assertSuccessful();
+    expect(WaLog::where('jenis_kirim', 'laporan_pengerjaan')->where('status', WaLog::STATUS_SUKSES)->count())->toBe(1);
+});
+
+it('cron berhenti mengulang setelah 3 kali gagal (menunggu kirim manual)', function () {
+    $order = ($this->orderSelesai)();
+    Order::query()->whereKey($order->id)->update(['updated_at' => now()->subMinutes(30)]);
+
+    foreach (range(1, 3) as $i) {
+        WaLog::create([
+            'action' => 'kirim_dokumen', 'target' => '6281234567890', 'jenis_kirim' => 'laporan_pengerjaan',
+            'related_type' => Order::class, 'related_id' => $order->id,
+            'status' => WaLog::STATUS_GAGAL, 'error_message' => 'gateway timeout',
+        ]);
+    }
+
+    $hasil = app(NotifikasiWaService::class)->kirimOtomatisSelesai($order->fresh());
+
+    expect($hasil['laporan'])->toContain('gagal 3x')
+        ->and(WaLog::where('status', WaLog::STATUS_SUKSES)->count())->toBe(0);
+});
+
+it('cron tidak berbuat apa-apa bila fitur dimatikan', function () {
+    config(['wa.notif_otomatis_selesai' => false]);
+    $order = ($this->orderSelesai)();
+    Order::query()->whereKey($order->id)->update(['updated_at' => now()->subMinutes(30)]);
+
+    $this->artisan('laporan:kirim-otomatis')->expectsOutputToContain('nonaktif')->assertSuccessful();
+
+    expect($order->fresh()->laporan_terkirim_pada)->toBeNull()->and(WaLog::count())->toBe(0);
+});

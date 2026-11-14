@@ -59,14 +59,8 @@ class SyaratAdministrasiService
             ->get();
 
         foreach ($orders as $order) {
-            if ($order->laporan_terkirim_pada === null) {
-                $hasil[] = $this->entri('laporan', $order, 'Laporan pengerjaan belum terkirim', sprintf(
-                    'Order #%d (%s): laporan pengerjaan belum dikirim ke customer.',
-                    $order->id,
-                    $order->customer?->nama ?? 'tanpa customer',
-                ));
-            }
-
+            // Revisi 14 Nov 2026 poin 23: pengiriman laporan ke customer dilakukan sistem (cron
+            // laporan:kirim-otomatis) / admin, BUKAN tanggung jawab teknisi — tidak lagi menahan keberangkatan.
             $hasil = [...$hasil, ...$this->penghalangFisik($order, $teknisi)];
         }
 

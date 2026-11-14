@@ -19,6 +19,7 @@ class PhotoReportTemplate extends Model
         'field_set',
         'urutan',
         'wajib',
+        'dianjurkan',
         'aktif',
     ];
 
@@ -28,6 +29,7 @@ class PhotoReportTemplate extends Model
             'kategori' => ServiceTypeCast::class,
             'urutan' => 'integer',
             'wajib' => 'boolean',
+            'dianjurkan' => 'boolean',
             'aktif' => 'boolean',
         ];
     }

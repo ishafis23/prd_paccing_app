@@ -30,6 +30,10 @@ return [
     // sadar di produksi (WA_NOTIF_OTOMATIS_SELESAI=true); uji dulu dengan WA_TEST_TARGET.
     'notif_otomatis_selesai' => (bool) env('WA_NOTIF_OTOMATIS_SELESAI', false),
 
+    // Poin 23: cron `laporan:kirim-otomatis` — jeda sejak order selesai (menit) & jendela ke belakang (hari).
+    'jeda_kirim_otomatis_menit' => (int) env('WA_JEDA_KIRIM_OTOMATIS_MENIT', 15),
+    'jendela_kirim_otomatis_hari' => (int) env('WA_JENDELA_KIRIM_OTOMATIS_HARI', 3),
+
     // MODE UJI: bila diisi, SEMUA notifikasi otomatis ke customer diarahkan
     // ke nomor ini (mis. nomor admin) — untuk uji coba. Kosongkan di produksi.
     'test_target' => env('WA_TEST_TARGET'),

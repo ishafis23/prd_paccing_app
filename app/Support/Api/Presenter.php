@@ -211,6 +211,7 @@ class Presenter
             $fotoItem = $semuaFoto->where('order_item_id', $item->id);
             $perUnit = $unitSvc->fotoPerUnit($item, $unitPerItem->get($item->id));
             $wajib = FotoLaporanSlot::wajibUntuk($item->kategori);
+            $dianjurkan = FotoLaporanSlot::dianjurkanUntuk($item->kategori);
 
             return [
                 'id' => $item->id,
@@ -228,6 +229,7 @@ class Presenter
                     'kode' => $kode,
                     'label' => $label,
                     'wajib' => array_key_exists($kode, $wajib),
+                    'dianjurkan' => array_key_exists($kode, $dianjurkan),
                     'foto' => $perUnit ? null : ($fotoItem->firstWhere('slot', $kode) ? self::foto($fotoItem->firstWhere('slot', $kode)) : null),
                 ])->values()->all(),
             ];

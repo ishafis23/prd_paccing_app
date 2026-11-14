@@ -687,6 +687,11 @@ class OrderResource extends BaseResource
                 Tables\Filters\SelectFilter::make('team_id')->label('Tim')->options(fn () => Team::where('aktif', true)->pluck('nama', 'id')),
                 Tables\Filters\SelectFilter::make('titik_id')->label('Titik')->options(fn () => Titik::orderBy('urutan')->pluck('nama', 'id')),
                 Tables\Filters\TernaryFilter::make('bayar_dilaporkan_teknisi')->label('Lapor bayar teknisi'),
+                Tables\Filters\Filter::make('laporan_belum_terkirim')
+                    ->label('Laporan belum terkirim ke customer')
+                    ->query(fn (Builder $query) => $query
+                        ->whereIn('status', [OrderStatus::Selesai->value, OrderStatus::ButuhFollowup->value])
+                        ->whereNull('laporan_terkirim_pada')),
                 Tables\Filters\Filter::make('tanggal_jadwal')
                     ->form([
                         Forms\Components\DatePicker::make('tanggal_jadwal')->label('Tanggal Jadwal'),

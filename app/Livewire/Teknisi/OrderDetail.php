@@ -184,6 +184,16 @@ class OrderDetail extends Component
      *
      * @return array<int, array<int, string>>
      */
+    public function getFotoSlotsDianjurkanProperty(): array
+    {
+        return $this->order->orderItems
+            ->mapWithKeys(fn ($item) => [$item->id => array_keys(FotoLaporanSlot::dianjurkanUntuk($item->kategori))])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
     public function getFotoSlotsWajibProperty(): array
     {
         return $this->order->orderItems
@@ -1348,6 +1358,7 @@ class OrderDetail extends Component
                 'perUnit' => $unitService->fotoPerUnit($item, $unitItem),
                 'slots' => FotoLaporanSlot::untuk($item->kategori),
                 'slotWajib' => FotoLaporanSlot::wajibUntuk($item->kategori),
+                'slotDianjurkan' => FotoLaporanSlot::dianjurkanUntuk($item->kategori),
                 'fotoPerSlot' => $foto->keyBy('slot'),
                 'unit' => $unit,
                 'item' => $item,

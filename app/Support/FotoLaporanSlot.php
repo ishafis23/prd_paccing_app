@@ -40,4 +40,10 @@ class FotoLaporanSlot
     {
         return app(PhotoReportTemplateService::class)->daftarWajib($kategori);
     }
+
+    /** Slot tidak wajib tetapi ditekankan untuk diisi (revisi 14 Nov 2026 poin 22). */
+    public static function dianjurkanUntuk(ServiceType|ServiceTypeValue|null $kategori): array
+    {
+        return app(PhotoReportTemplateService::class)->daftarDianjurkan($kategori);
+    }
 }

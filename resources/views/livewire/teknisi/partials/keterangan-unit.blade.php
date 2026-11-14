@@ -48,6 +48,7 @@
                                             @php
                                                 $tersimpan = $uv['fotoPerSlot']->get($slotKey);
                                                 $wajib = array_key_exists($slotKey, $uv['slotWajib']);
+                                                $dianjurkan = array_key_exists($slotKey, $uv['slotDianjurkan'] ?? []);
                                             @endphp
                                             <div wire:key="fotounit-{{ $unit->id }}-{{ $slotKey }}" x-data="photoUpload('fotoUnit.{{ $unit->id }}.{{ $slotKey }}', {{ $order->id }})">
                                                 <button type="button" @click="openDialog()"
@@ -59,7 +60,7 @@
                                                         <template x-if="!preview">
                                                             <div class="flex flex-col items-center">
                                                                 <x-heroicon-o-camera class="h-5 w-5" />
-                                                                <span class="mt-0.5 px-1 text-[11px]">{{ $slotLabel }}@if ($wajib) <span class="text-rose-500">*Wajib</span>@endif</span>
+                                                                <span class="mt-0.5 px-1 text-[11px]">{{ $slotLabel }}@if ($wajib) <span class="text-rose-500">*Wajib</span>@elseif ($dianjurkan) <span class="font-semibold text-amber-600">★ Dianjurkan</span>@endif</span>
                                                             </div>
                                                         </template>
                                                     @endif

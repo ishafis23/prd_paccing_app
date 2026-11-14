@@ -228,6 +228,8 @@ class NotifikasiWaService
      *
      * @return array{laporan: string, tagihan: string} hasil per dokumen: terkirim|sudah|gagal:<alasan>|dilewati:<alasan>
      */
+    public const MAKS_PERCOBAAN_OTOMATIS = 3;
+
     public function kirimOtomatisSelesai(Order $order): array
     {
         $hasil = ['laporan' => 'dilewati:nonaktif', 'tagihan' => 'dilewati:nonaktif'];
@@ -251,7 +253,9 @@ class NotifikasiWaService
         if ($this->sudahDikirim($order, 'laporan_pengerjaan') || $order->laporan_terkirim_pada !== null) {
             $hasil['laporan'] = 'sudah';
         } else {
-            $hasil['laporan'] = $this->coba(fn () => $this->kirimLaporanPengerjaan($order, $pengirim));
+            $hasil['laporan'] = $this->terlaluBanyakGagal($order, 'laporan_pengerjaan')
+                ? 'dilewati:gagal '.self::MAKS_PERCOBAAN_OTOMATIS.'x, kirim manual dari admin'
+                : $this->coba(fn () => $this->kirimLaporanPengerjaan($order, $pengirim));
         }
 
         // 2) Invoice / kuitansi (hanya bila order sudah punya invoice aktif).
@@ -268,9 +272,11 @@ class NotifikasiWaService
         if ($this->sudahDikirim($invoice, $jenis)) {
             $hasil['tagihan'] = 'sudah';
         } else {
-            $hasil['tagihan'] = $this->coba(fn () => $lunas
-                ? $this->kirimPembayaranLunas($invoice, $pengirim)
-                : $this->kirimTagihan($invoice, $pengirim));
+            $hasil['tagihan'] = $this->terlaluBanyakGagal($invoice, $jenis)
+                ? 'dilewati:gagal '.self::MAKS_PERCOBAAN_OTOMATIS.'x, kirim manual dari admin'
+                : $this->coba(fn () => $lunas
+                    ? $this->kirimPembayaranLunas($invoice, $pengirim)
+                    : $this->kirimTagihan($invoice, $pengirim));
         }
 
         return $hasil;
@@ -332,6 +338,17 @@ class NotifikasiWaService
     }
 
     /** @param  callable(): WaLog  $kirim */
+    /** Percobaan kirim yang tercatat gagal sudah mencapai batas (cron berhenti mengulang). */
+    private function terlaluBanyakGagal(Model $related, string $jenis): bool
+    {
+        return WaLog::query()
+            ->where('related_type', $related::class)
+            ->where('related_id', $related->getKey())
+            ->where('jenis_kirim', $jenis)
+            ->where('status', WaLog::STATUS_GAGAL)
+            ->count() >= self::MAKS_PERCOBAAN_OTOMATIS;
+    }
+
     private function coba(callable $kirim): string
     {
         try {
