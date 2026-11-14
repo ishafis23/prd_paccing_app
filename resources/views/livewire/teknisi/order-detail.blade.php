@@ -273,6 +273,23 @@
                 <textarea wire:model="alasanKendala" rows="3" placeholder="mis. customer tidak jadi / tidak ada di lokasi"
                     class="w-full rounded-xl border border-gray-300 text-sm"></textarea>
                 @error('alasanKendala') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+
+                <label class="block text-sm font-semibold text-gray-700">Kendala dari sisi</label>
+                <select wire:model="pihakKendala" class="w-full rounded-xl border border-gray-300 text-sm">
+                    <option value="">— pilih —</option>
+                    <option value="customer">Customer</option>
+                    <option value="teknisi">Teknisi</option>
+                </select>
+                @error('pihakKendala') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+
+                <label class="block text-sm font-semibold text-gray-700">
+                    Bukti sudah diberi tahu ke customer (screenshot chat / dokumentasi)
+                    @if (config('kendala.bukti_wajib'))<span class="text-red-600">*</span>@endif
+                </label>
+                <input type="file" wire:model="buktiKendala" accept="image/*"
+                    class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-rose-50 file:px-3 file:py-2 file:font-semibold file:text-rose-700">
+                <div wire:loading wire:target="buktiKendala" class="text-xs text-gray-500">Mengunggah…</div>
+                @error('buktiKendala') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
                 <div class="flex gap-2">
                     <button type="button" @click="buka = false"
                         class="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-600 active:bg-gray-200">
@@ -779,6 +796,51 @@
                     <x-heroicon-o-arrow-path class="h-5 w-5 animate-spin" /> Menyimpan…
                 </span>
             </button>
+        </div>
+    @endif
+
+    {{-- Revisi 14 Nov 2026 poin 13: dokumentasi video (galeri atau rekam langsung). --}}
+    @if ($order->status !== $orderStatus::Batal)
+        <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <p class="flex items-center gap-2 font-bold text-gray-900">
+                <x-heroicon-o-video-camera class="h-5 w-5 text-blue-500" /> Dokumentasi Video
+            </p>
+            @if (session('video_status'))
+                <p class="mt-2 rounded-lg bg-green-50 p-2 text-xs font-medium text-green-700">{{ session('video_status') }}</p>
+            @endif
+            @if (session('video_error') || $errors->has('video'))
+                <p class="mt-2 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">{{ session('video_error') ?? $errors->first('video') }}</p>
+            @endif
+
+            @foreach ($order->videos as $video)
+                <div class="mt-3 rounded-xl bg-gray-50 p-2">
+                    <video src="{{ $video->url() }}" controls preload="metadata" class="w-full rounded-lg"></video>
+                    <div class="mt-1 flex items-center justify-between gap-2 text-xs text-gray-500">
+                        <span class="truncate">{{ $video->keterangan ?: $video->nama_asli }} · {{ $video->created_at?->format('d M H:i') }}</span>
+                        @if ((int) $video->user_id === (int) auth()->id() && ! $order->sudahDitutup())
+                            <form method="POST" action="{{ route('teknisi.video.destroy', ['order' => $order->id, 'video' => $video->id]) }}"
+                                onsubmit="return confirm('Hapus video ini?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="font-semibold text-red-600">Hapus</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+
+            <form method="POST" action="{{ route('teknisi.video.store', ['order' => $order->id]) }}" enctype="multipart/form-data" class="mt-3 space-y-2">
+                @csrf
+                {{-- accept="video/*": HP menawarkan rekam langsung atau pilih dari galeri. --}}
+                <input type="file" name="video" accept="video/mp4,video/quicktime,video/webm,video/3gpp,video/*" required
+                    class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-semibold file:text-blue-700">
+                <input type="text" name="keterangan" maxlength="255" placeholder="Keterangan (opsional)"
+                    class="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <button type="submit" class="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white active:bg-blue-700">
+                    Unggah Video
+                </button>
+                <p class="text-[11px] text-gray-400">Format MP4/MOV/WEBM/3GP, maks {{ config('video.maks_mb') }} MB.</p>
+            </form>
         </div>
     @endif
 

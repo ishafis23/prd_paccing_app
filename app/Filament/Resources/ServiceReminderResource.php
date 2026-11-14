@@ -9,6 +9,7 @@ use App\Filament\Resources\ServiceReminderResource\Pages;
 use App\Models\Order;
 use App\Models\ServiceReminder;
 use App\Services\PaymentService;
+use App\Services\ServiceReminderService;
 use App\Support\EnumOptions;
 use Carbon\CarbonImmutable;
 use Filament\Forms;
@@ -121,6 +122,22 @@ class ServiceReminderResource extends BaseResource
                 Tables\Columns\TextColumn::make('customer.nama')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('order.serviceCatalog.jenis_layanan')->label('Layanan terakhir'),
                 Tables\Columns\TextColumn::make('tanggal_servis_berikutnya')->date('d M Y')->sortable(),
+                Tables\Columns\TextColumn::make('interval_bulan')->label('Interval')
+                    ->formatStateUsing(fn ($state, ServiceReminder $r) => $state.' bln'.($r->sumber_interval === 'teknisi' ? ' (teknisi)' : '')),
+                Tables\Columns\TextColumn::make('status_kirim')->label('Status Kirim')->badge()
+                    ->formatStateUsing(fn (int $state) => match ($state) {
+                        ServiceReminder::KIRIM_TERKIRIM => 'Terkirim',
+                        ServiceReminder::KIRIM_GAGAL => 'Gagal',
+                        default => 'Menunggu',
+                    })
+                    ->color(fn (int $state) => match ($state) {
+                        ServiceReminder::KIRIM_TERKIRIM => 'success',
+                        ServiceReminder::KIRIM_GAGAL => 'danger',
+                        default => 'gray',
+                    })
+                    ->description(fn (ServiceReminder $r) => $r->error_terakhir),
+                Tables\Columns\TextColumn::make('jumlah_terkirim')->label('Terkirim (x)'),
+                Tables\Columns\TextColumn::make('terkirim_at')->label('Terakhir Terkirim')->dateTime('d M Y H:i')->placeholder('-'),
                 Tables\Columns\TextColumn::make('status_notice')->badge()->color(fn (ReminderStatus $state) => match ($state) {
                     ReminderStatus::SudahDihubungi, ReminderStatus::Selesai => 'success',
                     ReminderStatus::SiapDihubungi => 'warning',
@@ -134,6 +151,24 @@ class ServiceReminderResource extends BaseResource
                     ->query(fn ($query) => $query->jatuhTempo()),
             ])
             ->actions([
+                Tables\Actions\Action::make('kirimSekarang')
+                    ->label('Kirim Sekarang')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->requiresConfirmation()
+                    ->visible(fn (ServiceReminder $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
+                        && ! in_array($record->status_notice, [ReminderStatus::Selesai, ReminderStatus::SudahDihubungi], true))
+                    ->action(function (ServiceReminder $record) {
+                        $hasil = app(ServiceReminderService::class)->proses($record);
+                        Notification::make()
+                            ->title(match ($hasil) {
+                                'terkirim' => 'Pengingat terkirim ke customer',
+                                'ditutup' => 'Customer sudah punya servis lebih baru; notice ditutup',
+                                'dilewati' => 'Belum bisa dikirim: '.$record->fresh()->error_terakhir,
+                                default => 'Gagal mengirim: '.$record->fresh()->error_terakhir,
+                            })
+                            ->color($hasil === 'terkirim' ? 'success' : 'warning')
+                            ->send();
+                    }),
                 Tables\Actions\Action::make('tandaiDihubungi')
                     ->label('Tandai Dihubungi')
                     ->icon('heroicon-o-check-circle')

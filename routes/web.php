@@ -70,6 +70,10 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
     Route::get('/order/{order}/photos', [PhotoController::class, 'getByOrder'])->name('teknisi.photo.index');
     Route::delete('/photo/{photo}', [PhotoController::class, 'destroy'])->name('teknisi.photo.destroy');
 
+    // Dokumentasi video pengerjaan (revisi 14 Nov 2026 poin 13)
+    Route::post('/order/{order}/video', [\App\Http\Controllers\OrderVideoController::class, 'store'])->whereNumber('order')->name('teknisi.video.store');
+    Route::delete('/order/{order}/video/{video}', [\App\Http\Controllers\OrderVideoController::class, 'destroy'])->whereNumber(['order', 'video'])->name('teknisi.video.destroy');
+
     // Temporary Photo Upload (Real-time upload saat file dipilih)
     Route::post('/order/{order}/temp-photo', [TemporaryPhotoUploadController::class, 'store'])->name('teknisi.temp-photo.store');
     Route::get('/order/{order}/temp-photos', [TemporaryPhotoUploadController::class, 'index'])->name('teknisi.temp-photo.index');
@@ -88,6 +92,7 @@ Route::middleware(['auth', 'role:teknisi', 'user.aktif'])->prefix('teknisi')->gr
 
 // Resi publik (B14a) — read-only tanpa login; token acak di orders.resi_token.
 Route::get('/resi/{order}/{token}', [ResiController::class, 'show'])->name('resi.show');
+Route::post('/resi/{order}/{token}/ulasan', [ResiController::class, 'ulasan'])->middleware('throttle:10,1')->name('resi.ulasan');
 
 // Surat Jalan publik (dev-plan/12 §3.12) — read-only tanpa login, khusus korporat.
 Route::get('/surat-jalan/{order}/{token}', [SuratJalanController::class, 'show'])->name('surat-jalan.show');

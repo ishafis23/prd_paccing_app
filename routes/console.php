@@ -9,4 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // B26: pembersihan otomatis foto tua & file yatim — harian 03:00.
+// Revisi 14 Nov 2026: pengingat servis berkala ke customer — harian 09:00.
+Schedule::command('reminder:kirim')->dailyAt('09:00')->withoutOverlapping();
+
 Schedule::command('foto:bersihkan')->dailyAt('03:00')->withoutOverlapping();

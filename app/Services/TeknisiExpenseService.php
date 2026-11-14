@@ -131,7 +131,9 @@ class TeknisiExpenseService
             throw new BusinessRuleException('Hanya pengeluaran pending yang bisa dihapus.');
         }
 
+        $foto = $expense->foto_path;
         $expense->delete();
+        app(FotoBuktiService::class)->hapusFile($foto);
     }
 
     /** Batasi query ke satu hari (harian) atau satu bulan (bulanan). */
@@ -177,6 +179,8 @@ class TeknisiExpenseService
             'total_pending' => (int) $expenses->where('status', 'pending')->sum('nominal'),
             'total_approved' => (int) $expenses->where('status', 'approved')->sum('nominal'),
             'total_rejected' => (int) $expenses->where('status', 'rejected')->sum('nominal'),
+            // `total` = semua yang tidak ditolak; app membaca ini untuk "Bulan ini" (sebelumnya Rp NaN).
+            'total' => (int) $expenses->where('status', '!=', 'rejected')->sum('nominal'),
             'total_items' => $expenses->count(),
         ];
     }
@@ -189,6 +193,7 @@ class TeknisiExpenseService
         return [
             'total_pending' => (int) $expenses->where('status', 'pending')->sum('nominal'),
             'total_approved' => (int) $expenses->where('status', 'approved')->sum('nominal'),
+            'total' => (int) $expenses->where('status', '!=', 'rejected')->sum('nominal'),
             'total_items' => $expenses->count(),
         ];
     }

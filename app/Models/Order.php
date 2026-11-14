@@ -33,6 +33,7 @@ class Order extends Model
         'tanggal_jadwal',
         'jam_jadwal',
         'titik_id',
+        'interval_servis_bulan',
         'status',
         'metode_dipilih',
         'bayar_dilaporkan_teknisi',
@@ -384,6 +385,21 @@ class Order extends Model
         }
 
         return $this->surat_jalan_token;
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(OrderReview::class);
+    }
+
+    public function videos(): HasMany
+    {
+        return $this->hasMany(OrderVideo::class)->orderByDesc('id');
+    }
+
+    public function kendalaBuktis(): HasMany
+    {
+        return $this->hasMany(OrderKendalaBukti::class)->orderByDesc('id');
     }
 
     public function cashHandovers(): HasMany

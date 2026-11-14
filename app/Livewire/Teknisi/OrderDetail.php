@@ -49,6 +49,11 @@ class OrderDetail extends Component
     /** besok | sore — wajib dipilih saat lapor kendala. */
     public string $jenisKendala = '';
 
+    /** Bukti kendala sudah disampaikan ke customer (revisi 14 Nov 2026 poin 17). */
+    public $buktiKendala = null;
+
+    public string $pihakKendala = '';
+
     public string $catatanPerbaikan = '';
 
     public string $estimasiHargaPerbaikan = '';
@@ -687,13 +692,32 @@ class OrderDetail extends Component
      */
     public function tandaiKendala(): void
     {
+        $wajib = (bool) config('kendala.bukti_wajib');
+        $this->validate([
+            'buktiKendala' => [$wajib ? 'required' : 'nullable', 'image', 'max:5120'],
+            'pihakKendala' => [$wajib ? 'required' : 'nullable', \Illuminate\Validation\Rule::in(\App\Models\OrderKendalaBukti::PIHAK)],
+        ], [
+            'buktiKendala.required' => 'Lampirkan bukti (screenshot/dokumentasi) bahwa kendala sudah disampaikan ke customer.',
+            'pihakKendala.required' => 'Pilih sumber kendala: customer atau teknisi.',
+        ]);
+
+        $path = null;
+
         try {
-            app(TeknisiService::class)->tandaiKendala($this->order, auth()->user(), $this->alasanKendala, $this->jenisKendala);
+            if ($this->buktiKendala !== null) {
+                $path = $this->buktiKendala->store('kendala-bukti', 'public');
+                app(\App\Services\FotoTimestampService::class)->tempelPath($path);
+            }
+
+            app(TeknisiService::class)->tandaiKendala($this->order, auth()->user(), $this->alasanKendala, $this->jenisKendala, $path, $this->pihakKendala ?: null, $wajib);
             session()->flash('status', $this->jenisKendala === TeknisiService::KENDALA_SORE
                 ? 'Ditandai pending sore. Titik berikutnya sudah terbuka; order ini bisa dikerjakan sore.'
                 : 'Order ditandai terkendala (pending besok/hari lain). Admin akan menjadwalkan ulang.');
-            $this->reset('alasanKendala', 'jenisKendala');
+            $this->reset('alasanKendala', 'jenisKendala', 'buktiKendala', 'pihakKendala');
         } catch (BusinessRuleException|AuthorizationException $e) {
+            if ($path !== null) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+            }
             session()->flash('error', $e->getMessage());
         }
     }

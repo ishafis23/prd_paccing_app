@@ -4,17 +4,24 @@ namespace App\Livewire\Teknisi;
 
 use App\Exceptions\BusinessRuleException;
 use App\Models\TeknisiExpense;
+use App\Services\FotoBuktiService;
 use App\Services\TeknisiExpenseService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 class LaporanPengeluaran extends Component
 {
     use WithPagination;
+    use WithFileUploads;
+
+    /** Foto bukti pengeluaran (revisi 14 Nov 2026 poin 4): wajib saat catat baru bila EXPENSE_FOTO_WAJIB aktif. */
+    public $foto = null;
 
     #[Validate('required|date|before_or_equal:today')]
     public string $tanggal_input = '';
@@ -71,6 +78,7 @@ class LaporanPengeluaran extends Component
     {
         return [
             'kategori' => ['required', Rule::in(TeknisiExpense::KATEGORI)],
+            'foto' => [config('expense.foto_wajib') && $this->editId === null ? 'required' : 'nullable', 'image', 'max:5120'],
             'partner_id' => ['nullable', Rule::in(array_keys($this->partnerOptions))],
         ];
     }
@@ -196,7 +204,7 @@ class LaporanPengeluaran extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['tanggal_input', 'kategori', 'order_id', 'partner_id', 'qty', 'harga', 'nominal', 'keterangan', 'showForm', 'editId']);
+        $this->reset(['tanggal_input', 'kategori', 'order_id', 'partner_id', 'qty', 'harga', 'nominal', 'keterangan', 'foto', 'showForm', 'editId']);
         $this->tanggal_input = today()->format('Y-m-d');
         $this->qty = 1;
         $this->harga = 0;
@@ -229,9 +237,22 @@ class LaporanPengeluaran extends Component
 
             $service = app(TeknisiExpenseService::class);
 
+            $fotoLama = null;
+            if ($this->foto !== null) {
+                try {
+                    $data += app(FotoBuktiService::class)->simpan($this->foto, $this->editId);
+                } catch (ValidationException $ve) {
+                    $this->addError('foto', $ve->validator->errors()->first('foto'));
+
+                    return;
+                }
+            }
+
             if ($this->editId !== null) {
                 $e = TeknisiExpense::query()->where('teknisi_id', auth()->id())->findOrFail($this->editId);
+                $fotoLama = isset($data['foto_path']) ? $e->foto_path : null;
                 $hasil = $service->ubah(auth()->user(), $e, $data);
+                app(FotoBuktiService::class)->hapusFile($fotoLama);
                 session()->flash('status', 'Pengeluaran berhasil diubah.'.($hasil['perlu_acc_ulang'] ? ' Menunggu persetujuan ulang admin.' : ''));
             } else {
                 $service->catat(auth()->user(), $data);

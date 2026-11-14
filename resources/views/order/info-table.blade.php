@@ -55,6 +55,37 @@
                         <td class="py-4 px-4 text-red-900 dark:text-red-200 align-top">{{ $getState()->alasan_kendala }}</td>
                     </tr>
                 @endif
+                @if ($getState()->videos->isNotEmpty())
+                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                        <td class="py-4 px-4 font-semibold text-gray-700 dark:text-gray-300 w-1/3 align-top">Dokumentasi Video</td>
+                        <td class="py-4 px-4 align-top">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                @foreach ($getState()->videos as $video)
+                                    <div>
+                                        <video src="{{ $video->url() }}" controls preload="metadata" class="w-full rounded-lg"></video>
+                                        <p class="mt-1 text-xs text-gray-500">{{ $video->pengunggah?->name }} · {{ $video->created_at?->format('d M Y H:i') }}{{ $video->keterangan ? ' · '.$video->keterangan : '' }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </td>
+                    </tr>
+                @endif
+                @foreach ($getState()->kendalaBuktis as $bukti)
+                    <tr class="border-b border-gray-200 dark:border-gray-700 bg-red-50/50 dark:bg-red-900/10">
+                        <td class="py-4 px-4 font-semibold text-red-700 dark:text-red-300 w-1/3 align-top">
+                            Bukti Kendala
+                            <span class="block text-xs font-normal text-gray-500">{{ $bukti->created_at?->format('d M Y H:i') }}{{ $bukti->pihak ? ' · dari sisi '.$bukti->pihak : '' }}</span>
+                        </td>
+                        <td class="py-4 px-4 text-gray-900 dark:text-white align-top">
+                            <p class="text-sm">{{ $bukti->alasan }}</p>
+                            @if ($bukti->fotoUrl())
+                                <a href="{{ $bukti->fotoUrl() }}" target="_blank" rel="noopener" class="mt-2 inline-block">
+                                    <img src="{{ $bukti->fotoUrl() }}" alt="Bukti kendala" class="h-24 w-24 rounded-lg object-cover ring-1 ring-gray-200">
+                                </a>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
                 @if ($getState()->perbaikan_menunggu_konfirmasi)
                     <tr class="border-b border-gray-200 dark:border-gray-700 bg-amber-50 dark:bg-amber-900/20">
                         <td class="py-4 px-4 font-semibold text-amber-700 dark:text-amber-300 w-1/3 align-top">Menunggu Konfirmasi</td>

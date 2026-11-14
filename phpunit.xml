@@ -23,6 +23,9 @@
              di request terpisah), murni batas proses test lokal. -->
         <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
+        <env name="EXPENSE_FOTO_WAJIB" value="false"/>
+        <env name="KENDALA_BUKTI_WAJIB" value="false"/>
+        <env name="FOTO_TIMESTAMP" value="false"/>
         <!-- Kunci APP_URL agar tes (URL absolut via getUrl/Url::absolute) tidak
              bergantung pada .env lokal (mis. APP_URL produksi ber-subfolder). -->
         <env name="APP_URL" value="http://localhost"/>

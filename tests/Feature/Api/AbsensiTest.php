@@ -32,15 +32,15 @@ it('hari-ini: belum absen -> siap pulang -> selesai, memuat mode & lokasi kantor
     Sanctum::actingAs($this->teknisi);
 
     $this->getJson('/api/v1/absensi/hari-ini')->assertOk()
-        ->assertJsonPath('data.state', 'belum_absen')->assertJsonPath('data.mode_absensi', 'lokasi')
+        ->assertJsonPath('data.state', 'belum_absen')->assertJsonPath('data.lacak_aktif', false)->assertJsonPath('data.mode_absensi', 'lokasi')
         ->assertJsonPath('data.lokasi_kantor.0.nama', 'Kantor Pusat');
 
     $this->post('/api/v1/absensi/datang', ['foto' => ($this->foto)(), 'lat' => -6.2, 'lng' => 106.8166], $this->json)
         ->assertCreated()->assertJsonStructure(['data' => ['jam_datang', 'status_datang']]);
-    $this->getJson('/api/v1/absensi/hari-ini')->assertJsonPath('data.state', 'siap_pulang');
+    $this->getJson('/api/v1/absensi/hari-ini')->assertJsonPath('data.state', 'siap_pulang')->assertJsonPath('data.lacak_aktif', true);
 
     $this->post('/api/v1/absensi/pulang', ['foto' => ($this->foto)()], $this->json)->assertOk();
-    $this->getJson('/api/v1/absensi/hari-ini')->assertJsonPath('data.state', 'selesai');
+    $this->getJson('/api/v1/absensi/hari-ini')->assertJsonPath('data.state', 'selesai')->assertJsonPath('data.lacak_aktif', false);
 });
 
 it('datang ditolak di luar radius, tanpa lokasi, atau dua kali', function () {

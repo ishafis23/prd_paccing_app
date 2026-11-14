@@ -9,14 +9,18 @@ use App\Http\Controllers\Api\V1\Concerns\MencariOrder;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\OrderItem;
+use App\Models\OrderKendalaBukti;
 use App\Services\AttendanceService;
 use App\Services\OrderService;
+use App\Services\OrderVideoService;
+use App\Services\ServiceReminderService;
 use App\Services\StorageQuotaService;
 use App\Services\TeknisiService;
 use App\Support\Api\Presenter;
 use App\Support\ServiceTypeResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 /** Detail order & aksi status/layanan/pembayaran oleh teknisi (tim) di lapangan. */
@@ -93,9 +97,39 @@ class OrderController extends Controller
 
     public function kendala(Request $request, int $order): JsonResponse
     {
-        $data = $request->validate(['alasan' => ['required', 'string', 'max:1000']]);
+        $wajib = (bool) config('kendala.bukti_wajib');
+        $data = $request->validate([
+            'alasan' => ['required', 'string', 'max:1000'],
+            'jenis' => ['nullable', Rule::in([TeknisiService::KENDALA_BESOK, TeknisiService::KENDALA_SORE])],
+            'pihak' => [$wajib ? 'required' : 'nullable', Rule::in(OrderKendalaBukti::PIHAK)],
+            'bukti' => [$wajib ? 'required' : 'nullable', 'image', 'max:5120'],
+        ]);
 
-        app(TeknisiService::class)->tandaiKendala($this->cariOrder($request, $order, tulis: true), $request->user(), $data['alasan']);
+        $orderModel = $this->cariOrder($request, $order, tulis: true);
+        $path = null;
+
+        try {
+            if ($request->hasFile('bukti')) {
+                app(StorageQuotaService::class)->pastikanCukup((int) $request->file('bukti')->getSize());
+                $path = $request->file('bukti')->store('kendala-bukti', 'public');
+                StorageQuotaService::lupakanCache();
+            }
+
+            app(TeknisiService::class)->tandaiKendala(
+                $orderModel,
+                $request->user(),
+                $data['alasan'],
+                $data['jenis'] ?? TeknisiService::KENDALA_BESOK,
+                $path,
+                $data['pihak'] ?? null,
+                $wajib,
+            );
+        } catch (\Throwable $e) {
+            if ($path !== null) {
+                Storage::disk('public')->delete($path);
+            }
+            throw $e;
+        }
 
         return $this->detail($request, $order);
     }
@@ -113,6 +147,48 @@ class OrderController extends Controller
             $data['catatan'],
             isset($data['estimasi_harga']) ? (float) $data['estimasi_harga'] : null,
         );
+
+        return $this->detail($request, $order);
+    }
+
+    /** Teknisi mengisi pilihan customer: cuci ulang tiap berapa bulan (kosong = default 3 bulan). */
+    public function intervalServis(Request $request, int $order): JsonResponse
+    {
+        $data = $request->validate([
+            'interval_bulan' => ['required', 'integer', 'min:'.ServiceReminderService::INTERVAL_MIN, 'max:'.ServiceReminderService::INTERVAL_MAX],
+        ]);
+
+        app(ServiceReminderService::class)->setIntervalServis(
+            $this->cariOrder($request, $order, tulis: true),
+            (int) $data['interval_bulan'],
+        );
+
+        return $this->detail($request, $order);
+    }
+
+    /** Tambah dokumentasi video pengerjaan (multipart `video`, opsional `keterangan`). */
+    public function tambahVideo(Request $request, int $order): JsonResponse
+    {
+        $data = $request->validate([
+            'video' => ['required', 'file'],
+            'keterangan' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        app(OrderVideoService::class)->tambah(
+            $this->cariOrder($request, $order, tulis: true),
+            $request->user(),
+            $request->file('video'),
+            $data['keterangan'] ?? null,
+        );
+
+        return $this->detail($request, $order);
+    }
+
+    public function hapusVideo(Request $request, int $order, int $video): JsonResponse
+    {
+        $o = $this->cariOrder($request, $order, tulis: true);
+
+        app(OrderVideoService::class)->hapus($o->videos()->findOrFail($video), $request->user());
 
         return $this->detail($request, $order);
     }

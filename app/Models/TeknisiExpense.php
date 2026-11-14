@@ -28,7 +28,16 @@ class TeknisiExpense extends Model
         'status',
         'approved_by',
         'catatan_approval',
+        'foto_path',
+        'foto_hash',
+        'foto_phash',
+        'foto_diunggah_pada',
     ];
+
+    public function fotoUrl(): ?string
+    {
+        return filled($this->foto_path) ? asset('storage/'.ltrim($this->foto_path, '/')) : null;
+    }
 
     protected function casts(): array
     {
@@ -36,6 +45,7 @@ class TeknisiExpense extends Model
             'tanggal_input' => 'date',
             'qty' => 'integer',
             'harga' => 'integer',
+            'foto_diunggah_pada' => 'datetime',
         ];
     }
 

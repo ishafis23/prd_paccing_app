@@ -41,6 +41,8 @@ class AbsensiController extends Controller
             'waktu_server' => now()->toIso8601String(),
             'mode_absensi' => $settings->mode_absensi->value,
             'state' => $state,
+            // Revisi 14 Nov poin 9a: app melacak posisi HANYA saat true (sudah absen datang, belum pulang).
+            'lacak_aktif' => $state === 'siap_pulang',
             'absen' => Presenter::absensi($absen),
             'batas' => [
                 'games1' => substr((string) $settings->jam_games1_batas, 0, 5),

@@ -31,6 +31,20 @@ class Presenter
         return filled($path) ? asset('storage/'.ltrim((string) $path, '/')) : null;
     }
 
+    private const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+    private const BULAN = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    /** "Sel, 10 Nov 2026" — tanpa bergantung pada locale server. */
+    public static function tanggalIndonesia(?\DateTimeInterface $tanggal): ?string
+    {
+        if ($tanggal === null) {
+            return null;
+        }
+
+        return sprintf('%s, %d %s %s', self::HARI[(int) $tanggal->format('w')], (int) $tanggal->format('j'), self::BULAN[(int) $tanggal->format('n')], $tanggal->format('Y'));
+    }
+
     public static function rupiah(float|int|string|null $nilai): int
     {
         return (int) round((float) $nilai);
@@ -76,8 +90,9 @@ class Presenter
             'status' => $order->status->value,
             'tanggal_jadwal' => $order->tanggal_jadwal?->toDateString(),
             'jam_jadwal' => $order->jam_jadwal ? substr((string) $order->jam_jadwal, 0, 5) : null,
-            'titik' => $order->titik ? ['id' => $order->titik->id, 'nama' => $order->titik->nama, 'jam' => substr((string) $order->titik->jam, 0, 5)] : null,
-            'customer' => ['nama' => $order->customer?->nama, 'no_hp' => $order->customer?->no_hp],
+            'tanggal_tampil' => self::tanggalIndonesia($order->tanggal_jadwal),
+            'titik' => $order->titik ? ['id' => $order->titik->id, 'nama' => $order->titik->nama, 'urutan' => (int) $order->titik->urutan, 'jam' => substr((string) $order->titik->jam, 0, 5)] : null,
+            'customer' => ['nama' => $order->customer?->nama, 'no_hp' => $order->customer?->no_hp, 'wa_url' => self::waUrl($order->customer?->no_hp)],
             'alamat' => $order->alamat_pengerjaan ?: $order->customerAddress?->alamat ?: $order->customer?->alamat,
             'maps_url' => self::mapsUrl($order),
             'layanan' => $order->ringkasanLayanan(),
@@ -86,6 +101,43 @@ class Presenter
             'is_klaim' => (bool) $order->is_klaim,
             'ditutup' => $order->sudahDitutup(),
             'updated_at' => $order->updated_at?->toIso8601String(),
+        ] + ($order->relationLoaded('workReports') ? [
+            // Catatan pengerjaan teknisi (revisi 14 Nov poin 16) — hanya bila relasi sudah dimuat (riwayat).
+            'catatan_pengerjaan' => $order->workReports->sortByDesc('id')->first()?->catatan_pengerjaan,
+        ] : []);
+    }
+
+    /** Tautan chat WhatsApp langsung ke customer (https://wa.me/62...), null bila nomor kosong. */
+    public static function waUrl(?string $noHp): ?string
+    {
+        $digit = preg_replace('/\D/', '', (string) $noHp) ?? '';
+        if ($digit === '') {
+            return null;
+        }
+        if (str_starts_with($digit, '0')) {
+            $digit = '62'.substr($digit, 1);
+        } elseif (! str_starts_with($digit, '62')) {
+            $digit = '62'.$digit;
+        }
+
+        return 'https://wa.me/'.$digit;
+    }
+
+    /**
+     * Status kunci urutan titik untuk teknisi: null bila terbuka, selain itu info titik penghalang.
+     *
+     * @return array{terkunci: bool, terkunci_oleh: ?string, pesan_terkunci: ?string}
+     */
+    public static function kunciTitik(Order $order, User $teknisi): array
+    {
+        $penghalang = $order->status === \App\Enums\OrderStatus::Terjadwal
+            ? app(TeknisiService::class)->titikPenghalang($order, $teknisi)
+            : null;
+
+        return [
+            'terkunci' => $penghalang !== null,
+            'terkunci_oleh' => $penghalang?->titik?->nama,
+            'pesan_terkunci' => $penghalang !== null ? app(TeknisiService::class)->pesanTitikTerkunci($penghalang) : null,
         ];
     }
 
@@ -130,7 +182,7 @@ class Presenter
     {
         $order->loadMissing([
             'customer', 'customerAddress', 'titik', 'orderItems.acUnit', 'workReports.photos', 'latestPayment',
-            'cashHandovers', 'orderTechnicians.teknisi', 'teknisi',
+            'cashHandovers', 'orderTechnicians.teknisi', 'teknisi', 'kendalaBuktis', 'videos',
         ]);
 
         $teknisiSvc = app(TeknisiService::class);
@@ -201,9 +253,25 @@ class Presenter
             ->where('tanggal', now()->toDateString())
             ->exists();
 
-        return self::orderRingkas($order) + [
+        return self::orderRingkas($order) + self::kunciTitik($order, $teknisi) + [
             'catatan_admin' => $order->catatan_admin,
             'alasan_kendala' => $order->alasan_kendala,
+            'kendala_bukti' => ($kb = $order->kendalaBuktis->first()) === null ? null : [
+                'jenis' => $kb->jenis,
+                'pihak' => $kb->pihak,
+                'alasan' => $kb->alasan,
+                'foto_url' => self::url($kb->foto_path),
+                'dicatat_pada' => $kb->created_at?->toIso8601String(),
+            ],
+            'video' => $order->videos->map(fn ($v): array => [
+                'id' => $v->id,
+                'url' => $v->url(),
+                'nama' => $v->nama_asli,
+                'ukuran' => (int) $v->ukuran,
+                'keterangan' => $v->keterangan,
+                'dicatat_pada' => $v->created_at?->toIso8601String(),
+                'bisa_hapus' => (int) $v->user_id === (int) $teknisi->id && ! $order->sudahDitutup(),
+            ])->values()->all(),
             'perbaikan' => [
                 'menunggu_konfirmasi' => (bool) $order->perbaikan_menunggu_konfirmasi,
                 'catatan' => $order->perbaikan_catatan,
@@ -258,6 +326,9 @@ class Presenter
             'keterangan' => $e->keterangan,
             'status' => $e->status,
             'catatan_approval' => $e->catatan_approval,
+            'foto_url' => self::url($e->foto_path),
+            'foto_diunggah_pada' => $e->foto_diunggah_pada?->toIso8601String(),
+            'dicatat_pada' => $e->created_at?->toIso8601String(),
             'order_id' => $e->order_id,
             'order_label' => $e->order ? "#{$e->order->id} — ".($e->order->customer?->nama ?? 'Tanpa nama') : null,
             'partner' => $e->partner ? ['id' => $e->partner->id, 'name' => $e->partner->name] : null,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\TeknisiExpense;
+use App\Services\FotoBuktiService;
 use App\Services\TeknisiExpenseService;
 use App\Support\Api\Presenter;
 use Illuminate\Http\JsonResponse;
@@ -82,6 +83,12 @@ class PengeluaranController extends Controller
 
         $data = $this->service->validasi($user, $request->all());
 
+        // Revisi 14 Nov 2026 poin 4: foto bukti wajib + tolak foto kembar.
+        $request->validate(['foto' => [config('expense.foto_wajib') ? 'required' : 'nullable', 'image', 'max:5120']]);
+        if ($request->hasFile('foto')) {
+            $data += app(FotoBuktiService::class)->simpan($request->file('foto'));
+        }
+
         $e = $this->service->catat($user, $data);
         if ($uuid !== null) {
             $e->forceFill(['client_uuid' => $uuid])->save();
@@ -97,7 +104,17 @@ class PengeluaranController extends Controller
         // Hanya pencatat; selain itu 404 (tidak membocorkan keberadaan data).
         $expense = TeknisiExpense::query()->where('teknisi_id', $user->id)->findOrFail($id);
 
-        $hasil = $this->service->ubah($user, $expense, $this->service->validasi($user, $request->all()));
+        $data = $this->service->validasi($user, $request->all());
+
+        $request->validate(['foto' => ['nullable', 'image', 'max:5120']]);
+        $fotoLama = null;
+        if ($request->hasFile('foto')) {
+            $fotoLama = $expense->foto_path;
+            $data += app(FotoBuktiService::class)->simpan($request->file('foto'), $expense->id);
+        }
+
+        $hasil = $this->service->ubah($user, $expense, $data);
+        app(FotoBuktiService::class)->hapusFile($fotoLama);
 
         return response()->json(['data' => Presenter::pengeluaran($hasil['expense'], $user->id) + ['perlu_acc_ulang' => $hasil['perlu_acc_ulang']]]);
     }

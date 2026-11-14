@@ -49,11 +49,28 @@ class WaTemplateService
         ."Terima kasih.\n\n"
         ."Hormat kami,\n{nama_usaha}";
 
+    /** Pengingat servis berkala (cuci AC) — dikirim cron `reminder:kirim`. */
+    public const DEFAULT_REMINDER_SERVIS = "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
+        ."Bapak/Ibu {nama}\n\n"
+        .'Sudah sekitar {interval} bulan sejak {layanan} terakhir kami kerjakan ({tanggal_terakhir}).'
+        ." Agar AC tetap dingin dan awet, yuk jadwalkan perawatan berikutnya. Balas pesan ini untuk memesan jadwal.\n\n"
+        ."Terima kasih atas kepercayaan Anda.\n\n"
+        ."Hormat kami,\n{nama_usaha}";
+
+    /** Tagihan (invoice belum dibayar) yang ikut terkirim otomatis setelah pengerjaan selesai. */
+    public const DEFAULT_TAGIHAN_PENGERJAAN = "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
+        ."Bapak/Ibu {nama}\n\n"
+        .'Pengerjaan Anda telah selesai. Terlampir invoice {nomor_invoice} sebesar {total}.'
+        ." Pembayaran dan rincian dapat dilihat melalui tautan berikut:\n{tautan_invoice}\n\n"
+        ."Terima kasih atas kepercayaan Anda.\n\n"
+        ."Hormat kami,\n{nama_usaha}";
+
     /** Default pengantar PDF laporan pengerjaan. */
     public const DEFAULT_LAPORAN_PENGERJAAN = "Assalamu'alaikum Warahmatullahi Wabarakatuh,\n\n"
         ."Bapak/Ibu {nama}\n\n"
         .'Bersama pesan ini kami sampaikan laporan pengerjaan {layanan} untuk order {nomor_order}.'
         ." Rincian dan foto pengerjaan terlampir dalam file PDF.\n\n"
+        ."Lihat dokumentasi dan beri penilaian pekerjaan kami di:\n{tautan_resi}\n\n"
         ."Terima kasih atas kepercayaan Anda.\n\n"
         ."Hormat kami,\n{nama_usaha}";
 
@@ -75,6 +92,14 @@ class WaTemplateService
             'nama' => 'Pengingat Tagihan',
             'isi' => self::DEFAULT_REMINDER_TAGIHAN,
         ],
+        'tagihan_pengerjaan' => [
+            'nama' => 'Tagihan Setelah Pengerjaan Selesai',
+            'isi' => self::DEFAULT_TAGIHAN_PENGERJAAN,
+        ],
+        'reminder_servis' => [
+            'nama' => 'Pengingat Servis Berkala',
+            'isi' => self::DEFAULT_REMINDER_SERVIS,
+        ],
         'laporan_pengerjaan' => [
             'nama' => 'Notifikasi Laporan Pengerjaan',
             'isi' => self::DEFAULT_LAPORAN_PENGERJAAN,
@@ -93,6 +118,9 @@ class WaTemplateService
         'total',
         'tautan_invoice',
         'nomor_order',
+        'interval',
+        'tanggal_terakhir',
+        'tautan_resi',
     ];
 
     public function placeholderList(): string

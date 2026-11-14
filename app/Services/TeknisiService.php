@@ -10,10 +10,12 @@ use App\Enums\PaymentStatus;
 use App\Enums\RoleName;
 use App\Enums\ServiceType;
 use App\Exceptions\BusinessRuleException;
+use App\Jobs\KirimLaporanOtomatisJob;
 use App\Jobs\KirimNotifWaJob;
 use App\Models\Attendance;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderKendalaBukti;
 use App\Models\OrderPhoto;
 use App\Models\StockItem;
 use App\Models\User;
@@ -297,6 +299,8 @@ class TeknisiService
             // Resi publik tersedia begitu order selesai (B14a).
             if ($order->status === OrderStatus::Selesai) {
                 $order->pastikanResiToken();
+                // Revisi 14 Nov 2026 poin 18: laporan (+ invoice bila ada) terkirim otomatis ke WA customer.
+                KirimLaporanOtomatisJob::antre($order);
             }
 
             // B21: attendance terbuka seluruh anggota yang hadir ikut ditutup,
@@ -614,10 +618,27 @@ class TeknisiService
      *  - sore: pending tapi bisa dikerjakan sore. Status TETAP aktif supaya masih
      *    bisa dikerjakan nanti, tetapi titik berikutnya langsung terbuka.
      */
-    public function tandaiKendala(Order $order, User $teknisi, string $alasan, string $jenis = self::KENDALA_BESOK): Order
-    {
+    public function tandaiKendala(
+        Order $order,
+        User $teknisi,
+        string $alasan,
+        string $jenis = self::KENDALA_BESOK,
+        ?string $buktiPath = null,
+        ?string $pihak = null,
+        bool $wajibBukti = false,
+    ): Order {
         $this->pastikanAnggota($order, $teknisi);
         $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        // Revisi 14 Nov 2026 poin 17: kendala wajib disertai bukti sudah diberi tahu ke customer.
+        if ($wajibBukti) {
+            if (! filled($buktiPath)) {
+                throw new BusinessRuleException('Bukti (screenshot/dokumentasi) bahwa kendala sudah disampaikan ke customer wajib dilampirkan.');
+            }
+            if (! in_array($pihak, OrderKendalaBukti::PIHAK, true)) {
+                throw new BusinessRuleException('Pilih sumber kendala: dari sisi customer atau dari sisi teknisi.');
+            }
+        }
 
         if (! in_array($order->status, [OrderStatus::Terjadwal, OrderStatus::MenujuLokasi, OrderStatus::Dikerjakan], true)) {
             throw new BusinessRuleException('Order harus berstatus terjadwal/menuju lokasi/dikerjakan untuk ditandai terkendala.');
@@ -632,7 +653,17 @@ class TeknisiService
             throw new BusinessRuleException('Alasan kendala wajib diisi.');
         }
 
-        return DB::transaction(function () use ($order, $alasan, $jenis): Order {
+        return DB::transaction(function () use ($order, $alasan, $jenis, $buktiPath, $pihak, $teknisi): Order {
+            if (filled($buktiPath) || filled($pihak)) {
+                $order->kendalaBuktis()->create([
+                    'user_id' => $teknisi->id,
+                    'jenis' => $jenis,
+                    'pihak' => in_array($pihak, OrderKendalaBukti::PIHAK, true) ? $pihak : null,
+                    'alasan' => $alasan,
+                    'foto_path' => $buktiPath,
+                ]);
+            }
+
             $label = $jenis === self::KENDALA_SORE ? 'KENDALA - PENDING SORE' : 'KENDALA';
             $order->jenis_kendala = $jenis;
             $order->alasan_kendala = $alasan;

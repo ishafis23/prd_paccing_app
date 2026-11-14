@@ -153,6 +153,23 @@
                     @enderror
                 </div>
 
+                {{-- Foto bukti (revisi 14 Nov 2026 poin 4) --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        Foto Bukti @if (config('expense.foto_wajib') && $editId === null)<span class="text-red-600">*</span>@endif
+                    </label>
+                    <input type="file" wire:model="foto" accept="image/*"
+                        class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-semibold file:text-blue-700">
+                    <div wire:loading wire:target="foto" class="mt-1 text-xs text-gray-500">Mengunggah foto…</div>
+                    @if ($foto)
+                        <img src="{{ $foto->temporaryUrl() }}" alt="Pratinjau bukti" class="mt-2 h-24 w-24 rounded-lg object-cover ring-1 ring-gray-200">
+                    @endif
+                    <p class="mt-1 text-[11px] text-gray-400">Foto yang sama tidak bisa dipakai dua kali. Waktu foto dicap otomatis.</p>
+                    @error('foto')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 {{-- Action buttons --}}
                 <div class="flex gap-2">
                     <button

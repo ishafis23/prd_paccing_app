@@ -18,13 +18,16 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:api-login');
 
-    Route::middleware(['auth:sanctum', 'api.teknisi', 'throttle:api'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'api.teknisi', 'throttle:api', \App\Http\Middleware\CapWaktuFotoUnggahan::class])->group(function (): void {
         // Sesi, profil, perangkat push
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/akun/foto-profil', [AuthController::class, 'fotoProfil'])->middleware('throttle:api-tulis');
         Route::post('/perangkat', [AuthController::class, 'daftarPerangkat']);
         Route::delete('/perangkat/{token}', [AuthController::class, 'hapusPerangkat']);
+
+        // Ulasan customer atas pekerjaan teknisi login (revisi 14 Nov 2026 poin 8)
+        Route::get('/ulasan', [JadwalController::class, 'ulasan']);
 
         // Administrasi (banner & penahan berangkat)
         Route::get('/administrasi', [KeuanganController::class, 'administrasi']);
@@ -52,13 +55,16 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/material/opsi', [LaporanController::class, 'opsiMaterial']);
         Route::get('/order/{order}', [OrderController::class, 'show'])->whereNumber('order');
 
-        Route::middleware('throttle:api-tulis')->whereNumber(['order', 'item', 'unit', 'foto', 'id'])->group(function (): void {
+        Route::middleware('throttle:api-tulis')->whereNumber(['order', 'item', 'unit', 'foto', 'id', 'video'])->group(function (): void {
             Route::post('/order/{order}/berangkat', [OrderController::class, 'berangkat']);
             Route::post('/order/{order}/lokasi', [OrderController::class, 'lokasi']);
             Route::post('/order/{order}/check-in', [OrderController::class, 'checkIn']);
             Route::post('/order/{order}/kendala', [OrderController::class, 'kendala']);
             Route::post('/order/{order}/perbaikan', [OrderController::class, 'perbaikan']);
             Route::post('/order/{order}/tutup', [OrderController::class, 'tutup']);
+            Route::post('/order/{order}/video', [OrderController::class, 'tambahVideo']);
+            Route::delete('/order/{order}/video/{video}', [OrderController::class, 'hapusVideo']);
+            Route::post('/order/{order}/interval-servis', [OrderController::class, 'intervalServis']);
 
             Route::post('/order/{order}/layanan', [OrderController::class, 'tambahLayanan']);
             Route::delete('/order/{order}/layanan/{item}', [OrderController::class, 'hapusLayanan']);

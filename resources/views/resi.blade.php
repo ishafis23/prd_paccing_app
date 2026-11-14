@@ -245,6 +245,42 @@
         </div>
     @endif
 
+    {{-- Ulasan customer (revisi 14 Nov 2026 poin 8) --}}
+    @if (($ulasan ?? null) !== null || ($bisaMengulas ?? false))
+        <section class="mt-6 rounded-lg bg-sky-50 p-4 ring-1 ring-sky-100">
+            <h3 class="text-sm font-bold text-sky-800">Penilaian Pekerjaan</h3>
+
+            @if (session('ulasan_status'))
+                <p class="mt-2 rounded-md bg-green-100 p-2 text-sm font-medium text-green-800">{{ session('ulasan_status') }}</p>
+            @endif
+            @if (session('ulasan_error') || $errors->any())
+                <p class="mt-2 rounded-md bg-red-100 p-2 text-sm font-medium text-red-700">{{ session('ulasan_error') ?? $errors->first() }}</p>
+            @endif
+
+            @if ($ulasan ?? null)
+                <p class="mt-2 text-2xl tracking-widest text-amber-500" aria-label="{{ $ulasan->rating }} dari 5 bintang">{{ str_repeat('★', $ulasan->rating) }}<span class="text-gray-300">{{ str_repeat('★', 5 - $ulasan->rating) }}</span></p>
+                @if (filled($ulasan->komentar))
+                    <p class="mt-1 whitespace-pre-line text-sm text-gray-700">{{ $ulasan->komentar }}</p>
+                @endif
+                <p class="mt-1 text-xs text-gray-500">Terima kasih, penilaian Anda sudah kami terima.</p>
+            @else
+                <p class="mt-1 text-xs text-gray-600">Bagaimana pekerjaan teknisi kami{{ $teknisi?->name ? ' ('.$teknisi->name.')' : '' }}?</p>
+                <form method="POST" action="{{ route('resi.ulasan', ['order' => $order->id, 'token' => $order->resi_token]) }}" class="mt-3 space-y-3">
+                    @csrf
+                    <div class="flex flex-row-reverse justify-end gap-1 text-3xl">
+                        @for ($i = 5; $i >= 1; $i--)
+                            <input type="radio" name="rating" id="bintang{{ $i }}" value="{{ $i }}" class="peer sr-only" required @checked(old('rating') == $i)>
+                            <label for="bintang{{ $i }}" class="cursor-pointer text-gray-300 peer-checked:text-amber-500 hover:text-amber-400 [&:has(~label:hover)]:text-amber-400 peer-hover:text-amber-400" title="{{ $i }} bintang">★</label>
+                        @endfor
+                    </div>
+                    <textarea name="komentar" rows="3" maxlength="1000" placeholder="Komentar (opsional)"
+                        class="block w-full rounded-lg border border-gray-200 p-2 text-sm">{{ old('komentar') }}</textarea>
+                    <button type="submit" class="w-full rounded-lg bg-sky-600 px-4 py-2 text-sm font-bold text-white">Kirim Penilaian</button>
+                </form>
+            @endif
+        </section>
+    @endif
+
     {{-- Footer --}}
     <footer class="mt-6 border-t border-gray-200 pt-3 text-center">
         <p class="text-xs font-semibold text-sky-700">Paccing — Perawatan AC Profesional</p>

@@ -25,6 +25,10 @@ return [
     'notif_berangkat' => (bool) env('WA_NOTIF_BERANGKAT', true),
     'notif_lunas' => (bool) env('WA_NOTIF_LUNAS', false),
     'notif_laporan' => (bool) env('WA_NOTIF_LAPORAN', true),
+    // Revisi 14 Nov 2026 poin 18: begitu order selesai/lunas, kirim OTOMATIS laporan pengerjaan
+    // + invoice (belum bayar) / kuitansi (sudah bayar) ke WA customer. Default MATI: nyalakan
+    // sadar di produksi (WA_NOTIF_OTOMATIS_SELESAI=true); uji dulu dengan WA_TEST_TARGET.
+    'notif_otomatis_selesai' => (bool) env('WA_NOTIF_OTOMATIS_SELESAI', false),
 
     // MODE UJI: bila diisi, SEMUA notifikasi otomatis ke customer diarahkan
     // ke nomor ini (mis. nomor admin) — untuk uji coba. Kosongkan di produksi.

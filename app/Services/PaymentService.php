@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Enums\CustomerJenis;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\ReminderStatus;
 use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
+use App\Jobs\KirimLaporanOtomatisJob;
 use App\Models\Income;
 use App\Models\Order;
 use App\Models\OrderTotalCorrection;
@@ -371,6 +371,9 @@ class PaymentService
         }
 
         $this->buatReminder($order, $payment);
+
+        // Revisi 14 Nov 2026 poin 18: setelah lunas, kuitansi (invoice berstatus bayar) ikut terkirim otomatis.
+        KirimLaporanOtomatisJob::antre($order);
     }
 
     private function catatIncome(Order $order, Payment $payment): void
@@ -405,7 +408,8 @@ class PaymentService
         // dev-plan/12 §3.6: interval ikut kategori customer, bukan angka
         // tetap dari katalog — rumahan/perorangan 3 bulan, company
         // (sekolah/kantor dll) 1 bulan (lebih sering butuh servis berkala).
-        $interval = $order->customer?->jenis === CustomerJenis::Company ? 1 : 3;
+        // Revisi 14 Nov 2026: pilihan teknisi (orders.interval_servis_bulan) menimpa default.
+        [$interval, $sumber] = app(ServiceReminderService::class)->intervalUntuk($order);
 
         $tanggalBayar = CarbonImmutable::parse($payment->tanggal_bayar ?? now());
 
@@ -413,6 +417,7 @@ class PaymentService
             'customer_id' => $order->customer_id,
             'order_id' => $order->id,
             'interval_bulan' => $interval,
+            'sumber_interval' => $sumber,
             'tanggal_servis_berikutnya' => $tanggalBayar->addMonthsNoOverflow($interval)->toDateString(),
             'status_notice' => ReminderStatus::BelumJatuhTempo,
         ]);

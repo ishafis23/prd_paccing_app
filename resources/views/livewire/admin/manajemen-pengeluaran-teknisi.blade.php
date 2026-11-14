@@ -186,6 +186,7 @@
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Kategori</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Tanggal</th>
                         <th class="px-4 py-2 text-right text-xs font-semibold text-gray-600">Nominal</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Bukti</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Status</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Aksi</th>
                     </tr>
@@ -213,6 +214,18 @@
                             </td>
                             <td class="px-4 py-2 text-right text-xs font-bold text-gray-900">
                                 {{ $this->formatRupiah($expense->nominal) }}
+                            </td>
+                            <td class="px-4 py-2 text-xs">
+                                @if ($expense->fotoUrl())
+                                    <a href="{{ $expense->fotoUrl() }}" target="_blank" rel="noopener">
+                                        <img src="{{ $expense->fotoUrl() }}" alt="Bukti pengeluaran" class="h-12 w-12 rounded-lg object-cover ring-1 ring-gray-200">
+                                    </a>
+                                    @if ($expense->foto_diunggah_pada)
+                                        <p class="mt-0.5 text-[10px] text-gray-400">{{ $expense->foto_diunggah_pada->format('d M H:i') }}</p>
+                                    @endif
+                                @else
+                                    <span class="text-[11px] text-gray-400">Tanpa foto</span>
+                                @endif
                             </td>
                             <td class="px-4 py-2">
                                 @php

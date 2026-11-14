@@ -240,3 +240,109 @@ it('riwayat: filter nama customer dan paginasi', function () {
     $filter = $this->getJson('/api/v1/riwayat?q='.urlencode((string) $o->customer->nama))->assertOk();
     expect(collect($filter->json('data'))->pluck('id')->all())->toContain($o->id);
 });
+
+it('riwayat memuat tanggal_tampil, urut & saring menurut tanggal pengerjaan (bukan updated_at)', function () {
+    $lama = ($this->buatOrder)(1, OrderStatus::Selesai);
+    $lama->update(['tanggal_jadwal' => '2026-11-03', 'jam_jadwal' => '09:00']);
+    $baru = ($this->buatOrder)(1, OrderStatus::Selesai);
+    $baru->update(['tanggal_jadwal' => '2026-11-10', 'jam_jadwal' => '08:00']);
+    // Menyentuh order lama tidak boleh mengubah urutan/tanggalnya.
+    $lama->touch();
+    Sanctum::actingAs($this->teknisi);
+
+    $res = $this->getJson('/api/v1/riwayat')->assertOk();
+    expect(collect($res->json('data'))->pluck('id')->all())->toBe([$baru->id, $lama->id])
+        ->and($res->json('data.0.tanggal_tampil'))->toBe('Sel, 10 Nov 2026');
+
+    $filter = $this->getJson('/api/v1/riwayat?tanggal=2026-11-03')->assertOk();
+    expect(collect($filter->json('data'))->pluck('id')->all())->toBe([$lama->id]);
+
+    $bulan = $this->getJson('/api/v1/riwayat?bulan=2026-11')->assertOk();
+    expect($bulan->json('meta.total'))->toBe(2);
+});
+
+it('kendala wajib bukti + pihak saat KENDALA_BUKTI_WAJIB aktif; bukti tersimpan sebagai riwayat dan tampil di detail', function () {
+    config(['kendala.bukti_wajib' => true]);
+    $order = ($this->buatOrder)(1, OrderStatus::Terjadwal);
+    Sanctum::actingAs($this->teknisi);
+
+    // Tanpa bukti / tanpa pihak -> ditolak, status tidak berubah.
+    $this->postJson("/api/v1/order/{$order->id}/kendala", ['alasan' => 'AC rusak'])->assertStatus(422);
+    expect($order->fresh()->status)->toBe(OrderStatus::Terjadwal);
+
+    $this->post("/api/v1/order/{$order->id}/kendala", [
+        'alasan' => 'Customer tidak di rumah', 'jenis' => 'besok', 'pihak' => 'customer', 'bukti' => ($this->foto)('chat.jpg'),
+    ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('data.kendala_bukti.pihak', 'customer')
+        ->assertJsonPath('data.kendala_bukti.alasan', 'Customer tidak di rumah');
+
+    $bukti = $order->kendalaBuktis()->first();
+    expect($order->fresh()->status)->toBe(OrderStatus::Terkendala)
+        ->and($bukti->foto_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($bukti->foto_path);
+});
+
+it('kendala gagal (status tidak valid) tidak meninggalkan file bukti yatim', function () {
+    config(['kendala.bukti_wajib' => true]);
+    $order = ($this->buatOrder)(1, OrderStatus::Selesai);
+    Sanctum::actingAs($this->teknisi);
+
+    $this->post("/api/v1/order/{$order->id}/kendala", [
+        'alasan' => 'x', 'pihak' => 'teknisi', 'bukti' => ($this->foto)('chat.jpg'),
+    ], ['Accept' => 'application/json'])->assertStatus(422);
+
+    expect(Storage::disk('public')->allFiles('kendala-bukti'))->toBeEmpty();
+});
+
+it('kendala pending sore lewat API (jenis=sore) tidak mengubah status', function () {
+    $order = ($this->buatOrder)(1, OrderStatus::Terjadwal);
+    Sanctum::actingAs($this->teknisi);
+
+    $this->postJson("/api/v1/order/{$order->id}/kendala", ['alasan' => 'Hujan', 'jenis' => 'sore'])->assertOk();
+
+    expect($order->fresh()->status)->toBe(OrderStatus::Terjadwal)
+        ->and($order->fresh()->jenis_kendala)->toBe('sore');
+});
+
+it('jadwal memuat urutan titik + status terkunci; pending sore membuka titik berikutnya; wa_url customer', function () {
+    $t1 = \App\Models\Titik::factory()->create(['nama' => 'Titik 1', 'urutan' => 1, 'jam' => '08:15:00']);
+    $t2 = \App\Models\Titik::factory()->create(['nama' => 'Titik 2', 'urutan' => 2, 'jam' => '09:30:00']);
+
+    $o1 = ($this->buatOrder)(1, OrderStatus::Terjadwal);
+    $o1->update(['titik_id' => $t1->id]);
+    $o2 = ($this->buatOrder)(1, OrderStatus::Terjadwal);
+    $o2->update(['titik_id' => $t2->id]);
+    $o2->customer->update(['no_hp' => '0812-3456-7890']);
+    Sanctum::actingAs($this->teknisi);
+
+    $res = $this->getJson('/api/v1/jadwal')->assertOk();
+    $baris = collect($res->json('data.jadwal'))->keyBy('id');
+    expect($baris[$o1->id]['titik']['urutan'])->toBe(1)
+        ->and($baris[$o1->id]['terkunci'])->toBeFalse()
+        ->and($baris[$o2->id]['terkunci'])->toBeTrue()
+        ->and($baris[$o2->id]['terkunci_oleh'])->toBe('Titik 1')
+        ->and($baris[$o2->id]['pesan_terkunci'])->toContain('Selesaikan Titik 1')
+        ->and($baris[$o2->id]['customer']['wa_url'])->toBe('https://wa.me/6281234567890');
+
+    // Detail ikut memuat kunci; berangkat ke titik terkunci ditolak.
+    $this->getJson("/api/v1/order/{$o2->id}")->assertOk()->assertJsonPath('data.terkunci', true);
+    $this->postJson("/api/v1/order/{$o2->id}/berangkat")->assertStatus(422);
+
+    // Titik 1 pending sore -> titik 2 terbuka.
+    $this->postJson("/api/v1/order/{$o1->id}/kendala", ['alasan' => 'Hujan', 'jenis' => 'sore'])->assertOk();
+    $baru = collect($this->getJson('/api/v1/jadwal')->json('data.jadwal'))->keyBy('id');
+    expect($baru[$o2->id]['terkunci'])->toBeFalse();
+});
+
+it('riwayat memuat catatan_pengerjaan teknisi', function () {
+    $order = ($this->buatOrder)(1, OrderStatus::Selesai);
+    \App\Models\WorkReport::create([
+        'order_id' => $order->id, 'teknisi_id' => $this->teknisi->id, 'catatan_pengerjaan' => 'Cuci standar, besok lanjut outdoor',
+        'waktu_mulai' => now(), 'waktu_selesai' => now(),
+    ]);
+    Sanctum::actingAs($this->teknisi);
+
+    $this->getJson('/api/v1/riwayat')->assertOk()
+        ->assertJsonPath('data.0.catatan_pengerjaan', 'Cuci standar, besok lanjut outdoor');
+});
