@@ -111,7 +111,7 @@ class OrderController extends Controller
         try {
             if ($request->hasFile('bukti')) {
                 app(StorageQuotaService::class)->pastikanCukup((int) $request->file('bukti')->getSize());
-                $path = $request->file('bukti')->store('kendala-bukti', 'public');
+                $path = app(\App\Services\FotoJpgService::class)->simpan($request->file('bukti'), 'kendala-bukti');
                 StorageQuotaService::lupakanCache();
             }
 
@@ -128,6 +128,27 @@ class OrderController extends Controller
             if ($path !== null) {
                 Storage::disk('public')->delete($path);
             }
+            throw $e;
+        }
+
+        return $this->detail($request, $order);
+    }
+
+    /** Poin 24: bukti susulan (screenshot chat) untuk order yang sudah pending/terkendala. Disimpan sebagai JPG. */
+    public function buktiKendala(Request $request, int $order): JsonResponse
+    {
+        $request->validate(['bukti' => ['required', 'image', 'max:5120']]);
+
+        $orderModel = $this->cariOrder($request, $order, tulis: true);
+        app(StorageQuotaService::class)->pastikanCukup((int) $request->file('bukti')->getSize());
+        $path = app(\App\Services\FotoJpgService::class)->simpan($request->file('bukti'), 'kendala-bukti');
+        StorageQuotaService::lupakanCache();
+
+        try {
+            app(\App\Services\FotoTimestampService::class)->tempelPath($path);
+            app(TeknisiService::class)->tambahBuktiKendala($orderModel, $request->user(), $path);
+        } catch (\Throwable $e) {
+            Storage::disk('public')->delete($path);
             throw $e;
         }
 

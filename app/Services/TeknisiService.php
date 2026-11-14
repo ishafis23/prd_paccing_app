@@ -693,6 +693,39 @@ class TeknisiService
     }
 
     /**
+     * Revisi 14 Nov 2026 poin 24 — tambah bukti SUSULAN (screenshot chat) bahwa customer sudah
+     * diinfokan, untuk order yang sudah ditandai pending/terkendala (mis. ditandai sebelum
+     * bukti diwajibkan). Tidak mengubah status order.
+     */
+    public function tambahBuktiKendala(Order $order, User $teknisi, string $buktiPath): OrderKendalaBukti
+    {
+        $this->pastikanAnggota($order, $teknisi);
+        $this->assertRole($teknisi, [RoleName::Teknisi]);
+
+        if (blank($order->jenis_kendala)) {
+            throw new BusinessRuleException('Order ini tidak sedang ditandai pending/terkendala.');
+        }
+
+        if (! in_array($order->status, [OrderStatus::Terjadwal, OrderStatus::MenujuLokasi, OrderStatus::Dikerjakan, OrderStatus::Terkendala], true)) {
+            throw new BusinessRuleException('Bukti hanya bisa ditambahkan selama order masih pending/terkendala.');
+        }
+
+        if (blank($buktiPath)) {
+            throw new BusinessRuleException('Lampirkan gambar bukti.');
+        }
+
+        $terakhir = $order->kendalaBuktis()->whereNotNull('pihak')->latest('id')->first();
+
+        return $order->kendalaBuktis()->create([
+            'user_id' => $teknisi->id,
+            'jenis' => $order->jenis_kendala,
+            'pihak' => $terakhir?->pihak,
+            'alasan' => $order->alasan_kendala,
+            'foto_path' => $buktiPath,
+        ]);
+    }
+
+    /**
      * Tombol "Ada Perbaikan" (dev-plan/13 §2): teknisi lapor kebutuhan
      * sparepart/perbaikan tambahan yg sudah dibicarakan dgn customer.
      * Beda dari tandaiKendala — order TETAP `dikerjakan`, cuma menambah

@@ -246,6 +246,30 @@
                 <x-heroicon-o-clock class="h-5 w-5" /> Pending — dikerjakan sore
             </p>
             <p class="mt-1 text-sm text-amber-900/80">{{ $order->alasan_kendala }}</p>
+
+            {{-- Poin 24: bukti (screenshot chat) bahwa customer sudah diinfokan; disimpan sebagai JPG. --}}
+            @php $buktiPending = $order->kendalaBuktis()->whereNotNull('foto_path')->latest('id')->get(); @endphp
+            <div class="mt-3 border-t border-amber-200 pt-3">
+                @if ($buktiPending->isEmpty())
+                    <p class="text-xs font-semibold text-red-600">Belum ada bukti customer sudah diinfokan. Unggah screenshot chat.</p>
+                @else
+                    <p class="text-xs font-semibold text-emerald-700">{{ $buktiPending->count() }} bukti sudah diunggah</p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @foreach ($buktiPending as $b)
+                            <a href="{{ $b->fotoUrl() }}" target="_blank" rel="noopener">
+                                <img src="{{ $b->fotoUrl() }}" alt="Bukti pending" class="h-16 w-16 rounded-lg object-cover ring-1 ring-amber-200">
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+
+                <label class="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-bold text-amber-700 ring-1 ring-amber-300 active:bg-amber-100">
+                    <x-heroicon-o-camera class="h-4 w-4" /> Unggah bukti (screenshot chat, JPG)
+                    <input type="file" wire:model="buktiPending" accept="image/*" class="hidden">
+                </label>
+                <div wire:loading wire:target="buktiPending" class="mt-1 text-xs text-gray-500">Mengunggah…</div>
+                @error('buktiPending') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
         </div>
     @endif
 

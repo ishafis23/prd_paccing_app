@@ -52,6 +52,9 @@ class OrderDetail extends Component
     /** Bukti kendala sudah disampaikan ke customer (revisi 14 Nov 2026 poin 17). */
     public $buktiKendala = null;
 
+    /** Bukti susulan (screenshot chat) pada order yang sudah pending — poin 24. */
+    public $buktiPending = null;
+
     public string $pihakKendala = '';
 
     public string $catatanPerbaikan = '';
@@ -715,7 +718,7 @@ class OrderDetail extends Component
 
         try {
             if ($this->buktiKendala !== null) {
-                $path = $this->buktiKendala->store('kendala-bukti', 'public');
+                $path = app(\App\Services\FotoJpgService::class)->simpan($this->buktiKendala, 'kendala-bukti');
                 app(\App\Services\FotoTimestampService::class)->tempelPath($path);
             }
 
@@ -729,6 +732,39 @@ class OrderDetail extends Component
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
             }
             session()->flash('error', $e->getMessage());
+        }
+    }
+
+    /** Otomatis tersimpan begitu teknisi memilih gambar di kartu Pending. */
+    public function updatedBuktiPending(): void
+    {
+        $this->unggahBuktiPending();
+    }
+
+    public function unggahBuktiPending(): void
+    {
+        $this->validate(['buktiPending' => ['required', 'image', 'max:5120']], [
+            'buktiPending.required' => 'Pilih gambar bukti (screenshot chat) dulu.',
+            'buktiPending.image' => 'Bukti harus berupa gambar.',
+            'buktiPending.max' => 'Ukuran gambar maksimal 5 MB.',
+        ]);
+
+        $path = null;
+
+        try {
+            $path = app(\App\Services\FotoJpgService::class)->simpan($this->buktiPending, 'kendala-bukti');
+            app(\App\Services\FotoTimestampService::class)->tempelPath($path);
+
+            app(TeknisiService::class)->tambahBuktiKendala($this->order, auth()->user(), $path);
+            session()->flash('status', 'Bukti tersimpan: customer sudah diinfokan.');
+            $this->order->unsetRelation('kendalaBuktis');
+        } catch (BusinessRuleException|AuthorizationException $e) {
+            if ($path !== null) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+            }
+            session()->flash('error', $e->getMessage());
+        } finally {
+            $this->reset('buktiPending');
         }
     }
 

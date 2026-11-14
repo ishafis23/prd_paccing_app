@@ -60,6 +60,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/order/{order}/lokasi', [OrderController::class, 'lokasi']);
             Route::post('/order/{order}/check-in', [OrderController::class, 'checkIn']);
             Route::post('/order/{order}/kendala', [OrderController::class, 'kendala']);
+            Route::post('/order/{order}/kendala/bukti', [OrderController::class, 'buktiKendala']);
             Route::post('/order/{order}/perbaikan', [OrderController::class, 'perbaikan']);
             Route::post('/order/{order}/tutup', [OrderController::class, 'tutup']);
             Route::post('/order/{order}/video', [OrderController::class, 'tambahVideo']);
