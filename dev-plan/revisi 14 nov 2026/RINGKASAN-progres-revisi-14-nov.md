@@ -12,7 +12,7 @@ Status sisi **backend, API, admin, dan portal web**. Sisi **app mobile** ada di 
 | 6 | Capaian Games 5/6 | App | API `GET /capaian` dan `games()` sudah ada. |
 | 7 | Cara cek posisi teknisi | Selesai | Lihat `PANDUAN-uji-peta-teknisi.md`. |
 | 8 | Ulasan customer | Selesai | Form bintang + komentar di halaman resi publik (link yang sama dengan dokumentasi). Satu ulasan per order. Admin: menu **Ulasan Customer**. API: `GET /ulasan`. Link resi ikut di WA laporan (`{tautan_resi}`). |
-| 9a | Pelacakan hanya antara absen datang dan pulang | Selesai (API) | `absensi/hari-ini` mengirim `lacak_aktif`. App harus mengikutinya. Server tetap menerima titik terlambat (keputusan commit sebelumnya). |
+| 9a | Pelacakan GPS | Keputusan: sejak login sampai logout | Diputuskan 14 Nov 2026: GPS menyala sejak login (bukan hanya antara absen datang-pulang) dan izin lokasi diminta saat pertama masuk (poin 1). Flag `lacak_aktif` tetap dikirim API tetapi **tidak dipakai** app. |
 | 9b/14 | Kunci urutan titik | Diverifikasi | Sudah berfungsi dan kini diuji termasuk pending-sore. API mengirim `terkunci`, `terkunci_oleh`, `pesan_terkunci`. |
 | 10 | Tanggal di Riwayat Pengerjaan | Selesai (API) | `tanggal_tampil`; filter dan urutan menurut tanggal pengerjaan. |
 | 11 | Foto setoran tunai | Sudah ada | Foto wajib, `foto_url` di API, tampil di admin. Tinggal app menampilkannya. |

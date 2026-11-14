@@ -10,7 +10,7 @@ Bisa dibuka Admin, Finance, dan HR.
    - **Live**: update terakhir kurang dari 5 menit lalu.
    - **Basi**: lebih dari 5 menit tanpa update.
    - **Terakhir / Di luar jam kerja**: teknisi belum absen datang atau sudah absen pulang.
-4. **Aturan 9a:** app hanya melacak ketika `GET /api/v1/absensi/hari-ini` mengembalikan `lacak_aktif: true`, yaitu setelah absen datang dan sebelum absen pulang. Server tetap menerima titik yang terlambat tiba (maks. 7 hari, tidak boleh di masa depan) supaya antrean offline tidak hilang.
+4. **Keputusan 9a (14 Nov 2026):** GPS menyala sejak teknisi login sampai logout, tidak menunggu absen datang. Saat pertama masuk app meminta izin lokasi (poin 1). `lacak_aktif` di `absensi/hari-ini` tetap ada tetapi tidak dipakai app. Server menerima titik yang terlambat tiba (maks. 7 hari, tidak boleh di masa depan) supaya antrean offline tidak hilang.
 
 ## Skenario uji (butuh 1 HP teknisi + 1 laptop admin)
 
