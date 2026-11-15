@@ -258,6 +258,8 @@ class Presenter
         return self::orderRingkas($order) + self::kunciTitik($order, $teknisi) + [
             'catatan_admin' => $order->catatan_admin,
             'alasan_kendala' => $order->alasan_kendala,
+            'jenis_kendala' => $order->jenis_kendala,
+            'interval_servis_bulan' => $order->interval_servis_bulan === null ? null : (int) $order->interval_servis_bulan,
             'kendala_bukti' => ($kb = $order->kendalaBuktis->first()) === null ? null : [
                 'jenis' => $kb->jenis,
                 'pihak' => $kb->pihak,

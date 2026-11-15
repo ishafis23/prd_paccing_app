@@ -98,7 +98,10 @@ class KeuanganController extends Controller
     {
         $request->validate(['bulan' => ['nullable', 'date_format:Y-m']]);
 
-        return response()->json(['data' => $this->keuangan->capaian($request->user(), $request->input('bulan'))]);
+        return response()->json(['data' => $this->keuangan->capaian($request->user(), $request->input('bulan')) + [
+            // Revisi 14 Nov poin 6: akumulasi capaian Games bulan berjalan (sama dengan kartu di web).
+            'games_bulan_ini' => app(\App\Services\TechnicianIncentiveService::class)->jumlahGamesBulan($request->user(), now()),
+        ]]);
     }
 
     /** Ledger insentif/denda sendiri per bulan. */
