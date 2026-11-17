@@ -1,33 +1,61 @@
 <x-filament-panels::page>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        function petaTeknisi(markers, center, zoom) {
+        // Leaflet dimuat dinamis (sekali) sehingga peta tetap tampil walau skrip
+        // tidak tereksekusi ulang saat halaman di-render ulang oleh Livewire.
+        window.muatLeaflet = window.muatLeaflet || function () {
+            if (window.L) return Promise.resolve();
+            if (window._leafletPromise) return window._leafletPromise;
+
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(css);
+
+            window._leafletPromise = new Promise((ok, gagal) => {
+                const js = document.createElement('script');
+                js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                js.onload = ok;
+                js.onerror = () => { window._leafletPromise = null; gagal(new Error('Leaflet gagal dimuat')); };
+                document.head.appendChild(js);
+            });
+
+            return window._leafletPromise;
+        };
+
+        window.petaTeknisi = window.petaTeknisi || function (markers, center, zoom) {
             return {
                 map: null,
-                layer: null,
-                init() {
-                    this.map = L.map(this.$el).setView(center, zoom);
+                gagal: false,
+                async init() {
+                    try {
+                        await window.muatLeaflet();
+                    } catch (e) {
+                        this.gagal = true;
+                        return;
+                    }
+
+                    this.map = L.map(this.$refs.peta).setView(center, zoom);
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '&copy; OpenStreetMap contributors',
                         maxZoom: 19,
                     }).addTo(this.map);
 
-                    this.layer = L.layerGroup().addTo(this.map);
+                    const layer = L.layerGroup().addTo(this.map);
                     markers.forEach((t) => {
                         L.marker([t.lat, t.lng], { opacity: t.stale ? 0.5 : 1 })
-                            .addTo(this.layer)
+                            .addTo(layer)
                             .bindPopup(
                                 `<b>${t.nama}</b><br>${t.customer}<br>${t.alamat}`
                                 + `<br><small>${t.stale ? 'Sinyal terakhir (basi): ' : 'Update: '}${t.updated_label}</small>`
                             );
                     });
+                    setTimeout(() => this.map && this.map.invalidateSize(), 200);
                 },
                 destroy() {
                     if (this.map) this.map.remove();
                 },
             };
-        }
+        };
     </script>
 
     <div class="space-y-5" wire:poll.20s>
@@ -42,12 +70,12 @@
                     Belum ada teknisi yang pernah mengirim GPS. Posisi muncul setelah teknisi membuka app saat jam kerja.
                 </p>
             @else
-                <div
-                    wire:key="peta-teknisi-map-{{ $markersKey }}"
-                    x-data="petaTeknisi(@js($markers), @js($center), {{ $zoom }})"
-                    x-init="init()"
-                    class="mt-3 h-[420px] w-full overflow-hidden rounded-xl ring-1 ring-gray-100"
-                ></div>
+                <div wire:key="peta-teknisi-map-{{ $markersKey }}" x-data="petaTeknisi(@js($markers), @js($center), {{ $zoom }})" x-init="init()">
+                    <div x-ref="peta" class="mt-3 h-[420px] w-full overflow-hidden rounded-xl ring-1 ring-gray-100"></div>
+                    <p x-show="gagal" x-cloak class="mt-2 text-sm text-rose-600">
+                        Peta gagal dimuat (koneksi ke unpkg.com / openstreetmap.org terblokir?). Daftar teknisi di bawah tetap akurat.
+                    </p>
+                </div>
             @endif
         </div>
 
