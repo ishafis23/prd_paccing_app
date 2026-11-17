@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use Closure;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -23,6 +24,12 @@ class PastikanTeknisiAktif
 
         if (! $user->hasRole(RoleName::Teknisi->value)) {
             return response()->json(['message' => 'Akun ini bukan akun teknisi.', 'code' => 'bukan_teknisi'], 403);
+        }
+
+        // Penanda "sedang membuka app" (waktu server). Ditulis paling sering tiap 30 detik.
+        if ($user->last_seen_at === null || $user->last_seen_at->lt(now()->subSeconds(30))) {
+            DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
+            $user->last_seen_at = now();
         }
 
         return $next($request);

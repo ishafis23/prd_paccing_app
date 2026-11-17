@@ -102,12 +102,29 @@
                                 <p class="truncate text-xs text-gray-500">{{ $t['customer'] }} &middot; {{ $t['alamat'] }}</p>
                             </div>
                             <div class="text-right text-xs">
-                                @if ($t['lat'] === null)
-                                    <span class="font-semibold text-gray-400">Belum ada sinyal GPS</span>
-                                @else
-                                    <span class="font-semibold {{ $t['stale'] ? 'text-amber-600' : 'text-emerald-600' }}">
-                                        {{ $t['stale'] ? ($t['kelompok'] === 2 ? 'Terakhir' : 'Basi') : 'Live' }} &middot; {{ $t['updated_at']?->diffForHumans() }}
-                                    </span>
+                                @php $aktifApp = $t['last_seen_at'] !== null && $t['last_seen_at']->gt(now()->subMinutes(2)); @endphp
+                                {{-- Aplikasi: waktu server saat teknisi terakhir memanggil API --}}
+                                <div>
+                                    @if ($aktifApp)
+                                        <span class="font-semibold text-emerald-600">&#9679; App aktif &middot; {{ $t['last_seen_at']->diffForHumans() }}</span>
+                                    @elseif ($t['last_seen_at'] !== null)
+                                        <span class="font-semibold text-gray-500">App terakhir dibuka &middot; {{ $t['last_seen_at']->diffForHumans() }}</span>
+                                    @else
+                                        <span class="font-semibold text-gray-400">App belum pernah dibuka</span>
+                                    @endif
+                                </div>
+                                {{-- GPS --}}
+                                <div class="mt-0.5">
+                                    @if ($t['lat'] === null)
+                                        <span class="font-semibold text-gray-400">GPS: belum ada sinyal</span>
+                                    @else
+                                        <span class="font-semibold {{ $t['stale'] ? 'text-amber-600' : 'text-emerald-600' }}">
+                                            GPS: {{ $t['stale'] ? ($t['kelompok'] === 2 ? 'Terakhir' : 'Basi') : 'Live' }} &middot; {{ $t['updated_at']?->diffForHumans() }}
+                                        </span>
+                                    @endif
+                                </div>
+                                @if ($aktifApp && ($t['lat'] === null || $t['stale']))
+                                    <div class="mt-0.5 text-[11px] text-rose-600">App aktif tetapi GPS belum masuk &mdash; cek izin lokasi / hemat baterai di HP.</div>
                                 @endif
                             </div>
                         </div>

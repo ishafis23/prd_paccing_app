@@ -13,6 +13,7 @@ use App\Services\StorageQuotaService;
 use App\Support\Api\Presenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -45,6 +46,7 @@ class AuthController extends Controller
         // Satu akun = satu perangkat aktif: login baru mencabut semua token lama (HP sebelumnya
         // otomatis keluar) agar GPS/absen tidak tercampur dari dua HP.
         $user->tokens()->delete();
+        DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
 
         $token = $user->createToken($data['device_name'], ['teknisi'], now()->addDays((int) config('api.token_hari', 90)));
 

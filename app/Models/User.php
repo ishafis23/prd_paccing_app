@@ -54,6 +54,7 @@ class User extends Authenticatable implements FilamentUser
         'last_latitude',
         'last_longitude',
         'last_location_at',
+        'last_seen_at',
     ];
 
     protected $hidden = [
@@ -70,6 +71,7 @@ class User extends Authenticatable implements FilamentUser
             'last_latitude' => 'decimal:7',
             'last_longitude' => 'decimal:7',
             'last_location_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 

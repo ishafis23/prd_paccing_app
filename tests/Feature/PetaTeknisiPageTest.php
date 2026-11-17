@@ -68,7 +68,7 @@ it('teknisi tanpa sinyal gps tetap muncul di daftar dengan status belum ada siny
     $this->actingAs($admin)->get(PetaTeknisi::getUrl())
         ->assertOk()
         ->assertSee($teknisi->name)
-        ->assertSee('Belum ada sinyal GPS');
+        ->assertSee('belum ada sinyal');
 });
 
 it('teknisi dengan sinyal gps terbaru tampil live di daftar & peta', function () {
@@ -109,4 +109,35 @@ it('teknisi dalam jam kerja (absen datang, belum pulang) tanpa order aktif tampi
         ->assertSee($sudahPulang->name)
         ->assertSee($belumAbsen->name)
         ->assertSee('Di luar jam kerja');
+});
+
+it('penanda aktif: API mengisi last_seen_at (waktu server) dan peta menampilkan App aktif', function () {
+    $admin = ptUser(RoleName::Admin->value);
+    $bayu = ptUser(RoleName::Teknisi->value);
+    $bayu->update(['name' => 'Bayu']);
+
+    expect($bayu->fresh()->last_seen_at)->toBeNull();
+
+    Laravel\Sanctum\Sanctum::actingAs($bayu);
+    $this->getJson('/api/v1/absensi/hari-ini', ['Accept' => 'application/json']);
+
+    expect($bayu->fresh()->last_seen_at)->not->toBeNull()
+        ->and($bayu->fresh()->last_seen_at->diffInSeconds(now(), true))->toBeLessThan(5);
+
+    // GPS belum masuk tapi app aktif → peringatan.
+    $this->actingAs($admin, 'web')->get(PetaTeknisi::getUrl())
+        ->assertOk()
+        ->assertSee('App aktif')
+        ->assertSee('App aktif tetapi GPS belum masuk');
+});
+
+it('last_seen_at lama ditampilkan sebagai App terakhir dibuka, bukan aktif', function () {
+    $admin = ptUser(RoleName::Admin->value);
+    $t = ptUser(RoleName::Teknisi->value);
+    $t->update(['last_seen_at' => now()->subHours(3)]);
+
+    $this->actingAs($admin)->get(PetaTeknisi::getUrl())
+        ->assertOk()
+        ->assertSee('App terakhir dibuka')
+        ->assertDontSee('App aktif');
 });
