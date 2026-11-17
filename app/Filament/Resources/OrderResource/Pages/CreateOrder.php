@@ -88,6 +88,18 @@ class CreateOrder extends CreateRecord
                     ->visible(fn (Get $get): bool => $get('mode_pelanggan') !== 'baru')
                     ->live(),
 
+                // Revisi 17 Nov 2026 poin 25: pelanggan terdaftar → jenis (Instansi/Umum)
+                // otomatis dari data customer, tidak perlu dipilih lagi. Hanya pelanggan
+                // baru yang memilih jenis. OrderService fallback ke customer->jenis.
+                Forms\Components\Placeholder::make('jenis_pelanggan_info')
+                    ->label('Jenis Pelanggan')
+                    ->content(fn (Get $get): string => match (Customer::find($get('customer_id'))?->jenis?->value) {
+                        'company' => 'Instansi (otomatis dari data customer)',
+                        'perorangan' => 'Cust Umum (otomatis dari data customer)',
+                        default => 'Pilih customer dulu — jenis terisi otomatis.',
+                    })
+                    ->visible(fn (Get $get): bool => $get('mode_pelanggan') !== 'baru'),
+
                 Forms\Components\Select::make('jenis_pelanggan')
                     ->label('Jenis Pelanggan')
                     ->options([
@@ -95,8 +107,9 @@ class CreateOrder extends CreateRecord
                         'company' => 'Instansi',
                     ])
                     ->helperText('Berlaku utk semua alamat di submission ini. Menentukan wajib/tidaknya bukti pembayaran diupload teknisi.')
-                    ->required()
-                    ->default(fn (Get $get): string => Customer::find($get('customer_id'))?->jenis?->value ?? 'perorangan'),
+                    ->required(fn (Get $get): bool => $get('mode_pelanggan') === 'baru')
+                    ->visible(fn (Get $get): bool => $get('mode_pelanggan') === 'baru')
+                    ->default('perorangan'),
 
                 Forms\Components\Section::make('Data Pelanggan Baru')
                     ->visible(fn (Get $get): bool => $get('mode_pelanggan') === 'baru')
@@ -275,49 +288,16 @@ class CreateOrder extends CreateRecord
                                     ->live()
                                     ->columnSpanFull(),
 
+                                // Revisi 17 Nov 2026 poin 26: bisa dicari. Path relatif
+                                // `../` tidak konsisten ke-resolve di request AJAX pencarian,
+                                // jadi customer/alamat dibaca dari state Livewire lewat
+                                // state-path komponen (data.alamat.{k}.items.{k}.customer_ac_unit_id).
                                 Forms\Components\Select::make('customer_ac_unit_id')
                                     ->label('Pilih Unit AC')
-                                    ->options(function (Get $get) {
-                                        // 4 hop ke root customer_id: lewat index
-                                        // item "items", nama repeater "items",
-                                        // index item "alamat", nama repeater
-                                        // "alamat" — dibuktikan empiris lewat
-                                        // helperText debug (bukan tebakan), sama
-                                        // kasus dgn customer_address_id di atas.
-                                        $customerId = $get('../../../../customer_id');
-                                        if (blank($customerId)) {
-                                            return [];
-                                        }
-
-                                        // customer_address_id boleh kosong (admin
-                                        // memilih "pakai alamat utama customer") —
-                                        // fallback ke alamat utama di sini juga,
-                                        // supaya daftar Unit AC tidak ikut kosong
-                                        // gara-gara alamat tidak dipilih eksplisit.
-                                        // 2 hop: lewat index item "items", nama
-                                        // repeater "items" -> sampai level alamat.{i}
-                                        // tempat customer_address_id berada.
-                                        $alamatId = $get('../../customer_address_id');
-                                        if (blank($alamatId)) {
-                                            $alamatId = Customer::find($customerId)?->alamatUtama()?->id;
-                                        }
-
-                                        if (blank($alamatId)) {
-                                            return [];
-                                        }
-
-                                        return CustomerAcUnit::query()
-                                            ->where('customer_id', $customerId)
-                                            ->where('customer_address_id', $alamatId)
-                                            ->get()
-                                            ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()]);
-                                    })
-                                    // TANPA ->searchable() — sama seperti
-                                    // customer_address_id di atas: path relatif
-                                    // (../../../../customer_id, ../../customer_address_id)
-                                    // tidak konsisten ke-resolve saat request AJAX
-                                    // pencarian terpisah, daftar unit per alamat
-                                    // selalu pendek.
+                                    ->searchable()
+                                    ->options(fn (Forms\Components\Select $component, $livewire): array => $this->unitAcTersimpan($component->getStatePath(), $livewire))
+                                    ->getSearchResultsUsing(fn (string $search, Forms\Components\Select $component, $livewire): array => $this->unitAcTersimpan($component->getStatePath(), $livewire, $search))
+                                    ->getOptionLabelUsing(fn ($value): ?string => CustomerAcUnit::find($value)?->labelTampil())
                                     ->live()
                                     ->visible(fn (Get $get): bool => $get('unit_mode') === 'existing')
                                     ->columnSpanFull(),
@@ -390,6 +370,44 @@ class CreateOrder extends CreateRecord
                             ]),
                     ]),
             ]);
+    }
+
+    /**
+     * Unit AC tersimpan milik customer + alamat blok yang sedang diisi.
+     * Dipakai daftar opsi dan pencarian (kode, ruangan, merek, PK, label).
+     *
+     * @return array<int, string>
+     */
+    public function unitAcTersimpan(string $statePath, $livewire, ?string $cari = null): array
+    {
+        $customerId = data_get($livewire, 'data.customer_id');
+        if (blank($customerId)) {
+            return [];
+        }
+
+        // data.alamat.{k}.items.{k}.customer_ac_unit_id → data.alamat.{k}
+        $bagian = explode('.', $statePath);
+        $alamatPath = implode('.', array_slice($bagian, 0, 3));
+        $alamatId = data_get($livewire, $alamatPath.'.customer_address_id');
+
+        if (blank($alamatId)) {
+            $alamatId = Customer::find($customerId)?->alamatUtama()?->id;
+        }
+
+        if (blank($alamatId)) {
+            return [];
+        }
+
+        $kata = mb_strtolower(trim((string) $cari));
+
+        return CustomerAcUnit::query()
+            ->where('customer_id', $customerId)
+            ->where('customer_address_id', $alamatId)
+            ->orderBy('kode_unit')
+            ->get()
+            ->mapWithKeys(fn (CustomerAcUnit $u) => [$u->id => $u->labelTampil()])
+            ->when($kata !== '', fn ($c) => $c->filter(fn (string $label): bool => str_contains(mb_strtolower($label), $kata)))
+            ->all();
     }
 
     protected function stepRingkasan(): Forms\Components\Wizard\Step

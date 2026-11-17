@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\PaymentResource\Pages;
 use App\Models\Payment;
@@ -43,6 +44,10 @@ class PaymentResource extends BaseResource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(EnumOptions::for(PaymentStatus::class)),
+                // Revisi 17 Nov 2026 poin 33: filter metode bayar (cash/transfer/…).
+                Tables\Filters\SelectFilter::make('metode')
+                    ->label('Metode Bayar')
+                    ->options(EnumOptions::for(PaymentMethod::class)),
             ])
             ->actions([]);
     }
