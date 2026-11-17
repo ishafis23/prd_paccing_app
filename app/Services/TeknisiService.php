@@ -667,6 +667,11 @@ class TeknisiService
             $label = $jenis === self::KENDALA_SORE ? 'KENDALA - PENDING SORE' : 'KENDALA';
             $order->jenis_kendala = $jenis;
             $order->alasan_kendala = $alasan;
+            // Revisi 17 Nov 2026 poin 32: jejak permanen utk statistik (tidak dihapus saat jadwal ulang).
+            $order->kendala_pertama_pada ??= now();
+            if (in_array($pihak, OrderKendalaBukti::PIHAK, true)) {
+                $order->kendala_pihak ??= $pihak;
+            }
             $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[{$label}] ".$alasan);
 
             if ($jenis === self::KENDALA_SORE) {

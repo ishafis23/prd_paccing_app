@@ -50,6 +50,10 @@ class Order extends Model
         'keluhan',
         'alasan_kendala',
         'jenis_kendala',
+        'kendala_pertama_pada',
+        'kendala_pihak',
+        'dibatalkan_pada',
+        'dibatalkan_oleh',
         'perbaikan_menunggu_konfirmasi',
         'perbaikan_catatan',
         'perbaikan_estimasi_harga',
@@ -76,6 +80,8 @@ class Order extends Model
             'perbaikan_estimasi_harga' => 'decimal:2',
             'perbaikan_dilaporkan_pada' => 'datetime',
             'is_klaim' => 'boolean',
+            'kendala_pertama_pada' => 'datetime',
+            'dibatalkan_pada' => 'datetime',
         ];
     }
 

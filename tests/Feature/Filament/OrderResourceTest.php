@@ -136,7 +136,9 @@ it('admin batalkan order baru lewat aksi tabel', function () {
 
     Livewire::actingAs($this->admin)
         ->test(ListOrders::class)
-        ->callTableAction('batalkan', $order, data: ['alasan' => 'Customer batal']);
+        ->callTableAction('batalkan', $order, data: ['pihak' => 'customer', 'alasan' => 'Customer batal']);
+
+    expect($order->fresh()->dibatalkan_oleh)->toBe('customer');
 
     expect($order->fresh()->status)->toBe(OrderStatus::Batal);
 });

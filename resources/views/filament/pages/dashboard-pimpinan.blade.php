@@ -334,7 +334,7 @@
         @if ($tab === 'performa')
             <div class="space-y-4">
                 <div class="flex flex-wrap gap-2">
-                    @foreach (['teknisi' => '3.1 Pengerjaan per Teknisi', 'kehadiran' => '3.2 Rekap Kehadiran', 'klasifikasi' => '3.3 Klasifikasi Pengerjaan'] as $key => $label)
+                    @foreach (['teknisi' => '3.1 Pengerjaan per Teknisi', 'kehadiran' => '3.2 Rekap Kehadiran', 'klasifikasi' => '3.3 Klasifikasi Pengerjaan', 'kendala' => '3.4 Kendala & Batal'] as $key => $label)
                         <button type="button" wire:click="setPerforma('{{ $key }}')"
                             class="{{ $tabSub }} {{ $performa === $key ? 'bg-gray-800 text-white ring-gray-800' : 'bg-white text-gray-600 ring-gray-200 hover:bg-gray-50' }}">
                             {{ $label }}
@@ -342,11 +342,27 @@
                     @endforeach
                 </div>
 
+                {{-- Filter tanggal (periode gaji lintas bulan). Kosong = bulan terpilih. --}}
+                <div class="{{ $kartu }} flex flex-wrap items-end gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500">Mulai tanggal</label>
+                        <input type="date" wire:model.live="dari" class="mt-1 rounded-lg border-gray-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500">Sampai tanggal</label>
+                        <input type="date" wire:model.live="sampai" class="mt-1 rounded-lg border-gray-300 text-sm">
+                    </div>
+                    @if ($dari !== '' || $sampai !== '')
+                        <button type="button" wire:click="resetPeriodePerforma" class="rounded-lg px-3 py-2 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50">Reset ke bulan</button>
+                    @endif
+                    <p class="text-xs text-gray-500">Periode ditampilkan: <strong>{{ $periodeLabelPerforma }}</strong>. Isi kedua tanggal untuk periode lintas bulan (mis. 16 Okt – 15 Nov).</p>
+                </div>
+
                 {{-- 3.1 Pengerjaan per teknisi --}}
                 @if ($performa === 'teknisi')
                     <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5">
                         <div class="border-b border-gray-100 bg-gray-50/60 px-4 py-3">
-                            <h3 class="text-sm font-bold text-gray-700">Pengerjaan per Teknisi — {{ $bulanLabel }}</h3>
+                            <h3 class="text-sm font-bold text-gray-700">Pengerjaan per Teknisi — {{ $periodeLabelPerforma }}</h3>
                         </div>
                         @if (empty($performaTeknisi))
                             <p class="p-6 text-center text-sm text-gray-400">Belum ada teknisi aktif.</p>
@@ -358,15 +374,29 @@
                                             <th class="{{ $th }}">Teknisi</th>
                                             <th class="{{ $th }} text-right">Order Selesai</th>
                                             <th class="{{ $th }} text-right">Unit</th>
-                                            <th class="{{ $th }} text-right">Rupiah</th>
+                                            <th class="{{ $th }} text-right">Pendapatan Jasa</th>
+                                            <th class="{{ $th }} text-right">Pendapatan Material</th>
+                                            <th class="{{ $th }} text-right">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
                                         @foreach ($performaTeknisi as $p)
                                             <tr class="hover:bg-gray-50/60">
-                                                <td class="{{ $th }} font-medium text-gray-700">{{ $p['nama'] }}</td>
+                                                <td class="{{ $th }} font-medium text-gray-700">
+                                                    {{ $p['nama'] }}
+                                                    {{-- Rincian jasa per layanan (cuci / service / pemasangan / lainnya) --}}
+                                                    <ul class="mt-1 space-y-0.5 text-[11px] font-normal text-gray-500">
+                                                        @foreach ($p['layanan'] as $lay)
+                                                            @if ($lay['jasa'] > 0 || $lay['unit'] > 0)
+                                                                <li>{{ $lay['label'] }}: {{ $angka($lay['unit']) }} unit · jasa {{ $rp($lay['jasa']) }}</li>
+                                                            @endif
+                                                        @endforeach
+                                                    </ul>
+                                                </td>
                                                 <td class="{{ $th }} text-right">{{ $angka($p['orders']) }}</td>
                                                 <td class="{{ $th }} text-right">{{ $angka($p['unit']) }}</td>
+                                                <td class="{{ $th }} text-right text-emerald-700">{{ $rp($p['jasa']) }}</td>
+                                                <td class="{{ $th }} text-right text-sky-700">{{ $rp($p['material']) }}</td>
                                                 <td class="{{ $th }} text-right font-semibold">{{ $rp($p['rupiah']) }}</td>
                                             </tr>
                                         @endforeach
@@ -381,7 +411,7 @@
                 @if ($performa === 'kehadiran')
                     <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5">
                         <div class="border-b border-gray-100 bg-gray-50/60 px-4 py-3">
-                            <h3 class="text-sm font-bold text-gray-700">Rekap Kehadiran Teknisi — {{ $bulanLabel }}</h3>
+                            <h3 class="text-sm font-bold text-gray-700">Rekap Kehadiran Teknisi — {{ $periodeLabelPerforma }}</h3>
                         </div>
                         @if (empty($kehadiran))
                             <p class="p-6 text-center text-sm text-gray-400">Belum ada teknisi aktif.</p>
@@ -414,12 +444,35 @@
                     </div>
                 @endif
 
+                {{-- 3.4 Kendala & batal terhadap pekerjaan yang sudah dijadwalkan --}}
+                @if ($performa === 'kendala')
+                    @php $kb = $kendalaBatal; @endphp
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div class="{{ $kartu }}">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Pekerjaan Dijadwalkan</p>
+                            <p class="mt-1 text-2xl font-bold text-gray-800">{{ $angka($kb['dijadwalkan']) }}</p>
+                            <p class="text-xs text-gray-500">{{ $angka($kb['selesai']) }} selesai · {{ $periodeLabelPerforma }}</p>
+                        </div>
+                        <div class="{{ $kartu }}">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-amber-600">Terkendala</p>
+                            <p class="mt-1 text-2xl font-bold text-gray-800">{{ $angka($kb['terkendala']) }} <span class="text-sm font-normal text-gray-400">({{ number_format($kb['terkendala_persen'], 1, ',', '.') }}%)</span></p>
+                            <p class="text-xs text-gray-500">Sisi customer {{ $angka($kb['terkendala_customer']) }} · sisi teknisi {{ $angka($kb['terkendala_teknisi']) }} · tidak dicatat {{ $angka($kb['terkendala_tidak_dicatat']) }}</p>
+                        </div>
+                        <div class="{{ $kartu }}">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-rose-600">Batal</p>
+                            <p class="mt-1 text-2xl font-bold text-gray-800">{{ $angka($kb['batal']) }} <span class="text-sm font-normal text-gray-400">({{ number_format($kb['batal_persen'], 1, ',', '.') }}%)</span></p>
+                            <p class="text-xs text-gray-500">Atas kemauan customer {{ $angka($kb['batal_customer']) }} ({{ number_format($kb['batal_customer_persen'], 1, ',', '.') }}%) · internal {{ $angka($kb['batal_internal']) }} · tidak dicatat {{ $angka($kb['batal_tidak_dicatat']) }}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400">Persentase = jumlah ÷ pekerjaan yang dijadwalkan pada periode (berdasarkan tanggal jadwal). Order yang pernah terkendala lalu dijadwal ulang tetap dihitung terkendala.</p>
+                @endif
+
                 {{-- 3.3 Klasifikasi pengerjaan --}}
                 @if ($performa === 'klasifikasi')
                     @php
-                        $labelKlasifikasi = ['cuci' => 'Cuci', 'service' => 'Service', 'pemasangan' => 'Pemasangan'];
+                        $labelKlasifikasi = ['cuci' => 'Cuci', 'service' => 'Service', 'pemasangan' => 'Pemasangan', 'pengecekan' => 'Pengecekan'];
                     @endphp
-                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
                         @foreach ($labelKlasifikasi as $key => $label)
                             @php $k = $klasifikasi[$key] ?? ['unit' => 0, 'rupiah' => 0, 'transaksi' => 0, 'items' => []]; @endphp
                             <div class="{{ $kartu }}">

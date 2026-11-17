@@ -43,9 +43,19 @@ class DashboardPimpinan extends Page
     #[Url]
     public string $keuangan = 'pendapatan';
 
-    /** Sub-tab Aspek Performa: teknisi | kehadiran | klasifikasi. */
+    /** Sub-tab Aspek Performa: teknisi | kehadiran | klasifikasi | kendala. */
     #[Url]
     public string $performa = 'teknisi';
+
+    /**
+     * Filter tanggal Aspek Performa (revisi 17 Nov 2026 poin 30): periode gaji
+     * lintas bulan (mis. 16 Okt – 15 Nov). Keduanya kosong = bulan terpilih.
+     */
+    #[Url]
+    public string $dari = '';
+
+    #[Url]
+    public string $sampai = '';
 
     /** Toggle tabel Omset Jasa/Material: false = per kategori, true = rinci per transaksi. */
     public bool $rinciOmset = false;
@@ -77,7 +87,7 @@ class DashboardPimpinan extends Page
             $this->keuangan = 'pendapatan';
         }
 
-        if (! in_array($this->performa, ['teknisi', 'kehadiran', 'klasifikasi'], true)) {
+        if (! in_array($this->performa, ['teknisi', 'kehadiran', 'klasifikasi', 'kendala'], true)) {
             $this->performa = 'teknisi';
         }
     }
@@ -154,9 +164,37 @@ class DashboardPimpinan extends Page
 
     public function setPerforma(string $sub): void
     {
-        if (in_array($sub, ['teknisi', 'kehadiran', 'klasifikasi'], true)) {
+        if (in_array($sub, ['teknisi', 'kehadiran', 'klasifikasi', 'kendala'], true)) {
             $this->performa = $sub;
         }
+    }
+
+    public function resetPeriodePerforma(): void
+    {
+        $this->dari = '';
+        $this->sampai = '';
+    }
+
+    /**
+     * Periode Aspek Performa: rentang tanggal bila Dari & Sampai valid
+     * (Dari <= Sampai), selain itu bulan terpilih.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}
+     */
+    private function periodePerforma(): array
+    {
+        $ok = fn (string $v): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) && strtotime($v) !== false;
+
+        if ($ok($this->dari) && $ok($this->sampai) && $this->dari <= $this->sampai) {
+            $dari = CarbonImmutable::parse($this->dari)->startOfDay();
+            $sampai = CarbonImmutable::parse($this->sampai)->endOfDay();
+
+            return [$dari, $sampai, $dari->translatedFormat('d M Y').' – '.$sampai->translatedFormat('d M Y')];
+        }
+
+        [$awal, $akhir] = $this->periodeOmset();
+
+        return [$awal, $akhir, CarbonImmutable::createFromFormat('!Y-m', $this->bulan)->translatedFormat('F Y')];
     }
 
     protected function getViewData(): array
@@ -164,6 +202,7 @@ class DashboardPimpinan extends Page
         $service = app(DashboardPimpinanService::class);
         $bulan = CarbonImmutable::createFromFormat('!Y-m', $this->bulan);
         [$awal, $akhir] = $this->periodeOmset();
+        [$awalPerforma, $akhirPerforma, $periodeLabelPerforma] = $this->periodePerforma();
 
         $omsetRows = [];
         $omsetTotal = ['unit' => 0, 'jasa' => 0.0, 'material' => 0.0, 'total' => 0.0];
@@ -202,9 +241,11 @@ class DashboardPimpinan extends Page
             'labaRugiPekanan' => $service->labaRugiPekanan($awal, $akhir),
             'neraca' => $service->neraca(),
             'arusKas' => $service->arusKas($awal, $akhir),
-            'performaTeknisi' => $service->performaTeknisi($awal, $akhir),
-            'kehadiran' => $service->kehadiranTeknisi($awal, $akhir),
-            'klasifikasi' => $service->klasifikasiPengerjaan($awal, $akhir),
+            'periodeLabelPerforma' => $periodeLabelPerforma,
+            'performaTeknisi' => $service->performaTeknisi($awalPerforma, $akhirPerforma),
+            'kehadiran' => $service->kehadiranTeknisi($awalPerforma, $akhirPerforma),
+            'klasifikasi' => $service->klasifikasiPengerjaan($awalPerforma, $akhirPerforma),
+            'kendalaBatal' => $service->kendalaBatal($awalPerforma, $akhirPerforma),
         ];
     }
 }

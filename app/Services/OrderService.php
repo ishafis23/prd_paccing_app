@@ -967,10 +967,16 @@ class OrderService
         return $laporan->fresh();
     }
 
+    /** Pihak yang membatalkan (revisi 17 Nov 2026 poin 32). */
+    public const BATAL_CUSTOMER = 'customer';
+
+    public const BATAL_INTERNAL = 'internal';
+
     /**
      * Batalkan order (Admin/Owner) — hanya dari status `baru`/`terjadwal`.
+     * `$pihak`: customer (atas kemauan customer) | internal; null = tidak dicatat.
      */
-    public function cancel(Order $order, User $actor, ?string $alasan = null): Order
+    public function cancel(Order $order, User $actor, ?string $alasan = null, ?string $pihak = null): Order
     {
         $this->assertRole($actor, [RoleName::Admin, RoleName::Owner]);
 
@@ -978,8 +984,14 @@ class OrderService
             throw new BusinessRuleException('Hanya order berstatus baru/terjadwal/terkendala yang bisa dibatalkan.');
         }
 
+        if ($pihak !== null && ! in_array($pihak, [self::BATAL_CUSTOMER, self::BATAL_INTERNAL], true)) {
+            throw new BusinessRuleException('Pihak pembatal tidak dikenal.');
+        }
+
         $order->status = OrderStatus::Batal;
-        $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[BATAL] ".($alasan ?? 'dibatalkan admin'));
+        $order->dibatalkan_pada = now();
+        $order->dibatalkan_oleh = $pihak;
+        $order->catatan_admin = trim(($order->catatan_admin ?? '')."\n[BATAL".($pihak === self::BATAL_CUSTOMER ? ' - CUSTOMER' : '').'] '.($alasan ?? 'dibatalkan admin'));
         $order->save();
 
         return $order->fresh();

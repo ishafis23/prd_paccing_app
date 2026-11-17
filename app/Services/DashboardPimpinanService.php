@@ -48,6 +48,7 @@ class DashboardPimpinanService
         'instalasi' => 'Instalasi',
         'relokasi' => 'Relokasi',
         'bongkar' => 'Bongkar',
+        'pengecekan' => 'Pengecekan',
     ];
 
     public function __construct(private readonly AkuntanService $akuntan) {}
@@ -235,20 +236,46 @@ class DashboardPimpinanService
         ];
     }
 
+    /** Klasifikasi layanan utk rincian jasa per teknisi (revisi 17 Nov 2026 poin 31). */
+    public const KLASIFIKASI_JASA = [
+        'cuci' => 'Cuci',
+        'service' => 'Service',
+        'pemasangan' => 'Pemasangan',
+        'pengecekan' => 'Pengecekan',
+        'lainnya' => 'Lainnya',
+    ];
+
+    private const KATEGORI_KE_KLASIFIKASI = [
+        'cuci_ac' => 'cuci',
+        'service_ac' => 'service',
+        'tambah_freon' => 'service',
+        'pengadaan_ac' => 'pemasangan',
+        'instalasi' => 'pemasangan',
+        'relokasi' => 'pemasangan',
+        'bongkar' => 'pemasangan',
+        'pengecekan' => 'pengecekan',
+    ];
+
     /**
-     * Pengerjaan tiap teknisi aktif pada bulan terpilih: jumlah order,
-     * unit yang dikerjakan, dan rupiah yang dihasilkan.
+     * Pengerjaan tiap teknisi aktif pada periode terpilih: jumlah order,
+     * unit yang dikerjakan, dan rupiah — dipisah Jasa vs Material, plus
+     * rincian jasa per jenis layanan (cuci / service / pemasangan / lainnya).
      *
-     * @return array<int, array{nama: string, orders: int, unit: int, rupiah: float}>
+     * Order dipilih dgn aturan "tanggal pendapatan" yang sama dgn omset
+     * (OmsetService) sehingga lintas bulan konsisten. Order tim dihitung utuh
+     * utk tiap anggota (sama seperti sebelumnya).
+     *
+     * @return array<int, array{nama: string, orders: int, unit: int, rupiah: float, jasa: float, material: float, layanan: array<string, array{label: string, unit: int, jasa: float}>}>
      */
     public function performaTeknisi(CarbonInterface $awal, CarbonInterface $akhir): array
     {
+        $omset = app(OmsetService::class);
+        $barisPerOrder = $omset->baris($awal, $akhir)->groupBy('order_id');
+
         return $this->teknisiAktif()
-            ->map(function (User $teknisi) use ($awal, $akhir): array {
-                $orders = Order::query()
+            ->map(function (User $teknisi) use ($omset, $awal, $akhir, $barisPerOrder): array {
+                $orders = $omset->orderSelesai($awal, $akhir)
                     ->untukTeknisi($teknisi->id)
-                    ->where('status', OrderStatus::Selesai->value)
-                    ->whereBetween('updated_at', [$awal, $akhir])
                     ->with('orderItems')
                     ->get();
 
@@ -258,16 +285,84 @@ class DashboardPimpinanService
                         ->sum('jumlah')
                 );
 
+                $layanan = collect(self::KLASIFIKASI_JASA)
+                    ->map(fn (string $label): array => ['label' => $label, 'unit' => 0, 'jasa' => 0.0])
+                    ->all();
+                $jasa = 0.0;
+                $material = 0.0;
+
+                foreach ($orders as $order) {
+                    foreach ($barisPerOrder->get($order->id, collect()) as $b) {
+                        if ($b['komponen'] === 'jasa') {
+                            $jasa += (float) $b['subtotal'];
+                            $k = self::KATEGORI_KE_KLASIFIKASI[$b['kategori']] ?? 'lainnya';
+                            $layanan[$k]['jasa'] += (float) $b['subtotal'];
+                            $layanan[$k]['unit'] += (int) $b['unit'];
+                        } else {
+                            $material += (float) $b['subtotal'];
+                        }
+                    }
+                }
+
                 return [
                     'nama' => $teknisi->name,
                     'orders' => $orders->count(),
                     'unit' => $unit,
-                    'rupiah' => (float) $orders->sum(fn (Order $o): float => $o->total()),
+                    'rupiah' => $jasa + $material,
+                    'jasa' => $jasa,
+                    'material' => $material,
+                    'layanan' => $layanan,
                 ];
             })
             ->sortByDesc('rupiah')
             ->values()
             ->all();
+    }
+
+    /**
+     * Tingkat pekerjaan terkendala & batal terhadap pekerjaan yang sudah
+     * DIJADWALKAN pada periode (tanggal_jadwal) — angka dan persentase
+     * (revisi 17 Nov 2026 poin 32).
+     *
+     * - terkendala: pernah ditandai terkendala (jejak permanen walau sudah
+     *   dijadwal ulang), dipisah sisi customer / teknisi / tidak dicatat.
+     * - batal: status batal, dipisah atas kemauan customer / internal / tidak dicatat.
+     *
+     * @return array<string, int|float>
+     */
+    public function kendalaBatal(CarbonInterface $awal, CarbonInterface $akhir): array
+    {
+        $dijadwalkan = Order::query()
+            ->whereNotNull('tanggal_jadwal')
+            ->whereBetween('tanggal_jadwal', [$awal->toDateString(), $akhir->toDateString()])
+            ->get(['id', 'status', 'kendala_pertama_pada', 'kendala_pihak', 'dibatalkan_oleh']);
+
+        $total = $dijadwalkan->count();
+        $terkendala = $dijadwalkan->filter(fn (Order $o): bool => $o->kendala_pertama_pada !== null);
+        $batal = $dijadwalkan->filter(fn (Order $o): bool => $o->status === OrderStatus::Batal);
+
+        $persen = fn (int $n): float => $total > 0 ? round($n / $total * 100, 1) : 0.0;
+
+        $kendalaCustomer = $terkendala->where('kendala_pihak', 'customer')->count();
+        $kendalaTeknisi = $terkendala->where('kendala_pihak', 'teknisi')->count();
+        $batalCustomer = $batal->where('dibatalkan_oleh', 'customer')->count();
+        $batalInternal = $batal->where('dibatalkan_oleh', 'internal')->count();
+
+        return [
+            'dijadwalkan' => $total,
+            'selesai' => $dijadwalkan->filter(fn (Order $o): bool => $o->status === OrderStatus::Selesai)->count(),
+            'terkendala' => $terkendala->count(),
+            'terkendala_persen' => $persen($terkendala->count()),
+            'terkendala_customer' => $kendalaCustomer,
+            'terkendala_teknisi' => $kendalaTeknisi,
+            'terkendala_tidak_dicatat' => $terkendala->count() - $kendalaCustomer - $kendalaTeknisi,
+            'batal' => $batal->count(),
+            'batal_persen' => $persen($batal->count()),
+            'batal_customer' => $batalCustomer,
+            'batal_customer_persen' => $persen($batalCustomer),
+            'batal_internal' => $batalInternal,
+            'batal_tidak_dicatat' => $batal->count() - $batalCustomer - $batalInternal,
+        ];
     }
 
     /**
@@ -442,13 +537,14 @@ class DashboardPimpinanService
             'cuci' => [ServiceType::CuciAc],
             'service' => [ServiceType::ServiceAc, ServiceType::TambahFreon],
             'pemasangan' => [ServiceType::PengadaanAc, ServiceType::Instalasi, ServiceType::Relokasi, ServiceType::Bongkar],
+            'pengecekan' => ['pengecekan'],
         ];
 
         $hasil = [];
 
         foreach ($grup as $nama => $jenis) {
             $rows = collect($jenis)
-                ->map(fn (ServiceType $st): ?array => $perJenis->get($st->value))
+                ->map(fn (ServiceType|string $st): ?array => $perJenis->get($st instanceof ServiceType ? $st->value : $st))
                 ->filter();
 
             $rincian = $rows

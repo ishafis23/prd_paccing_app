@@ -1373,11 +1373,19 @@ class OrderResource extends BaseResource
                         ->visible(fn (Order $record) => auth()->user()->hasAnyRole([RoleName::Admin->value, RoleName::Owner->value])
                             && in_array($record->status, [OrderStatus::Baru, OrderStatus::Terjadwal, OrderStatus::Terkendala]))
                         ->form([
+                            // Revisi 17 Nov 2026 poin 32: dicatat utk ukur tingkat batal oleh customer.
+                            Forms\Components\Radio::make('pihak')
+                                ->label('Dibatalkan oleh')
+                                ->options([
+                                    OrderService::BATAL_CUSTOMER => 'Customer (atas kemauan customer)',
+                                    OrderService::BATAL_INTERNAL => 'Internal (kami / teknisi / kendala operasional)',
+                                ])
+                                ->required(),
                             Forms\Components\Textarea::make('alasan')->label('Alasan pembatalan'),
                         ])
                         ->action(function (Order $record, array $data) {
                             try {
-                                app(OrderService::class)->cancel($record, auth()->user(), $data['alasan'] ?? null);
+                                app(OrderService::class)->cancel($record, auth()->user(), $data['alasan'] ?? null, $data['pihak'] ?? null);
                                 Notification::make()->success()->title('Order dibatalkan')->send();
                             } catch (BusinessRuleException|AuthorizationException $e) {
                                 Notification::make()->danger()->title('Gagal membatalkan order')->body($e->getMessage())->send();

@@ -30,7 +30,7 @@ class OmsetService
     public const KATEGORI_UTAMA = ['cuci_ac', 'service_ac', 'pengadaan_ac'];
 
     /** Urutan tampil kategori. */
-    private const URUTAN = ['cuci_ac', 'service_ac', 'pengadaan_ac', 'tambah_freon', 'instalasi', 'relokasi', 'bongkar', 'lainnya'];
+    private const URUTAN = ['cuci_ac', 'service_ac', 'pengadaan_ac', 'tambah_freon', 'instalasi', 'relokasi', 'bongkar', 'pengecekan', 'lainnya'];
 
     private const LABEL = [
         'cuci_ac' => 'Cuci AC',
@@ -40,6 +40,7 @@ class OmsetService
         'instalasi' => 'Instalasi',
         'relokasi' => 'Relokasi',
         'bongkar' => 'Bongkar',
+        'pengecekan' => 'Pengecekan',
         'lainnya' => 'Lainnya',
     ];
 
