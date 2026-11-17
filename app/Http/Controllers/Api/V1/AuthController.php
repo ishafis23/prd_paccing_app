@@ -46,7 +46,11 @@ class AuthController extends Controller
         // Satu akun = satu perangkat aktif: login baru mencabut semua token lama (HP sebelumnya
         // otomatis keluar) agar GPS/absen tidak tercampur dari dua HP.
         $user->tokens()->delete();
-        DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
+        try {
+            DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $token = $user->createToken($data['device_name'], ['teknisi'], now()->addDays((int) config('api.token_hari', 90)));
 

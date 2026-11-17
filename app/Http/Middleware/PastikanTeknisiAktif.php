@@ -27,9 +27,14 @@ class PastikanTeknisiAktif
         }
 
         // Penanda "sedang membuka app" (waktu server). Ditulis paling sering tiap 30 detik.
-        if ($user->last_seen_at === null || $user->last_seen_at->lt(now()->subSeconds(30))) {
-            DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
-            $user->last_seen_at = now();
+        // Gagal menulis (mis. migrasi belum dijalankan) tidak boleh menjatuhkan API teknisi.
+        try {
+            if ($user->last_seen_at === null || $user->last_seen_at->lt(now()->subSeconds(30))) {
+                DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
+                $user->last_seen_at = now();
+            }
+        } catch (\Throwable $e) {
+            report($e);
         }
 
         return $next($request);
