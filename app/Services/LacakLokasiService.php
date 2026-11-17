@@ -20,6 +20,18 @@ class LacakLokasiService
     public const MAKS_UMUR_HARI = 7;
 
     /**
+     * Waktu dari app. Tanpa penanda zona (Z / +08:00) dianggap UTC — app mengirim
+     * jam UTC; membacanya sebagai zona server (Asia/Makassar) menggeser titik
+     * 8 jam ke belakang sehingga peta salah menandai teknisi "basi".
+     */
+    public static function parseWaktu(string $nilai): Carbon
+    {
+        $adaZona = (bool) preg_match('/(Z|[+-]\d{2}(:?\d{2})?)$/i', trim($nilai));
+
+        return ($adaZona ? Carbon::parse($nilai) : Carbon::parse($nilai, 'UTC'))->setTimezone(config('app.timezone'));
+    }
+
+    /**
      * `uuid_selesai` = titik yang boleh dihapus dari antrean app
      * (diterima, duplikat, atau ditolak permanen: waktu di masa depan / terlalu lama).
      *
@@ -33,7 +45,7 @@ class LacakLokasiService
         $terbaru = null;
 
         foreach ($titik as $t) {
-            $waktu = Carbon::parse($t['direkam_pada']);
+            $waktu = self::parseWaktu($t['direkam_pada']);
 
             if ($waktu->gt(now()->addMinutes(5)) || $waktu->lt(now()->subDays(self::MAKS_UMUR_HARI))) {
                 $ditolak++;

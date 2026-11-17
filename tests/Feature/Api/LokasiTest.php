@@ -5,6 +5,7 @@ use App\Models\DailyAttendance;
 use App\Models\TeknisiLokasiLog;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
@@ -31,8 +32,8 @@ it('menyimpan titik selama jam kerja dan memperbarui posisi terakhir', function 
     DailyAttendance::create(['user_id' => $this->teknisi->id, 'tanggal' => '2026-11-09', 'jam_datang' => '2026-11-09 08:00:00']);
     Sanctum::actingAs($this->teknisi);
 
-    $a = ($this->titik)('2026-11-09 09:00:00', -6.2);
-    $b = ($this->titik)('2026-11-09 09:30:00', -6.3);
+    $a = ($this->titik)('2026-11-09 09:00:00+08:00', -6.2);
+    $b = ($this->titik)('2026-11-09 09:30:00+08:00', -6.3);
 
     $this->postJson('/api/v1/lokasi/batch', ['titik' => [$b, $a]], $this->json)
         ->assertOk()
@@ -51,7 +52,7 @@ it('kirim ulang client_uuid yang sama tidak menggandakan', function () {
     DailyAttendance::create(['user_id' => $this->teknisi->id, 'tanggal' => '2026-11-09', 'jam_datang' => '2026-11-09 08:00:00']);
     Sanctum::actingAs($this->teknisi);
 
-    $payload = ['titik' => [($this->titik)('2026-11-09 09:00:00')]];
+    $payload = ['titik' => [($this->titik)('2026-11-09 09:00:00+08:00')]];
 
     $this->postJson('/api/v1/lokasi/batch', $payload, $this->json)->assertJsonPath('data.diterima', 1);
     $this->postJson('/api/v1/lokasi/batch', $payload, $this->json)
@@ -66,7 +67,7 @@ it('menerima titik di luar jam kerja (belum absen, sebelum datang, sesudah pulan
     Sanctum::actingAs($this->teknisi);
 
     // Belum absen sama sekali — tetap diterima.
-    $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-09 09:00:00')]], $this->json)
+    $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-09 09:00:00+08:00')]], $this->json)
         ->assertJsonPath('data.diterima', 1)
         ->assertJsonPath('data.ditolak', 0);
 
@@ -76,8 +77,8 @@ it('menerima titik di luar jam kerja (belum absen, sebelum datang, sesudah pulan
     ]);
 
     $this->postJson('/api/v1/lokasi/batch', ['titik' => [
-        ($this->titik)('2026-11-09 07:00:00'),
-        ($this->titik)('2026-11-09 17:00:00'),
+        ($this->titik)('2026-11-09 07:00:00+08:00'),
+        ($this->titik)('2026-11-09 17:00:00+08:00'),
     ]], $this->json)->assertJsonPath('data.diterima', 2);
 });
 
@@ -86,9 +87,9 @@ it('menolak titik dari masa depan dan titik yang terlalu lama; keduanya dilapork
     Sanctum::actingAs($this->teknisi);
 
     $respons = $this->postJson('/api/v1/lokasi/batch', ['titik' => [
-        ($this->titik)('2026-11-09 12:00:00'), // masa depan
-        ($this->titik)('2026-10-20 09:00:00'), // > 7 hari
-        ($this->titik)('2026-11-09 09:00:00'), // sah
+        ($this->titik)('2026-11-09 12:00:00+08:00'), // masa depan
+        ($this->titik)('2026-10-20 09:00:00+08:00'), // > 7 hari
+        ($this->titik)('2026-11-09 09:00:00+08:00'), // sah
     ]], $this->json)->assertOk();
 
     $respons->assertJsonPath('data.diterima', 1)->assertJsonPath('data.ditolak', 2);
@@ -101,7 +102,7 @@ it('titik lama hasil sync offline tidak menimpa posisi yang lebih baru', functio
     $this->teknisi->update(['last_latitude' => -7.0, 'last_longitude' => 110.0, 'last_location_at' => '2026-11-09 09:55:00']);
     Sanctum::actingAs($this->teknisi);
 
-    $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-09 09:00:00', -6.2)]], $this->json)
+    $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-09 09:00:00+08:00', -6.2)]], $this->json)
         ->assertJsonPath('data.diterima', 1);
 
     expect((float) $this->teknisi->fresh()->last_latitude)->toBe(-7.0);
@@ -114,6 +115,24 @@ it('validasi: koordinat, uuid, batas jumlah titik', function () {
     $this->postJson('/api/v1/lokasi/batch', ['titik' => [['client_uuid' => 'bukan-uuid', 'lat' => 120, 'lng' => 106, 'direkam_pada' => 'x']]], $this->json)
         ->assertUnprocessable();
 
-    $banyak = array_fill(0, 101, ($this->titik)('2026-11-09 09:00:00'));
+    $banyak = array_fill(0, 101, ($this->titik)('2026-11-09 09:00:00+08:00'));
     $this->postJson('/api/v1/lokasi/batch', ['titik' => $banyak], $this->json)->assertUnprocessable();
+});
+
+it('jam tanpa penanda zona dianggap UTC (bukan zona server) agar tidak bergeser 8 jam', function () {
+    $this->travelTo(Carbon::parse('2026-11-17 14:00:00', 'Asia/Makassar')); // = 06:00 UTC
+
+    Sanctum::actingAs($this->teknisi);
+
+    // App mengirim jam UTC sekarang tanpa 'Z'.
+    $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-17 06:00:00')]], $this->json)
+        ->assertOk()->assertJsonPath('data.diterima', 1);
+
+    $u = $this->teknisi->fresh();
+    expect($u->last_location_at->diffInMinutes(now(), true))->toBeLessThan(1);
+
+    // Dengan penanda zona tetap dihormati.
+    $this->postJson('/api/v1/lokasi/batch', ['titik' => [($this->titik)('2026-11-17T14:01:00+08:00')]], $this->json)
+        ->assertOk();
+    expect($this->teknisi->fresh()->last_location_at->format('H:i'))->toBe('14:01');
 });
