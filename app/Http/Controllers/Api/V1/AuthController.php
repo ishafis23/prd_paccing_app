@@ -47,7 +47,7 @@ class AuthController extends Controller
         // otomatis keluar) agar GPS/absen tidak tercampur dari dua HP.
         $user->tokens()->delete();
         try {
-            DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now()]);
+            DB::table('users')->where('id', $user->id)->update(['last_seen_at' => now(), 'app_keluar_pada' => null]);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -65,6 +65,12 @@ class AuthController extends Controller
         // Cabut token perangkat ini beserta token push-nya bila dikirim.
         if (filled($request->input('device_token'))) {
             DeviceToken::query()->where('user_id', $request->user()->id)->where('token', $request->input('device_token'))->delete();
+        }
+
+        try {
+            DB::table('users')->where('id', $request->user()->id)->update(['app_keluar_pada' => now()]);
+        } catch (\Throwable $e) {
+            report($e);
         }
 
         $request->user()->currentAccessToken()->delete();

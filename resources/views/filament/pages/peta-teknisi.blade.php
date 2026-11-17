@@ -42,11 +42,23 @@
 
                     const layer = L.layerGroup().addTo(this.map);
                     markers.forEach((t) => {
-                        L.marker([t.lat, t.lng], { opacity: t.stale ? 0.5 : 1 })
+                        // Warna = status APP (hijau aktif, abu-abu selain itu); pudar = GPS basi.
+                        const warna = t.app_status === 'aktif' ? '#059669' : '#6b7280';
+                        const titik = document.createElement('span');
+                        titik.style.cssText = `display:block;width:22px;height:22px;border-radius:50%;background:${warna};border:3px solid #fff;box-shadow:0 0 0 2px ${warna},0 1px 4px rgba(0,0,0,.4);`;
+                        const ikon = L.divIcon({
+                            className: '',
+                            html: titik,
+                            iconSize: [22, 22],
+                            iconAnchor: [11, 11],
+                            popupAnchor: [0, -12],
+                        });
+                        const labelApp = { aktif: 'App aktif', keluar: 'Sudah logout', tidak_aktif: 'App tidak aktif', belum: 'App belum pernah dibuka' }[t.app_status] || '';
+                        L.marker([t.lat, t.lng], { icon: ikon, opacity: t.stale ? 0.5 : 1 })
                             .addTo(layer)
                             .bindPopup(
                                 `<b>${t.nama}</b><br>${t.customer}<br>${t.alamat}`
-                                + `<br><small>${t.stale ? 'Sinyal terakhir (basi): ' : 'Update: '}${t.updated_label}</small>`
+                                + `<br><small><b>${labelApp}</b> &middot; GPS ${t.stale ? 'basi: ' : 'update: '}${t.updated_label}</small>`
                             );
                     });
                     setTimeout(() => this.map && this.map.invalidateSize(), 200);
@@ -102,15 +114,17 @@
                                 <p class="truncate text-xs text-gray-500">{{ $t['customer'] }} &middot; {{ $t['alamat'] }}</p>
                             </div>
                             <div class="text-right text-xs">
-                                @php $aktifApp = $t['last_seen_at'] !== null && $t['last_seen_at']->gt(now()->subMinutes(2)); @endphp
-                                {{-- Aplikasi: waktu server saat teknisi terakhir memanggil API --}}
+                                @php $statusApp = $t['app_status']; $aktifApp = $statusApp === 'aktif'; @endphp
+                                {{-- Aplikasi: status dari waktu server (panggilan API / logout) --}}
                                 <div>
-                                    @if ($aktifApp)
+                                    @if ($statusApp === 'aktif')
                                         <span class="font-semibold text-emerald-600">&#9679; App aktif &middot; {{ $t['last_seen_at']->diffForHumans() }}</span>
-                                    @elseif ($t['last_seen_at'] !== null)
-                                        <span class="font-semibold text-gray-500">App terakhir dibuka &middot; {{ $t['last_seen_at']->diffForHumans() }}</span>
+                                    @elseif ($statusApp === 'keluar')
+                                        <span class="font-semibold text-gray-500">&#9679; Sudah logout{{ $t['last_seen_at'] ? ' · terakhir dibuka '.$t['last_seen_at']->diffForHumans() : '' }}</span>
+                                    @elseif ($statusApp === 'tidak_aktif')
+                                        <span class="font-semibold text-gray-500">&#9679; App tidak aktif &middot; terakhir dibuka {{ $t['last_seen_at']->diffForHumans() }}</span>
                                     @else
-                                        <span class="font-semibold text-gray-400">App belum pernah dibuka</span>
+                                        <span class="font-semibold text-gray-400">&#9679; App belum pernah dibuka</span>
                                     @endif
                                 </div>
                                 {{-- GPS --}}

@@ -138,6 +138,24 @@ it('last_seen_at lama ditampilkan sebagai App terakhir dibuka, bukan aktif', fun
 
     $this->actingAs($admin)->get(PetaTeknisi::getUrl())
         ->assertOk()
-        ->assertSee('App terakhir dibuka')
-        ->assertDontSee('App aktif');
+        ->assertSee('App tidak aktif')
+        ->assertDontSee('● App aktif', false);
+});
+
+it('logout langsung menjadikan status app "Sudah logout", login lagi menjadikan aktif', function () {
+    $admin = ptUser(RoleName::Admin->value);
+    $t = ptUser(RoleName::Teknisi->value);
+    $t->update(['last_seen_at' => now()]);
+
+    expect($t->fresh()->statusApp())->toBe('aktif');
+
+    Laravel\Sanctum\Sanctum::actingAs($t);
+    $this->postJson('/api/v1/logout', [], ['Accept' => 'application/json'])->assertOk();
+
+    expect($t->fresh()->statusApp())->toBe('keluar');
+
+    $this->actingAs($admin, 'web')->get(PetaTeknisi::getUrl())->assertOk()->assertSee('Sudah logout');
+
+    $t->update(['last_seen_at' => now()->addSecond()]);
+    expect($t->fresh()->statusApp())->toBe('aktif');
 });

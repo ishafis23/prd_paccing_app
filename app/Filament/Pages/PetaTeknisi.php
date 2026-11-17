@@ -62,7 +62,7 @@ class PetaTeknisi extends Page
         return [
             'teknisi' => $teknisi,
             'markers' => $markers,
-            'markersKey' => md5($markers->map(fn (array $t) => "{$t['teknisi_id']}:{$t['lat']},{$t['lng']}:{$t['stale']}")->implode('|')),
+            'markersKey' => md5($markers->map(fn (array $t) => "{$t['teknisi_id']}:{$t['lat']},{$t['lng']}:{$t['stale']}:{$t['app_status']}")->implode('|')),
             'center' => $markers->isNotEmpty()
                 ? [$markers->avg('lat'), $markers->avg('lng')]
                 : [-2.5, 118.0], // fallback: tengah Indonesia bila belum ada titik.
@@ -106,6 +106,7 @@ class PetaTeknisi extends Page
                         'lng' => $t->last_longitude !== null ? (float) $t->last_longitude : null,
                         'updated_at' => $updatedAt,
                         'last_seen_at' => $t->last_seen_at,
+                        'app_status' => $t->statusApp(),
                         'stale' => $updatedAt !== null && $updatedAt->lt(now()->subMinutes(self::STALE_MENIT)),
                         'order_id' => $order->id,
                         'order_status' => $order->status,
@@ -147,6 +148,7 @@ class PetaTeknisi extends Page
                     'lng' => $t->last_longitude !== null ? (float) $t->last_longitude : null,
                     'updated_at' => $updatedAt,
                         'last_seen_at' => $t->last_seen_at,
+                        'app_status' => $t->statusApp(),
                     'stale' => $updatedAt !== null && $updatedAt->lt(now()->subMinutes(self::STALE_MENIT)),
                     'order_id' => null,
                     'order_status' => null,
@@ -192,6 +194,7 @@ class PetaTeknisi extends Page
                     'lng' => $t->last_longitude !== null ? (float) $t->last_longitude : null,
                     'updated_at' => $updatedAt,
                         'last_seen_at' => $t->last_seen_at,
+                        'app_status' => $t->statusApp(),
                     'stale' => $updatedAt !== null && $updatedAt->lt(now()->subMinutes(self::STALE_MENIT)),
                     'order_id' => null,
                     'order_status' => null,

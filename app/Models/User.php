@@ -29,6 +29,26 @@ class User extends Authenticatable implements FilamentUser
     /**
      * URL foto profil (dev-plan/revisiteknisi Poin 3), null bila belum diunggah.
      */
+    /** Jendela (menit) sejak panggilan API terakhir yang masih dianggap "app aktif". */
+    public const APP_AKTIF_MENIT = 2;
+
+    /**
+     * Status app teknisi (waktu server): aktif | keluar | tidak_aktif | belum.
+     * - keluar: logout terjadi setelah panggilan API terakhir.
+     */
+    public function statusApp(): string
+    {
+        if ($this->last_seen_at === null) {
+            return $this->app_keluar_pada !== null ? 'keluar' : 'belum';
+        }
+
+        if ($this->app_keluar_pada !== null && $this->app_keluar_pada->gte($this->last_seen_at)) {
+            return 'keluar';
+        }
+
+        return $this->last_seen_at->gt(now()->subMinutes(self::APP_AKTIF_MENIT)) ? 'aktif' : 'tidak_aktif';
+    }
+
     public function fotoProfilUrl(): ?string
     {
         return $this->foto_profil ? asset('storage/'.ltrim((string) $this->foto_profil, '/')) : null;
@@ -55,6 +75,7 @@ class User extends Authenticatable implements FilamentUser
         'last_longitude',
         'last_location_at',
         'last_seen_at',
+        'app_keluar_pada',
     ];
 
     protected $hidden = [
@@ -72,6 +93,7 @@ class User extends Authenticatable implements FilamentUser
             'last_longitude' => 'decimal:7',
             'last_location_at' => 'datetime',
             'last_seen_at' => 'datetime',
+            'app_keluar_pada' => 'datetime',
         ];
     }
 
