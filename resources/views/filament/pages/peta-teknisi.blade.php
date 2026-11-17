@@ -71,7 +71,7 @@
                 </p>
             @else
                 <div wire:key="peta-teknisi-map-{{ $markersKey }}" x-data="petaTeknisi(@js($markers), @js($center), {{ $zoom }})" x-init="init()">
-                    <div x-ref="peta" class="mt-3 h-[420px] w-full overflow-hidden rounded-xl ring-1 ring-gray-100"></div>
+                    <div x-ref="peta" style="height:420px;width:100%;margin-top:12px;border-radius:12px;overflow:hidden;position:relative;z-index:0;" class="ring-1 ring-gray-100"></div>
                     <p x-show="gagal" x-cloak class="mt-2 text-sm text-rose-600">
                         Peta gagal dimuat (koneksi ke unpkg.com / openstreetmap.org terblokir?). Daftar teknisi di bawah tetap akurat.
                     </p>
