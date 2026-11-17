@@ -17,6 +17,8 @@
         $potItems = $run->items->filter(fn ($i) => $i->jenis !== $b && $i->kategori !== 'dibayar_mingguan');
         $dibayarMingguan = $run->items->firstWhere('kategori', 'dibayar_mingguan');
         $kuota = \App\Services\PayrollService::KUOTA_OFF;
+        $adjMap = $run->adjustments->keyBy('id');
+        $potonganLain = $run->items->filter(fn ($i) => $i->kategori === 'potongan_lain');
         $totalBonus = $bonusItems->sum('nominal');
         $totalPot = $potItems->sum('nominal');
     @endphp
@@ -28,7 +30,8 @@
             <tr class="grup"><td colspan="3">PENDAPATAN</td></tr>
             <tr><td>Gaji Pokok</td><td class="muted">per periode</td><td class="angka">{{ $rp($run->gaji_pokok) }}</td></tr>
             @forelse ($bonusItems as $item)
-                <tr><td>{{ $item->label }}</td><td class="muted">bonus</td><td class="angka bonus">+ {{ $rp($item->nominal) }}</td></tr>
+                @php $adj = $item->kategori === 'bonus_lain' ? $adjMap->get((int) $item->referensi) : null; @endphp
+                <tr><td>{{ $item->label }}</td><td class="muted">{{ $adj ? trim(($adj->tanggal?->format('d M Y') ?? '').' '.($adj->catatan ?? '')) ?: 'bonus' : 'bonus' }}</td><td class="angka bonus">+ {{ $rp($item->nominal) }}</td></tr>
             @empty
                 <tr><td class="muted">Bonus</td><td class="muted">—</td><td class="angka muted">{{ $rp(0) }}</td></tr>
             @endforelse
@@ -50,6 +53,14 @@
                 <td class="muted">{{ $run->jumlah_setengah_hari }}×</td>
                 <td class="angka potongan">− {{ $rp($run->total_potongan_setengah_hari) }}</td>
             </tr>
+            @foreach ($potonganLain as $item)
+                @php $adj = $adjMap->get((int) $item->referensi); @endphp
+                <tr>
+                    <td>{{ $item->label }}</td>
+                    <td class="muted">{{ $adj ? (trim(($adj->tanggal?->format('d M Y') ?? '').' '.($adj->catatan ?? '')) ?: 'potongan lain') : 'potongan lain' }}</td>
+                    <td class="angka potongan">− {{ $rp($item->nominal) }}</td>
+                </tr>
+            @endforeach
             @if ((float) $run->total_potongan_kasbon > 0)
                 <tr>
                     <td>Potongan Kasbon</td>
@@ -67,7 +78,7 @@
                 {{-- Baris informasi (nominal 0): tidak ikut total potongan. --}}
                 <tr><td colspan="3" class="muted">⚠ {{ $kasbonTerlewat->label }}</td></tr>
             @endif
-            <tr class="sub"><td colspan="2">Total Potongan</td><td class="angka">− {{ $rp((float) $run->total_denda_telat + (float) $run->total_potongan_off + (float) $run->total_potongan_setengah_hari + (float) $run->total_potongan_kasbon + (float) $run->potongan_bpjs_tk) }}</td></tr>
+            <tr class="sub"><td colspan="2">Total Potongan</td><td class="angka">− {{ $rp((float) $run->total_denda_telat + (float) $run->total_potongan_off + (float) $run->total_potongan_setengah_hari + (float) $run->total_potongan_kasbon + (float) $run->total_potongan_lain + (float) $run->potongan_bpjs_tk) }}</td></tr>
 
             @if ($mingguan)
                 <tr class="grup"><td colspan="3">BONUS MINGGUAN (SUDAH DIBAYAR PEKANAN)</td></tr>

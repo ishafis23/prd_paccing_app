@@ -159,20 +159,14 @@ class PayrollRunResource extends BaseResource
                     ->visible(fn (PayrollRun $r): bool => $r->draft() && static::canViewAny())
                     ->requiresConfirmation()
                     ->action(function (PayrollRun $record): void {
-                        $profil = TechnicianPayrollProfile::where('user_id', $record->user_id)->first();
-                        if ($profil === null) {
-                            Notification::make()->danger()->title('Profil gaji teknisi ini tidak ada.')->send();
-
-                            return;
-                        }
-
                         try {
-                            app(PayrollService::class)->hitung($profil, $record->periode_mulai, auth()->user());
+                            app(PayrollService::class)->hitungUlang($record, auth()->user());
                             Notification::make()->success()->title('Gaji dihitung ulang')->send();
                         } catch (BusinessRuleException|AuthorizationException $e) {
                             Notification::make()->danger()->title('Gagal')->body($e->getMessage())->send();
                         }
                     }),
+                static::aksiEditPeriode(),
                 Tables\Actions\Action::make('acc')
                     ->label('ACC')
                     ->icon('heroicon-o-check-badge')
@@ -201,6 +195,7 @@ class PayrollRunResource extends BaseResource
                             Notification::make()->danger()->title('Gagal')->body($e->getMessage())->send();
                         }
                     }),
+                static::aksiHapus(),
                 Tables\Actions\Action::make('slip')
                     ->label('Slip')
                     ->icon('heroicon-o-document-text')
@@ -209,6 +204,114 @@ class PayrollRunResource extends BaseResource
                     ->openUrlInNewTab(),
             ])
             ->defaultSort('periode_selesai', 'desc');
+    }
+
+    /**
+     * Revisi 17 Nov 2026 poin 28: ubah tanggal mulai/selesai periode (draft).
+     */
+    public static function aksiEditPeriode(string $kelas = Tables\Actions\Action::class)
+    {
+        return $kelas::make('editPeriode')
+            ->label('Edit Periode')
+            ->icon('heroicon-o-calendar-days')
+            ->color('gray')
+            ->visible(fn (PayrollRun $r): bool => $r->draft() && static::canViewAny())
+            ->modalHeading('Edit Periode Gaji')
+            ->modalDescription('Gaji dihitung ulang untuk periode baru. Bonus/potongan lain yang sudah diinput tetap ikut.')
+            ->fillForm(fn (PayrollRun $r): array => [
+                'periode_mulai' => $r->periode_mulai->toDateString(),
+                'periode_selesai' => $r->periode_selesai->toDateString(),
+            ])
+            ->form([
+                Forms\Components\DatePicker::make('periode_mulai')->label('Mulai tanggal')->required(),
+                Forms\Components\DatePicker::make('periode_selesai')->label('Sampai tanggal')->required()->afterOrEqual('periode_mulai'),
+            ])
+            ->action(function (PayrollRun $record, array $data): void {
+                try {
+                    app(PayrollService::class)->ubahPeriode(
+                        $record,
+                        Carbon::parse($data['periode_mulai']),
+                        Carbon::parse($data['periode_selesai']),
+                        auth()->user()
+                    );
+                    Notification::make()->success()->title('Periode gaji diperbarui')->send();
+                } catch (BusinessRuleException|AuthorizationException $e) {
+                    Notification::make()->danger()->title('Gagal mengubah periode')->body($e->getMessage())->send();
+                }
+            });
+    }
+
+    /**
+     * Revisi 17 Nov 2026 poin 28: hapus gaji draft yang salah input.
+     */
+    public static function aksiHapus(string $kelas = Tables\Actions\Action::class)
+    {
+        return $kelas::make('hapusGaji')
+            ->label('Hapus')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->visible(fn (PayrollRun $r): bool => $r->draft() && static::canViewAny())
+            ->requiresConfirmation()
+            ->modalHeading('Hapus gaji draft?')
+            ->modalDescription('Gaji draft ini (termasuk bonus/potongan lain yang diinput) dihapus permanen. Gaji yang sudah di-ACC tidak bisa dihapus.')
+            ->action(function (PayrollRun $record): void {
+                try {
+                    app(PayrollService::class)->hapus($record, auth()->user());
+                    Notification::make()->success()->title('Gaji dihapus')->send();
+                } catch (BusinessRuleException|AuthorizationException $e) {
+                    Notification::make()->danger()->title('Gagal menghapus')->body($e->getMessage())->send();
+                }
+            });
+    }
+
+    /**
+     * Revisi 17 Nov 2026 poin 29: tambah bonus / potongan lain (boleh berkali-kali).
+     */
+    public static function aksiPenyesuaian(PayrollItemJenis $jenis, string $kelas = Tables\Actions\Action::class)
+    {
+        $bonus = $jenis === PayrollItemJenis::Bonus;
+
+        return $kelas::make($bonus ? 'tambahBonus' : 'tambahPotongan')
+            ->label($bonus ? '+ Input Bonus' : '+ Input Potongan Lain')
+            ->icon($bonus ? 'heroicon-o-plus-circle' : 'heroicon-o-minus-circle')
+            ->color($bonus ? 'success' : 'danger')
+            ->visible(fn (PayrollRun $r): bool => $r->draft() && static::canViewAny())
+            ->modalHeading($bonus ? 'Input Bonus' : 'Input Potongan Lain')
+            ->form([
+                Forms\Components\TextInput::make('keterangan')
+                    ->label($bonus ? 'Bonus untuk' : 'Potongan untuk')
+                    ->placeholder($bonus ? 'mis. Game 5' : 'mis. ganti pipa')
+                    ->datalist($bonus ? ['Game 4', 'Game 5', 'Game 6'] : [])
+                    ->required()
+                    ->maxLength(255),
+                Forms\Components\TextInput::make('nominal')
+                    ->numeric()
+                    ->prefix('Rp')
+                    ->minValue(1)
+                    ->required(),
+                Forms\Components\DatePicker::make('tanggal')
+                    ->label('Tanggal kejadian (opsional)')
+                    ->default(now()),
+                Forms\Components\Textarea::make('catatan')
+                    ->label('Catatan / detail')
+                    ->rows(2),
+            ])
+            ->action(function (PayrollRun $record, array $data) use ($jenis, $bonus): void {
+                try {
+                    app(PayrollService::class)->tambahPenyesuaian(
+                        $record,
+                        $jenis,
+                        $data['keterangan'],
+                        (float) $data['nominal'],
+                        auth()->user(),
+                        $data['tanggal'] ?? null,
+                        $data['catatan'] ?? null,
+                    );
+                    Notification::make()->success()->title($bonus ? 'Bonus ditambahkan' : 'Potongan ditambahkan')->send();
+                } catch (BusinessRuleException|AuthorizationException $e) {
+                    Notification::make()->danger()->title('Gagal')->body($e->getMessage())->send();
+                }
+            });
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -221,6 +324,14 @@ class PayrollRunResource extends BaseResource
                     Infolists\Components\TextEntry::make('status')->badge(),
                     Infolists\Components\TextEntry::make('periode')
                         ->state(fn (PayrollRun $r): string => $r->periode_mulai->format('d M Y').' – '.$r->periode_selesai->format('d M Y')),
+                ]),
+            Infolists\Components\Section::make('Bonus & Potongan Lain (input admin)')
+                ->description('Gunakan tombol + Input Bonus / + Input Potongan Lain di kanan atas. Bisa lebih dari satu.')
+                ->schema([
+                    Infolists\Components\ViewEntry::make('penyesuaian')
+                        ->hiddenLabel()
+                        ->view('payroll._penyesuaian')
+                        ->columnSpanFull(),
                 ]),
             Infolists\Components\Section::make('Rincian Gaji')
                 ->schema([

@@ -14,6 +14,7 @@ use App\Enums\RoleName;
 use App\Exceptions\BusinessRuleException;
 use App\Models\DailyAttendance;
 use App\Models\PayrollRun;
+use App\Models\PayrollRunAdjustment;
 use App\Models\TechnicianAdvance;
 use App\Models\TechnicianAdvanceRepayment;
 use App\Models\TechnicianEarlyLeave;
@@ -30,9 +31,9 @@ use Illuminate\Support\Facades\DB;
  * Penggajian teknisi (dev-plan/hrd/02). Fokus hitungan & status; slip dirender
  * dari PayrollRun + items.
  *
- * Gaji bersih = Gaji Pokok + Bonus Bulanan + Bonus Umum + Bonus Mingguan
+ * Gaji bersih = Gaji Pokok + Bonus Bulanan + Bonus Umum + Bonus Lain + Bonus Mingguan
  *               − Bonus Mingguan (sudah dibayar pekanan) − Denda Telat
- *               − Potongan OFF (kelebihan kuota) − BPJS TK − Kasbon.
+ *               − Potongan OFF (kelebihan kuota) − BPJS TK − Kasbon − Potongan Lain.
  */
 class PayrollService
 {
@@ -184,7 +185,7 @@ class PayrollService
         $profil = $run === null ? null : TechnicianPayrollProfile::where('user_id', $userId)->first();
 
         if ($run !== null && $profil !== null) {
-            $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh);
+            $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh, $run->periode_selesai);
         }
     }
 
@@ -211,7 +212,7 @@ class PayrollService
             ->where('status', PayrollStatus::Draft->value)
             ->whereDate('periode_selesai', '>=', CarbonImmutable::parse($tanggal)->toDateString())
             ->get()
-            ->each(fn (PayrollRun $run) => $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh));
+            ->each(fn (PayrollRun $run) => $this->proses($profil, $run->periode_mulai, $run->dihitung_oleh, $run->periode_selesai));
     }
 
     /**
@@ -272,9 +273,158 @@ class PayrollService
         return $alokasi;
     }
 
-    private function proses(TechnicianPayrollProfile $profil, CarbonInterface $mulaiAwal, ?int $actorId): PayrollRun
+    /**
+     * Hitung ulang gaji draft memakai periode yang TERSIMPAN (bukan diturunkan
+     * ulang dari cut-off) — penting bagi periode yang diedit manual (poin 28).
+     */
+    public function hitungUlang(PayrollRun $run, User $actor): PayrollRun
     {
-        [$mulai, $selesai] = $this->rentangPeriodeProfil($profil, $mulaiAwal);
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+
+        $profil = TechnicianPayrollProfile::where('user_id', $run->user_id)->first();
+
+        if ($profil === null) {
+            throw new BusinessRuleException('Profil gaji teknisi ini tidak ada.');
+        }
+
+        return $this->proses($profil, $run->periode_mulai, $actor->id, $run->periode_selesai);
+    }
+
+    /**
+     * Ubah tanggal mulai/selesai periode gaji (revisi 17 Nov 2026 poin 28) —
+     * hanya draft. Ditolak bila tumpang tindih dengan gaji lain teknisi yang
+     * sama (hindari dobel bayar); hapus dulu gaji yang salah input.
+     */
+    public function ubahPeriode(PayrollRun $run, CarbonInterface $mulai, CarbonInterface $selesai, User $actor): PayrollRun
+    {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+        $this->pastikanDraft($run, 'Periode hanya bisa diubah saat gaji masih draft.');
+
+        $mulai = CarbonImmutable::parse($mulai)->startOfDay();
+        $selesai = CarbonImmutable::parse($selesai)->startOfDay();
+
+        if ($selesai->lt($mulai)) {
+            throw new BusinessRuleException('Tanggal selesai tidak boleh sebelum tanggal mulai.');
+        }
+
+        $profil = TechnicianPayrollProfile::where('user_id', $run->user_id)->first();
+
+        if ($profil === null) {
+            throw new BusinessRuleException('Profil gaji teknisi ini tidak ada.');
+        }
+
+        $bentrok = PayrollRun::query()
+            ->where('user_id', $run->user_id)
+            ->whereKeyNot($run->id)
+            ->whereDate('periode_mulai', '<=', $selesai->toDateString())
+            ->whereDate('periode_selesai', '>=', $mulai->toDateString())
+            ->first();
+
+        if ($bentrok !== null) {
+            throw new BusinessRuleException(
+                'Periode tumpang tindih dengan gaji lain teknisi ini ('
+                .$bentrok->periode_mulai->format('d M Y').' – '.$bentrok->periode_selesai->format('d M Y')
+                .'). Hapus gaji yang salah input dulu.'
+            );
+        }
+
+        return DB::transaction(function () use ($run, $profil, $mulai, $selesai, $actor): PayrollRun {
+            $run->update([
+                'periode_mulai' => $mulai->toDateString(),
+                'periode_selesai' => $selesai->toDateString(),
+            ]);
+
+            return $this->proses($profil, $mulai, $actor->id, $selesai);
+        });
+    }
+
+    /**
+     * Hapus gaji draft yang salah input (revisi 17 Nov 2026 poin 28). Gaji
+     * yang sudah di-ACC/dibayar tidak bisa dihapus.
+     */
+    public function hapus(PayrollRun $run, User $actor): void
+    {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+        $this->pastikanDraft($run, 'Hanya gaji draft yang bisa dihapus.');
+
+        DB::transaction(function () use ($run): void {
+            $run->items()->delete();
+            $run->adjustments()->delete();
+            $run->delete();
+        });
+    }
+
+    /**
+     * Tambah bonus / potongan lain (revisi 17 Nov 2026 poin 29) — boleh
+     * berkali-kali; gaji langsung dihitung ulang.
+     */
+    public function tambahPenyesuaian(
+        PayrollRun $run,
+        PayrollItemJenis $jenis,
+        string $keterangan,
+        float $nominal,
+        User $actor,
+        ?string $tanggal = null,
+        ?string $catatan = null,
+    ): PayrollRunAdjustment {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+        $this->pastikanDraft($run, 'Bonus/potongan hanya bisa diinput saat gaji masih draft.');
+
+        $keterangan = trim($keterangan);
+
+        if ($keterangan === '') {
+            throw new BusinessRuleException('Keterangan wajib diisi (mis. "ganti pipa" atau "Game 5").');
+        }
+
+        if ($nominal <= 0) {
+            throw new BusinessRuleException('Nominal harus lebih dari 0.');
+        }
+
+        return DB::transaction(function () use ($run, $jenis, $keterangan, $nominal, $actor, $tanggal, $catatan): PayrollRunAdjustment {
+            $adj = $run->adjustments()->create([
+                'jenis' => $jenis->value,
+                'keterangan' => $keterangan,
+                'tanggal' => filled($tanggal) ? CarbonImmutable::parse($tanggal)->toDateString() : null,
+                'nominal' => round($nominal, 2),
+                'catatan' => filled($catatan) ? trim($catatan) : null,
+                'dibuat_oleh' => $actor->id,
+            ]);
+
+            $this->hitungUlang($run, $actor);
+
+            return $adj;
+        });
+    }
+
+    public function hapusPenyesuaian(PayrollRunAdjustment $adj, User $actor): void
+    {
+        $this->assertRole($actor, self::PENGELOLA_ROLES);
+
+        $run = $adj->payrollRun;
+        $this->pastikanDraft($run, 'Bonus/potongan hanya bisa dihapus saat gaji masih draft.');
+
+        DB::transaction(function () use ($adj, $run, $actor): void {
+            $adj->delete();
+            $this->hitungUlang($run, $actor);
+        });
+    }
+
+    private function pastikanDraft(PayrollRun $run, string $pesan): void
+    {
+        $run->refresh();
+
+        if (! $run->draft()) {
+            throw new BusinessRuleException($pesan);
+        }
+    }
+
+    private function proses(TechnicianPayrollProfile $profil, CarbonInterface $mulaiAwal, ?int $actorId, ?CarbonInterface $selesaiPasti = null): PayrollRun
+    {
+        // Periode eksplisit (gaji yang sudah ada / diedit manual) dipakai apa
+        // adanya; tanpa itu diturunkan dari cut-off profil.
+        [$mulai, $selesai] = $selesaiPasti !== null
+            ? [CarbonImmutable::parse($mulaiAwal)->startOfDay(), CarbonImmutable::parse($selesaiPasti)->endOfDay()]
+            : $this->rentangPeriodeProfil($profil, $mulaiAwal);
 
         $existing = PayrollRun::query()
             ->where('user_id', $profil->user_id)
@@ -355,9 +505,14 @@ class PayrollService
 
         $bonusUmum = (float) ($existing->bonus_umum ?? 0);
 
+        // Bonus/potongan lain input admin (poin 29): bertahan saat hitung ulang.
+        $penyesuaian = $existing?->adjustments()->get() ?? collect();
+        $bonusLain = (float) $penyesuaian->where('jenis', PayrollItemJenis::Bonus)->sum('nominal');
+        $potonganLain = (float) $penyesuaian->where('jenis', PayrollItemJenis::Potongan)->sum('nominal');
+
         // Kasbon dipotong setelah semua komponen lain (gaji tidak sampai negatif).
-        $sebelumKasbon = (float) $profil->gaji_pokok + $bonusBulanan + $bonusUmum
-            - $dendaTelat - $potonganOff - $potonganSetengahHari - (float) $profil->potongan_bpjs_tk;
+        $sebelumKasbon = (float) $profil->gaji_pokok + $bonusBulanan + $bonusUmum + $bonusLain
+            - $potonganLain - $dendaTelat - $potonganOff - $potonganSetengahHari - (float) $profil->potongan_bpjs_tk;
         $potonganKasbon = round(array_sum(array_column(
             $this->alokasiKasbon($profil->user_id, $mulai, $selesai, $sebelumKasbon),
             'nominal'
@@ -368,7 +523,8 @@ class PayrollService
         return DB::transaction(function () use (
             $existing, $profil, $mulai, $selesai, $actorId, $bulananPerKategori, $bonusBulanan,
             $bonusMingguan, $bonusUmum, $jumlahTelat, $dendaTelat, $jumlahOff, $kelebihanOff,
-            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari, $potonganKasbon, $adaKasbonTerlewat
+            $potonganOff, $jumlahSetengahHari, $potonganSetengahHari, $potonganKasbon, $adaKasbonTerlewat,
+            $penyesuaian, $bonusLain, $potonganLain
         ): PayrollRun {
             $run = $existing ?? new PayrollRun;
 
@@ -380,6 +536,8 @@ class PayrollService
                 'bonus_bulanan' => $bonusBulanan,
                 'bonus_umum' => $bonusUmum,
                 'bonus_mingguan' => $bonusMingguan,
+                'total_bonus_lain' => round($bonusLain, 2),
+                'total_potongan_lain' => round($potonganLain, 2),
                 'jumlah_hari_telat' => $jumlahTelat,
                 'total_denda_telat' => round($dendaTelat, 2),
                 'jumlah_hari_off' => $jumlahOff,
@@ -429,6 +587,20 @@ class PayrollService
                     'kategori' => 'dibayar_mingguan',
                     'label' => 'Sudah dibayar mingguan (Games 4,5,6)',
                     'nominal' => round($bonusMingguan, 2),
+                    'urutan' => ++$urutan,
+                ]);
+            }
+
+            foreach ($penyesuaian as $adj) {
+                /** @var PayrollRunAdjustment $adj */
+                $bonus = $adj->jenis === PayrollItemJenis::Bonus;
+
+                $run->items()->create([
+                    'jenis' => $adj->jenis->value,
+                    'kategori' => $bonus ? 'bonus_lain' : 'potongan_lain',
+                    'label' => $adj->keterangan,
+                    'nominal' => round((float) $adj->nominal, 2),
+                    'referensi' => (string) $adj->id,
                     'urutan' => ++$urutan,
                 ]);
             }
@@ -652,8 +824,10 @@ class PayrollService
         $gaji = (float) $run->gaji_pokok
             + (float) $run->bonus_bulanan
             + (float) $run->bonus_umum
+            + (float) $run->total_bonus_lain
             + (float) $run->bonus_mingguan
             - (float) $run->bonus_mingguan // sudah dibayar pekanan
+            - (float) $run->total_potongan_lain
             - (float) $run->total_denda_telat
             - (float) $run->total_potongan_off
             - (float) $run->total_potongan_setengah_hari

@@ -23,6 +23,7 @@ class PayrollRun extends Model
         'bonus_bulanan',
         'bonus_umum',
         'bonus_mingguan',
+        'total_bonus_lain',
         'jumlah_hari_telat',
         'total_denda_telat',
         'jumlah_hari_off',
@@ -30,6 +31,7 @@ class PayrollRun extends Model
         'jumlah_setengah_hari',
         'total_potongan_setengah_hari',
         'total_potongan_kasbon',
+        'total_potongan_lain',
         'potongan_bpjs_tk',
         'gaji_bersih',
         'status',
@@ -50,6 +52,8 @@ class PayrollRun extends Model
             'bonus_bulanan' => 'decimal:2',
             'bonus_umum' => 'decimal:2',
             'bonus_mingguan' => 'decimal:2',
+            'total_bonus_lain' => 'decimal:2',
+            'total_potongan_lain' => 'decimal:2',
             'total_denda_telat' => 'decimal:2',
             'total_potongan_off' => 'decimal:2',
             'total_potongan_setengah_hari' => 'decimal:2',
@@ -69,6 +73,11 @@ class PayrollRun extends Model
     public function items(): HasMany
     {
         return $this->hasMany(PayrollRunItem::class)->orderBy('urutan')->orderBy('id');
+    }
+
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(PayrollRunAdjustment::class)->orderBy('tanggal')->orderBy('id');
     }
 
     public function dihitungOleh(): BelongsTo
