@@ -311,6 +311,7 @@ class Presenter
                 'bayar_dilaporkan' => (bool) $order->bayar_dilaporkan_teknisi,
                 'bukti_url' => self::url($order->bukti_pembayaran),
                 'status_bayar' => $bayar?->status?->value,
+                'resi_url' => $order->resi_token ? \App\Support\Url::absolute('resi.show', [$order->id, $order->resi_token]) : null,
                 'setoran_aktif' => $handover ? ['id' => $handover->id, 'status' => $handover->status->value] : null,
                 'saluran' => app(PaymentChannelService::class)->daftarAktif()->map(fn ($c): array => [
                     'id' => $c->id,
