@@ -130,9 +130,18 @@ class Presenter
      */
     public static function kunciTitik(Order $order, User $teknisi): array
     {
-        $penghalang = $order->status === \App\Enums\OrderStatus::Terjadwal
-            ? app(TeknisiService::class)->titikPenghalang($order, $teknisi)
-            : null;
+        $svc = app(TeknisiService::class);
+        $terjadwal = $order->status === \App\Enums\OrderStatus::Terjadwal;
+        $penghalang = $terjadwal ? $svc->titikPenghalang($order, $teknisi) : null;
+
+        // Belum absen datang hari ini: seluruh order yang belum dimulai terkunci.
+        if ($terjadwal && ! $svc->sudahAbsenDatangHariIni($teknisi)) {
+            return [
+                'terkunci' => true,
+                'terkunci_oleh' => null,
+                'pesan_terkunci' => TeknisiService::PESAN_BELUM_ABSEN,
+            ];
+        }
 
         return [
             'terkunci' => $penghalang !== null,

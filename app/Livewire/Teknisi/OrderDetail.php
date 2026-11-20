@@ -144,6 +144,12 @@ class OrderDetail extends Component
         // Titik berurutan: order yang belum dimulai terkunci selama Titik sebelumnya belum beres.
         if ($order->status === \App\Enums\OrderStatus::Terjadwal) {
             $svc = app(TeknisiService::class);
+            if (! $svc->sudahAbsenDatangHariIni(auth()->user())) {
+                session()->flash('error', TeknisiService::PESAN_BELUM_ABSEN);
+                $this->redirect(\App\Support\Url::absolute('teknisi.jadwal'), navigate: true);
+
+                return;
+            }
             $penghalang = $svc->titikPenghalang($order, auth()->user());
             if ($penghalang !== null) {
                 session()->flash('error', $svc->pesanTitikTerkunci($penghalang));

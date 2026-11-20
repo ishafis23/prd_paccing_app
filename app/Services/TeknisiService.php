@@ -34,6 +34,21 @@ class TeknisiService
 
     public function __construct(private readonly StockService $stockService) {}
 
+    public const PESAN_BELUM_ABSEN = 'Absen datang dulu sebelum mengerjakan order. Buka menu Absensi.';
+
+    public function sudahAbsenDatangHariIni(User $teknisi): bool
+    {
+        if (! config('absensi.wajib_sebelum_berangkat', true)) {
+            return true;
+        }
+
+        return \App\Models\DailyAttendance::query()
+            ->where('user_id', $teknisi->id)
+            ->whereDate('tanggal', now()->toDateString())
+            ->whereNotNull('jam_datang')
+            ->exists();
+    }
+
     /**
      * Slider "mulai berangkat ke lokasi" (gaya ojek online).
      * Order: terjadwal -> menuju_lokasi.
@@ -45,6 +60,11 @@ class TeknisiService
 
         if ($order->status !== OrderStatus::Terjadwal) {
             throw new BusinessRuleException('Order harus berstatus terjadwal sebelum berangkat.');
+        }
+
+        // Masukan client (20 Nov 2026): wajib absen datang dulu sebelum mengakses pekerjaan Titik 1 dst.
+        if (! $this->sudahAbsenDatangHariIni($teknisi)) {
+            throw new BusinessRuleException(self::PESAN_BELUM_ABSEN);
         }
 
         $penghalangTitik = $this->titikPenghalang($order, $teknisi);

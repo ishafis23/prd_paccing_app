@@ -346,3 +346,20 @@ it('riwayat memuat catatan_pengerjaan teknisi', function () {
     $this->getJson('/api/v1/riwayat')->assertOk()
         ->assertJsonPath('data.0.catatan_pengerjaan', 'Cuci standar, besok lanjut outdoor');
 });
+
+it('wajib absen datang hari ini: belum absen -> order terkunci & berangkat ditolak', function () {
+    config(['absensi.wajib_sebelum_berangkat' => true]);
+    $order = ($this->buatOrder)(1, OrderStatus::Terjadwal);
+
+    Sanctum::actingAs($this->teknisi);
+    $this->getJson("/api/v1/order/{$order->id}")->assertOk()
+        ->assertJsonPath('data.terkunci', true)
+        ->assertJsonPath('data.pesan_terkunci', \App\Services\TeknisiService::PESAN_BELUM_ABSEN);
+    $this->getJson('/api/v1/jadwal')->assertOk()->assertJsonPath('data.jadwal.0.terkunci', true);
+    $this->postJson("/api/v1/order/{$order->id}/berangkat")->assertStatus(422)->assertJsonPath('code', 'aturan_bisnis');
+
+    DailyAttendance::create(['user_id' => $this->teknisi->id, 'tanggal' => today()->toDateString(), 'jam_datang' => now()]);
+
+    $this->getJson("/api/v1/order/{$order->id}")->assertJsonPath('data.terkunci', false);
+    $this->postJson("/api/v1/order/{$order->id}/berangkat")->assertOk()->assertJsonPath('data.status', 'menuju_lokasi');
+});
